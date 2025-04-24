@@ -1,6 +1,6 @@
-# rust-state-machine-tutorial README
+# Gitorial VS-Code Plugin README
 
-This is the README for your extension "rust-state-machine-tutorial". After writing up a brief description, we recommend including the following sections.
+This is the README for your extension "gitorial-vs-code-plugin". After writing up a brief description, we recommend including the following sections.
 
 ## Features
 

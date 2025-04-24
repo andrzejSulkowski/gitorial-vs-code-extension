@@ -1,71 +1,70 @@
-# rust-state-machine-tutorial README
+# VS Code Extension - Gitorial 
+**(🚧 Currently Under Development 🚧)A**
 
-This is the README for your extension "rust-state-machine-tutorial". After writing up a brief description, we recommend including the following sections.
+A VS Code extension that enables interactive, step-by-step, [Gitorial-based](https://github.com/gitorial-sdk) tutorials directly in your editor.
 
 ## Features
 
-Describe specific features of your extension including screenshots of your extension in action. Image paths are relative to this README file.
+- Clone tutorial repositories with a simple command
+- Navigate through structured step-by-step tutorials
+- Rich Markdown content for each tutorial step
+- Persistent state that remembers your progress
+- Easily follow coding lessons at your own pace
 
-For example if there is an image subfolder under your extension project workspace:
+## How to Use
 
-\!\[feature X\]\(images/feature-x.png\)
+### For Tutorial Users
 
-> Tip: Many popular extensions utilize animations. This is an excellent way to show off your extension! We recommend short, focused animations that are easy to follow.
+1. **Clone a Tutorial**
+   - Open the command palette with `Ctrl+Shift+P` (Windows/Linux) or `Cmd+Shift+P` (Mac)
+   - Run the command `Gitorial: Clone New Tutorial`
+   - Enter the Git URL of a tutorial repository (or use the default example)
+   - Select a folder to clone the tutorial into
 
-## Requirements
+2. **Open a Tutorial**
+   - Run the command `Gitorial: Open Tutorial` from the command palette
+   - Select from your available tutorials
+   - Follow the instructions in the tutorial webview panel
+   - Use the "Next" and "Back" buttons to navigate through tutorial steps
 
-If you have any requirements or dependencies, add a section describing those and how to install and configure them.
+### For Tutorial Authors
+Take a look at the official documentation [here](https://github.com/gitorial-sdk)
 
-## Extension Settings
+## How It Works
 
-Include if your extension adds any VS Code settings through the `contributes.configuration` extension point.
+The extension:
+1. Clones the tutorial repository into a user-selected location
+2. Discovers steps by reading numbered directories in the `steps/` folder
+3. Parses metadata and README files to build the tutorial structure
+4. Renders tutorial content as a webview with navigation controls
+5. Maintains your progress between VS Code sessions
 
-For example:
+## Development
 
-This extension contributes the following settings:
+### Prerequisites
 
-* `myExtension.enable`: Enable/disable this extension.
-* `myExtension.thing`: Set to `blah` to do something.
+- Node.js and npm
+- VS Code
 
-## Known Issues
+### Setup
 
-Calling out known issues can help limit users opening duplicate issues against your extension.
+1. Clone this repository
+2. Run `npm install` to install dependencies
+3. Run `npm run compile` to transpile the code
+4. Open the project in VS Code
+5. Press `F5` _(or open via command palette: `Debug: Start Debugging`)_ to run the extension in a development host
+6. Press `F5` again and run the extensions commands found under `Gitorial:*`
 
-## Release Notes
+### Project Structure
 
-Users appreciate release notes as you update your extension.
+- `src/extension.ts` - Main extension code
+- `src/types.ts` - TypeScript types and interfaces
 
-### 1.0.0
+### Key Dependencies
 
-Initial release of ...
+- `simple-git` - Git operations
+- `markdown-it` - Markdown rendering
 
-### 1.0.1
+## License
 
-Fixed issue #.
-
-### 1.1.0
-
-Added features X, Y, and Z.
-
----
-
-## Following extension guidelines
-
-Ensure that you've read through the extensions guidelines and follow the best practices for creating your extension.
-
-* [Extension Guidelines](https://code.visualstudio.com/api/references/extension-guidelines)
-
-## Working with Markdown
-
-You can author your README using Visual Studio Code. Here are some useful editor keyboard shortcuts:
-
-* Split the editor (`Cmd+\` on macOS or `Ctrl+\` on Windows and Linux).
-* Toggle preview (`Shift+Cmd+V` on macOS or `Shift+Ctrl+V` on Windows and Linux).
-* Press `Ctrl+Space` (Windows, Linux, macOS) to see a list of Markdown snippets.
-
-## For more information
-
-* [Visual Studio Code's Markdown Support](http://code.visualstudio.com/docs/languages/markdown)
-* [Markdown Syntax Reference](https://help.github.com/articles/markdown-basics/)
-
-**Enjoy!**
+MIT

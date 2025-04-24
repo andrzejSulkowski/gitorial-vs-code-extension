@@ -1,21 +1,26 @@
 {
-  "name": "rust-state-machine-tutorial",
-  "displayName": "rust-state-machine-tutorial",
-  "description": "Interactive VS Code extension that guides you step-by-step through Shawn Tabrizi’s Rust State Machine tutorial, complete with code demos, inline explanations, and easy navigation.",
+  "name": "gitorial",
+  "displayName": "Gitorial",
+  "description": "Interactive VS Code extension that guides you step-by-step through Git-based tutorials with inline explanations and easy navigation.",
   "version": "0.0.1",
+  "type": "commonjs",
   "engines": {
     "vscode": "^1.99.0"
   },
   "categories": [
+    "Education",
     "Other"
   ],
-  "activationEvents": [],
   "main": "./out/extension.js",
   "contributes": {
     "commands": [
       {
-        "command": "rust-state-machine-tutorial.helloWorld",
-        "title": "Hello World"
+        "command": "gitorial.cloneTutorial",
+        "title": "Gitorial: Clone New Tutorial"
+      },
+      {
+        "command": "gitorial.openTutorial",
+        "title": "Gitorial: Open Tutorial"
       }
     ]
   },
@@ -28,14 +33,19 @@
     "test": "vscode-test"
   },
   "devDependencies": {
-    "@types/vscode": "^1.99.0",
+    "@types/markdown-it": "^14.1.2",
     "@types/mocha": "^10.0.10",
     "@types/node": "20.x",
+    "@types/vscode": "^1.99.0",
     "@typescript-eslint/eslint-plugin": "^8.28.0",
     "@typescript-eslint/parser": "^8.28.0",
-    "eslint": "^9.23.0",
-    "typescript": "^5.8.2",
     "@vscode/test-cli": "^0.0.10",
-    "@vscode/test-electron": "^2.4.1"
+    "@vscode/test-electron": "^2.4.1",
+    "eslint": "^9.23.0",
+    "typescript": "^5.8.2"
+  },
+  "dependencies": {
+    "markdown-it": "^14.1.0",
+    "simple-git": "^3.27.0"
   }
 }

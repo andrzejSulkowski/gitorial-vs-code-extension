@@ -14,7 +14,6 @@ const tutorials = new Map<string, Tutorial>();
 export async function activate(context: vscode.ExtensionContext) {
   console.log("🦀 Gitorial engine active");
 
-  // Register commands
   context.subscriptions.push(
     vscode.commands.registerCommand("gitorial.cloneTutorial", () => cloneTutorial(context)),
     vscode.commands.registerCommand("gitorial.openTutorial", () => openTutorialSelector())
@@ -64,126 +63,146 @@ async function cloneRepo(repoUrl: string, targetDir: string): Promise<void> {
   const git: SimpleGit = simpleGit({ baseDir: targetDir });
   const branches = await git.branch();
   
-  // Check for gitorial or master branch
-  const tutorialBranch = branches.all.includes("gitorial")
-    ? "gitorial"
-    : branches.all.includes("master")
-    ? "master"
-    : null;
+  let gitorialBranch = null;
   
-  if (!tutorialBranch) {
-    throw new Error("No gitorial or master branch found.");
+  if (branches.all.includes("gitorial")) {
+    gitorialBranch = "gitorial";
+  } 
+  else {
+    const remoteGitorial = branches.all.find(branch => 
+      branch.includes('/gitorial') ||
+      branch === 'remotes/origin/gitorial' ||
+      branch === 'origin/gitorial'
+    );
+    
+    if (remoteGitorial) {
+      try {
+        await git.checkout(["-b", "gitorial", "--track", "origin/gitorial"]);
+        gitorialBranch = "gitorial";
+        console.log("Created local gitorial branch tracking remote");
+      } catch (error) {
+        console.error("Error creating tracking branch:", error);
+        try {
+          await git.fetch(["origin", "gitorial:gitorial"]);
+          await git.checkout("gitorial");
+          gitorialBranch = "gitorial";
+          console.log("Created local gitorial branch via fetch");
+        } catch (fetchError) {
+          console.error("Error fetching gitorial branch:", fetchError);
+        }
+      }
+    }
   }
   
-  await git.checkout(tutorialBranch);
+  if (!gitorialBranch) {
+    throw new Error("No gitorial branch found.");
+  }
 }
 
 /**
- * Load tutorial structure from the cloned repository
+ * Load tutorial structure from the cloned repository by reading commits
  */
 async function loadTutorial(
   context: vscode.ExtensionContext, 
   repoUrl: string, 
   targetDir: string
 ): Promise<string | null> {
-  const stepsDir = path.join(targetDir, "steps");
-  const stepDirs = findStepDirectories(stepsDir);
-  const steps = loadSteps(stepsDir, stepDirs);
+  try {
+    const git: SimpleGit = simpleGit({ baseDir: targetDir });
+    
+    const log = await git.log();
+    
+    if (!log.all || log.all.length === 0) {
+      vscode.window.showErrorMessage("No commits found in the gitorial branch.");
+      return null;
+    }
 
-  if (steps.length === 0) {
-    vscode.window.showErrorMessage("No valid tutorial steps found.");
+    // Reverse it to get oldest commits first
+    const commits = [...log.all].reverse();
+    
+    const steps = extractStepsFromCommits(commits, targetDir);
+    
+    if (steps.length === 0) {
+      vscode.window.showErrorMessage("No valid tutorial steps found in commit history.");
+      return null;
+    }
+
+    const id = path.basename(repoUrl).replace(/\.git$/, "");
+    const humanTitle = formatTitleFromId(id);
+    const savedStep = context.globalState.get<number>(`tutorial:${id}:step`, 0);
+
+    tutorials.set(id, {
+      repoUrl,
+      localPath: targetDir,
+      title: humanTitle,
+      steps,
+      currentStep: savedStep,
+    });
+    
+    vscode.window.showInformationMessage(
+      `Loaded tutorial "${humanTitle}" with ${steps.length} steps.`
+    );
+    
+    return id;
+  } catch (error) {
+    console.error("Error loading tutorial:", error);
+    vscode.window.showErrorMessage(`Failed to load tutorial: ${error}`);
     return null;
   }
-
-  const id = path.basename(repoUrl).replace(/\.git$/, "");
-  const humanTitle = formatTitleFromId(id);
-  const savedStep = context.globalState.get<number>(`tutorial:${id}:step`, 0);
-
-  tutorials.set(id, {
-    repoUrl,
-    localPath: targetDir,
-    title: humanTitle,
-    steps,
-    currentStep: savedStep,
-  });
-  
-  vscode.window.showInformationMessage(
-    `Loaded tutorial "${humanTitle}" with ${steps.length} steps.`
-  );
-  
-  return id;
 }
 
 /**
- * Find all step directories that contain metadata
+ * Extract tutorial steps from commit history
  */
-function findStepDirectories(stepsDir: string): string[] {
-  try {
-    const entries = fs.readdirSync(stepsDir, { withFileTypes: true });
-    return entries
-      .filter((d) => d.isDirectory())
-      .map((d) => d.name)
-      .filter((name) =>
-        fs.existsSync(path.join(stepsDir, name, "gitorial_metadata.json"))
-      )
-      .sort((a, b) => parseInt(a, 10) - parseInt(b, 10));
-  } catch (error) {
-    console.error("Error reading steps directory:", error);
-    return [];
-  }
-}
-
-/**
- * Load all tutorial steps from the directories
- */
-function loadSteps(stepsDir: string, stepDirs: string[]): TutorialStep[] {
+function extractStepsFromCommits(commits: any[], repoPath: string): TutorialStep[] {
   const steps: TutorialStep[] = [];
-  
-  for (const dir of stepDirs) {
-    try {
-      const step = loadSingleStep(stepsDir, dir);
-      if (step) {
-        steps.push(step);
-      }
-    } catch (error) {
-      console.error(`Error loading step ${dir}:`, error);
+  const validTypes = ["section", "template", "solution", "action"];
+
+  // Skip the "readme" commit (should be the last one)
+  const filteredCommits = commits.filter(commit => 
+    !commit.message.toLowerCase().startsWith("readme:"));
+
+  for (let i = 0; i < filteredCommits.length; i++) {
+    const commit = filteredCommits[i];
+    const message = commit.message.trim();
+    
+    const colonIndex = message.indexOf(':');
+    if (colonIndex === -1) {
+      console.warn(`Invalid commit message: ${message}`);
+      continue;
+    };
+    
+    const rawType = message.substring(0, colonIndex).toLowerCase();
+    if (!validTypes.includes(rawType)) {
+      console.warn(`Invalid step type: ${rawType}`);
+      continue;
+    };
+    
+    const type = rawType as StepType;
+    const title = message.substring(colonIndex + 1).trim();
+    const hash = commit.hash;
+    
+    const readmePath = path.join(repoPath, "README.md");
+    let markdown = "";
+    
+    if (fs.existsSync(readmePath)) {
+      markdown = fs.readFileSync(readmePath, "utf8");
+    } else {
+      console.warn(`Missing README.md for commit ${hash}`);
+      markdown = `> No README.md found for step "${title}"`;
     }
+    
+    const htmlContent = md.render(markdown);
+    
+    steps.push({
+      id: hash,
+      type,
+      title,
+      htmlContent
+    });
   }
   
   return steps;
-}
-
-/**
- * Load a single tutorial step
- */
-function loadSingleStep(stepsDir: string, dirName: string): TutorialStep | null {
-  const metaPath = path.join(stepsDir, dirName, "gitorial_metadata.json");
-  const readmePath = path.join(stepsDir, dirName, "README.md");
-
-  let raw: any;
-  try {
-    raw = JSON.parse(fs.readFileSync(metaPath, "utf8"));
-  } catch (err) {
-    console.error(`Failed to parse ${metaPath}:`, err);
-    return null;
-  }
-  
-  const commitMsg: string = raw.commitMessage || "";
-  const [rawType, ...titleParts] = commitMsg.split(":");
-  const type = rawType as StepType;
-  const title = titleParts.join(":").trim() || dirName;
-
-  let markdown = "";
-  if (fs.existsSync(readmePath)) {
-    markdown = fs.readFileSync(readmePath, "utf8");
-  } else {
-    console.warn(`Missing README.md for step ${dirName}`);
-    markdown = `> No README.md found for step ${dirName}`;
-  }
-  
-  const htmlContent = md.render(markdown);
-  
-  return { id: dirName, type, title, htmlContent };
 }
 
 /**
@@ -253,7 +272,21 @@ function openTutorial(id: string): void {
 
   const render = () => {
     const step = tutorial.steps[tutorial.currentStep];
-    panel.webview.html = generateTutorialHtml(tutorial, step);
+    checkoutCommit(tutorial.localPath, step.id)
+      .then(() => {
+        updateStepContent(tutorial.localPath, step)
+          .then(() => {
+            panel.webview.html = generateTutorialHtml(tutorial, step);
+          })
+          .catch((error) => {
+            console.error("Error updating step content:", error);
+            panel.webview.html = generateErrorHtml(error.toString());
+          });
+      })
+      .catch((error) => {
+        console.error("Error checking out commit:", error);
+        panel.webview.html = generateErrorHtml(error.toString());
+      });
   };
 
   panel.webview.onDidReceiveMessage((msg) => {
@@ -265,6 +298,66 @@ function openTutorial(id: string): void {
 }
 
 /**
+ * Checkout a specific commit in the repository
+ */
+async function checkoutCommit(repoPath: string, commitHash: string): Promise<void> {
+  const git: SimpleGit = simpleGit({ baseDir: repoPath });
+  await git.checkout(commitHash);
+}
+
+/**
+ * Update the step content by reading the README.md after checkout
+ */
+async function updateStepContent(repoPath: string, step: TutorialStep): Promise<void> {
+  let readmePath = path.join(repoPath, "README.md");
+  
+  if (fs.existsSync(readmePath)) {
+    const markdown = fs.readFileSync(readmePath, "utf8");
+    step.htmlContent = md.render(markdown);
+    return;
+  }
+  
+  try {
+    const files = fs.readdirSync(repoPath);
+    const markdownFiles = files.filter(file => 
+      file.toLowerCase().endsWith('.md') && 
+      fs.statSync(path.join(repoPath, file)).isFile()
+    );
+    
+    if (markdownFiles.length > 0) {
+      const mdPath = path.join(repoPath, markdownFiles[0]);
+      const markdown = fs.readFileSync(mdPath, "utf8");
+      step.htmlContent = md.render(markdown);
+      return;
+    }
+  } catch (error) {
+    console.warn("Error looking for markdown files:", error);
+  }
+  
+  console.warn(`No markdown files found for step ${step.id}`);
+  step.htmlContent = md.render(`
+  > No markdown content found for step "${step.title}"
+  
+  This step is missing documentation. You can still examine the code changes by looking at the files in the workspace.
+  `);
+}
+
+/**
+ * Generate HTML for error display
+ */
+function generateErrorHtml(errorMessage: string): string {
+  return `
+    <!DOCTYPE html><html><head><meta charset="UTF-8">
+    <style>
+      body { font-family: var(--vscode-font-family); padding:16px; }
+      .error { color: var(--vscode-errorForeground); }
+    </style></head><body>
+      <h1>Error</h1>
+      <div class="error">${errorMessage}</div>
+    </body></html>`;
+}
+
+/**
  * Generate HTML for the tutorial webview
  */
 function generateTutorialHtml(tutorial: Tutorial, step: TutorialStep): string {
@@ -273,6 +366,11 @@ function generateTutorialHtml(tutorial: Tutorial, step: TutorialStep): string {
     <style>
       body { font-family: var(--vscode-font-family); padding:16px; }
       .nav { display:flex; align-items:center; margin-bottom:12px; }
+      .step-type { display: inline-block; padding: 2px 6px; border-radius: 3px; font-size: 0.8em; margin-right: 8px; }
+      .section { background-color: var(--vscode-editorInfo-foreground); color: var(--vscode-editor-background); }
+      .template { background-color: var(--vscode-editorWarning-foreground); color: var(--vscode-editor-background); }
+      .solution { background-color: var(--vscode-editorSuccess-foreground); color: var(--vscode-editor-background); }
+      .action { background-color: var(--vscode-editorHint-foreground); color: var(--vscode-editor-background); }
       button { margin:0 8px; padding:4px 12px;
                background: var(--vscode-button-background);
                color: var(--vscode-button-foreground);
@@ -283,6 +381,7 @@ function generateTutorialHtml(tutorial: Tutorial, step: TutorialStep): string {
         <button id="prev" ${
           tutorial.currentStep === 0 ? "disabled" : ""
         }>← Back</button>
+        <span class="step-type ${step.type}">${step.type}</span>
         <strong>${step.title}</strong>
         <span style="margin:0 12px;">(${tutorial.currentStep + 1}/${
     tutorial.steps.length

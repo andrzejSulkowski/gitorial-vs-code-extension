@@ -16,8 +16,87 @@ export async function activate(context: vscode.ExtensionContext) {
 
   context.subscriptions.push(
     vscode.commands.registerCommand("gitorial.cloneTutorial", () => cloneTutorial(context)),
-    vscode.commands.registerCommand("gitorial.openTutorial", () => openTutorialSelector())
+    vscode.commands.registerCommand("gitorial.openTutorial", () => openTutorialSelector(context))
   );
+  
+  detectCurrentGitorial(context);
+}
+
+/**
+ * Detect if the current workspace is a Gitorial repository
+ */
+async function detectCurrentGitorial(context: vscode.ExtensionContext): Promise<boolean> {
+  const workspaceFolders = vscode.workspace.workspaceFolders;
+  if (!workspaceFolders || workspaceFolders.length === 0) {
+    return false;
+  }
+  
+  for (const folder of workspaceFolders) {
+    try {
+      const folderPath = folder.uri.fsPath;
+      const found = await loadExistingGitorial(context, folderPath);
+      if (found) {
+        return true;
+      }
+    } catch (error) {
+      console.error(`Error checking folder ${folder.uri.fsPath}:`, error);
+    }
+  }
+  
+  return false;
+}
+
+/**
+ * Attempt to load an existing Gitorial from a directory
+ * Returns true if a Gitorial was found and loaded
+ */
+async function loadExistingGitorial(context: vscode.ExtensionContext, folderPath: string): Promise<boolean> {
+  try {
+    const git = simpleGit({ baseDir: folderPath });
+    
+    const isRepo = await git.checkIsRepo();
+    if (!isRepo) {
+      return false;
+    }
+    
+    const branches = await git.branch();
+    const hasGitorialBranch = branches.all.some(branch => 
+      branch === 'gitorial' || 
+      branch.includes('/gitorial')
+    );
+    
+    if (hasGitorialBranch) {
+      console.log(`Found Gitorial repository at ${folderPath}`);
+      
+      const remotes = await git.getRemotes(true);
+      let repoUrl = folderPath;
+      
+      if (remotes && remotes.length > 0) {
+        const origin = remotes.find(r => r.name === 'origin');
+        if (origin && origin.refs && origin.refs.fetch) {
+          repoUrl = origin.refs.fetch;
+        }
+      }
+      
+      const tutorialId = await loadTutorial(context, repoUrl, folderPath);
+      if (tutorialId) {
+        const openNow = await vscode.window.showInformationMessage(
+          "Gitorial loaded successfully. Would you like to open it?",
+          'Open Now'
+        );
+        
+        if (openNow === 'Open Now') {
+          openTutorial(tutorialId);
+        }
+        
+        return true;
+      }
+    }
+  } catch (error) {
+    console.error(`Error loading Gitorial from ${folderPath}:`, error);
+  }
+  
+  return false;
 }
 
 /**
@@ -100,6 +179,32 @@ async function cloneRepo(repoUrl: string, targetDir: string): Promise<void> {
 }
 
 /**
+ * Generate a unique tutorial ID from the repository URL
+ */
+function generateTutorialId(repoUrl: string): string {
+  // Remove the .git suffix if present
+  let id = repoUrl.replace(/\.git$/, "");
+  
+  if (id.includes('@')) {
+    const parts = id.split(/[:/]/);
+    id = parts[parts.length - 1];
+  } else {
+    try {
+      const url = new URL(id);
+      const pathParts = url.pathname.split('/').filter(p => p);
+      id = pathParts[pathParts.length - 1];
+    } catch (e) {
+      id = path.basename(id);
+    }
+  }
+  
+  // Replace any non-alphanumeric characters with dashes
+  id = id.replace(/[^a-zA-Z0-9]/g, '-');
+  
+  return id;
+}
+
+/**
  * Load tutorial structure from the cloned repository by reading commits
  */
 async function loadTutorial(
@@ -110,6 +215,45 @@ async function loadTutorial(
   try {
     const git: SimpleGit = simpleGit({ baseDir: targetDir });
     
+    const currentBranch = await git.revparse(['--abbrev-ref', 'HEAD']);
+    if (currentBranch.trim() !== 'gitorial') {
+      console.log(`Currently on branch ${currentBranch}, attempting to checkout gitorial branch`);
+      
+      const branches = await git.branch();
+      
+      if (branches.all.includes('gitorial')) {
+        await git.checkout('gitorial');
+        console.log('Checked out local gitorial branch');
+      } else {
+        const remoteGitorial = branches.all.find(branch => 
+          branch.includes('/gitorial') || 
+          branch === 'remotes/origin/gitorial' ||
+          branch === 'origin/gitorial'
+        );
+        
+        if (remoteGitorial) {
+          try {
+            await git.checkout(['-b', 'gitorial', '--track', 'origin/gitorial']);
+            console.log('Created local gitorial branch tracking remote');
+          } catch (error) {
+            console.error('Error creating tracking branch:', error);
+            
+            try {
+              await git.fetch(['origin', 'gitorial:gitorial']);
+              await git.checkout('gitorial');
+              console.log('Created local gitorial branch via fetch');
+            } catch (fetchError) {
+              console.error('Error fetching gitorial branch:', fetchError);
+              return null;
+            }
+          }
+        } else {
+          console.error('No gitorial branch found in repository');
+          return null;
+        }
+      }
+    }
+    
     const log = await git.log();
     
     if (!log.all || log.all.length === 0) {
@@ -117,17 +261,14 @@ async function loadTutorial(
       return null;
     }
 
-    // Reverse it to get oldest commits first
     const commits = [...log.all].reverse();
-    
     const steps = extractStepsFromCommits(commits, targetDir);
-    
     if (steps.length === 0) {
       vscode.window.showErrorMessage("No valid tutorial steps found in commit history.");
       return null;
     }
 
-    const id = path.basename(repoUrl).replace(/\.git$/, "");
+    const id = generateTutorialId(repoUrl);
     const humanTitle = formatTitleFromId(id);
     const savedStep = context.globalState.get<number>(`tutorial:${id}:step`, 0);
 
@@ -158,7 +299,7 @@ function extractStepsFromCommits(commits: any[], repoPath: string): TutorialStep
   const steps: TutorialStep[] = [];
   const validTypes = ["section", "template", "solution", "action"];
 
-  // Skip the "readme" commit (should be the last one)
+  // Skip the "readme" commit (is expected to be the last one)
   const filteredCommits = commits.filter(commit => 
     !commit.message.toLowerCase().startsWith("readme:"));
 
@@ -231,25 +372,63 @@ async function promptToOpenTutorial(tutorialId: string): Promise<void> {
 /**
  * Show a selector to choose from available tutorials
  */
-async function openTutorialSelector(): Promise<void> {
-  if (!tutorials.size) {
-    void vscode.window.showInformationMessage(
-      "No tutorials available. Clone one first."
-    );
+async function openTutorialSelector(context: vscode.ExtensionContext): Promise<void> {
+  // Check first if there are already tutorials loaded
+  if (tutorials.size > 0) {
+    const picks = Array.from(tutorials.entries()).map(([id, t]) => ({
+      label: t.title,
+      id,
+    }));
+    
+    const selection = await vscode.window.showQuickPick(picks, {
+      placeHolder: "Select a tutorial",
+    });
+    
+    if (selection) {
+      openTutorial(selection.id);
+      return;
+    }
+  }
+  
+  const USE_CURRENT = 'Use Current Workspace';
+  const SELECT_DIRECTORY = 'Select Directory';
+  const CLONE_NEW = 'Clone New Tutorial';
+  
+  const option = await vscode.window.showQuickPick(
+    [USE_CURRENT, SELECT_DIRECTORY, CLONE_NEW],
+    { placeHolder: 'How would you like to open a tutorial?' }
+  );
+  
+  if (!option) {
     return;
   }
   
-  const picks = Array.from(tutorials.entries()).map(([id, t]) => ({
-    label: t.title,
-    id,
-  }));
-  
-  const selection = await vscode.window.showQuickPick(picks, {
-    placeHolder: "Select a tutorial",
-  });
-  
-  if (selection) {
-    openTutorial(selection.id);
+  switch (option) {
+    case USE_CURRENT:
+      const foundInCurrent = await detectCurrentGitorial(context);
+      if (!foundInCurrent) {
+        vscode.window.showErrorMessage(
+          "No Gitorial found in current workspace. The workspace must contain a Git repository with a 'gitorial' branch."
+        );
+      }
+      break;
+      
+    case SELECT_DIRECTORY:
+      const folderPick = await vscode.window.showOpenDialog({
+        canSelectFolders: true,
+        canSelectFiles: false,
+        openLabel: "Select Gitorial Directory",
+      });
+      
+      if (folderPick?.length) {
+        const targetDir = folderPick[0].fsPath;
+        await loadExistingGitorial(context, targetDir);
+      }
+      break;
+      
+    case CLONE_NEW:
+      await cloneTutorial(context);
+      break;
   }
 }
 
@@ -277,6 +456,8 @@ function openTutorial(id: string): void {
         updateStepContent(tutorial.localPath, step)
           .then(() => {
             panel.webview.html = generateTutorialHtml(tutorial, step);
+            
+            handleStepType(step, tutorial.localPath);
           })
           .catch((error) => {
             console.error("Error updating step content:", error);
@@ -419,6 +600,69 @@ function handleTutorialNavigation(
     `tutorial:${tutorialId}:step`, 
     tutorial.currentStep
   );
+}
+
+/**
+ * Handle different behaviors based on step type
+ */
+function handleStepType(step: TutorialStep, repoPath: string): void {
+  switch (step.type) {
+    case "section":
+      // For section steps, just show the README - no need to reveal files
+      break;
+      
+    case "template":
+      // For template steps, reveal files and allow editing
+      revealRelevantFiles(repoPath);
+      break;
+      
+    case "solution":
+      // For solution steps, reveal files but possibly in read-only mode
+      revealRelevantFiles(repoPath);
+      break;
+      
+    case "action":
+      // For action steps, reveal files and allow editing
+      revealRelevantFiles(repoPath);
+      break;
+      
+    default:
+      console.warn(`Unknown step type: ${step.type}`);
+      break;
+  }
+}
+
+/**
+ * Reveal relevant files in the editor based on git diff
+ */
+async function revealRelevantFiles(repoPath: string): Promise<void> {
+  try {
+    const git: SimpleGit = simpleGit({ baseDir: repoPath });
+    
+    const currentHash = await git.revparse(['HEAD']);
+    const parentHash = await git.revparse(['HEAD^']);
+    const diff = await git.diff([parentHash, currentHash, '--name-only']);
+    
+    const changedFiles = diff
+      .split('\n')
+      .filter(file => file.trim().length > 0)
+      .filter(file => !file.toLowerCase().endsWith('readme.md'));
+    
+    if (changedFiles.length > 0) {
+      const firstFile = path.join(repoPath, changedFiles[0]);
+      
+      if (fs.existsSync(firstFile)) {
+        const doc = await vscode.workspace.openTextDocument(firstFile);
+        await vscode.window.showTextDocument(doc, vscode.ViewColumn.Two);
+      }
+    }
+    // If no files to open (only README changed), we don't open any file
+    await vscode.commands.executeCommand('workbench.view.explorer');
+    
+    await vscode.commands.executeCommand('revealInExplorer', vscode.Uri.file(repoPath));
+  } catch (error) {
+    console.error("Error revealing files:", error);
+  }
 }
 
 /**

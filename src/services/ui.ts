@@ -1,14 +1,14 @@
 import * as vscode from "vscode";
 import * as path from "path";
 import * as fs from "fs";
-import { Tutorial, TutorialStep } from "../types";
+import * as T from "../types";
 
 /**
  * UI service handling webview and editor interactions
  */
 export class UIService {
   //TODO: create proper html components with a solid ui library or framework
-  generateTutorialHtml(tutorial: Tutorial, step: TutorialStep): string {
+  generateTutorialHtml(tutorial: T.Tutorial, step: T.TutorialStep): string {
     return `
       <!DOCTYPE html><html><head><meta charset="UTF-8">
       <style>
@@ -68,31 +68,37 @@ export class UIService {
   async revealFiles(repoPath: string, changedFiles: string[]): Promise<void> {
     if (changedFiles.length > 0) {
       const firstFile = path.join(repoPath, changedFiles[0]);
-      
+
       if (fs.existsSync(firstFile)) {
         const doc = await vscode.workspace.openTextDocument(firstFile);
         await vscode.window.showTextDocument(doc, vscode.ViewColumn.Two);
       }
     }
 
-    await vscode.commands.executeCommand('workbench.view.explorer');
-    await vscode.commands.executeCommand('revealInExplorer', vscode.Uri.file(repoPath));
+    await vscode.commands.executeCommand("workbench.view.explorer");
+    await vscode.commands.executeCommand(
+      "revealInExplorer",
+      vscode.Uri.file(repoPath)
+    );
   }
 
   /**
    * Handle navigation events from the tutorial webview
    */
-  handleNavigation(msg: any, tutorial: Tutorial, tutorialId: string): void {
-    if (msg.cmd === "next" && tutorial.currentStep < tutorial.steps.length - 1) {
+  handleNavigation(msg: any, tutorial: T.Tutorial, tutorialId: string): void {
+    if (
+      msg.cmd === "next" &&
+      tutorial.currentStep < tutorial.steps.length - 1
+    ) {
       tutorial.currentStep++;
     }
     if (msg.cmd === "prev" && tutorial.currentStep > 0) {
       tutorial.currentStep--;
     }
-    
+
     vscode.commands.executeCommand(
-      'setContext', 
-      `tutorial:${tutorialId}:step`, 
+      "setContext",
+      `tutorial:${tutorialId}:step`,
       tutorial.currentStep
     );
   }

@@ -13,18 +13,19 @@ export class GitService {
   /**
    * Clone a repository to a target directory
    */
-  async cloneRepo(repoUrl: string, targetDir: string): Promise<void> {
+  static async cloneRepo(repoUrl: string, targetDir: string): Promise<GitService> {
     const gitInitial = simpleGit();
     await gitInitial.clone(repoUrl, targetDir);
 
-    this.git = simpleGit({ baseDir: targetDir });
-    await this.setupGitorialBranch();
+    const service = new GitService( targetDir );
+    await service.setupGitorialBranch();
+    return service;
   }
 
   /**
    * Setup the gitorial branch
    */
-  private async setupGitorialBranch(): Promise<void> {
+  async setupGitorialBranch(): Promise<void> {
     const branches = await this.git.branch();
     
     if (branches.all.includes("gitorial")) {
@@ -34,7 +35,8 @@ export class GitService {
     const remoteGitorial = branches.all.find(branch => 
       branch.includes('/gitorial') ||
       branch === 'remotes/origin/gitorial' ||
-      branch === 'origin/gitorial'
+      branch === 'origin/gitorial' ||
+      branch === 'refs/remotes/origin/hack'
     );
     
     if (remoteGitorial) {
@@ -78,6 +80,19 @@ export class GitService {
   }
 
   /**
+   * Gets the Repo URL
+   */
+  async getRepoUrl(): Promise<string> {
+    const { remotes } = await this.getRepoInfo();
+    const origin = remotes.find(r => r.name === 'origin');
+    if (origin && origin.refs && origin.refs.fetch) {
+      return origin.refs.fetch;
+    }else {
+      throw new Error("Couldn't find a repository URL");
+    }
+  }
+
+  /**
    * Get repository information including remotes
    */
   async getRepoInfo(): Promise<{ remotes: RemoteWithRefs[], branches: BranchSummary }> {
@@ -101,10 +116,10 @@ export class GitService {
     return hasGitorialBranch;
   }
   /**
-   * Get commit history
+   * Get commit history from the gitorial branch
    */
-    async getCommitHistory(): Promise<readonly (DefaultLogFields & ListLogLine)[]> {
-        const log = await this.git.log();
-        return log.all;
-    }
+  async getCommitHistory(): Promise<readonly (DefaultLogFields & ListLogLine)[]> {
+    const log = await this.git.log(['gitorial']);
+    return log.all;
+  }
 }

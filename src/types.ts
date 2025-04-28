@@ -8,6 +8,7 @@ interface TutorialStep {
 }
 
 interface Tutorial {
+  id: string;
   repoUrl: string;
   localPath: string;
   title: string;

@@ -79,7 +79,7 @@ export class StepService {
       (commit) => !commit.message.toLowerCase().startsWith("readme:")
     );
 
-    for (let i = 0; i < filteredCommits.length; i++) {
+    for (let i = filteredCommits.length - 1; i >= 0; i--) {
       const commit = filteredCommits[i];
       const message = commit.message.trim();
 

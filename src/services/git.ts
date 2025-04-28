@@ -1,12 +1,16 @@
 import simpleGit, { BranchSummary, DefaultLogFields, ListLogLine, RemoteWithRefs, SimpleGit } from "simple-git";
+import path from "path";
+import vscode from "vscode";
 
 /**
  * Git service class handling all git-related operations
  */
 export class GitService {
   private git: SimpleGit;
+  private repoPath: string;
 
   constructor(repoPath: string) {
+    this.repoPath = repoPath;
     this.git = simpleGit({ baseDir: repoPath });
   }
 
@@ -121,5 +125,44 @@ export class GitService {
   async getCommitHistory(): Promise<readonly (DefaultLogFields & ListLogLine)[]> {
     const log = await this.git.log(['gitorial']);
     return log.all;
+  }
+
+  /**
+   * Show changes between current working directory state and the parent of a specific commit using VS Code's native Source Control diff view
+   * @param commitHash - The hash of the commit to compare against
+   */
+  async showCommitChanges(commitHash: string): Promise<void> {
+    const changedFiles = await this.getChangedFiles();
+    
+    const scheme = `git-${commitHash}`;
+    
+    const disposable = vscode.workspace.registerTextDocumentContentProvider(scheme, {
+      provideTextDocumentContent: async (uri: vscode.Uri) => {
+        const filePath = uri.path.startsWith('/') ? uri.path.slice(1) : uri.path;
+        try {
+          const content = await this.git.show([`${commitHash}:${filePath}`]);
+          return content;
+        } catch (error) {
+          console.error(`Error getting content for ${filePath} from commit ${commitHash}:`, error);
+          return '';
+        }
+      }
+    });
+    
+    for (const file of changedFiles) {
+      const oldUri = vscode.Uri.parse(`${scheme}:/${file}`);
+      const currentUri = vscode.Uri.file(path.join(this.repoPath, file));
+      
+      await vscode.commands.executeCommand(
+        'vscode.diff',
+        oldUri,      // Left side (old version)
+        currentUri,  // Right side (current version)
+        `${path.basename(file)} (${commitHash.slice(0, 7)} ↔ Working Tree)`,
+        { preview: false }
+      );
+    }
+    
+    // Clean up the content provider when done
+    disposable.dispose();
   }
 }

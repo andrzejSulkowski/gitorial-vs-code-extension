@@ -1,7 +1,5 @@
 import * as vscode from "vscode";
 import simpleGit, { SimpleGit } from "simple-git";
-import * as fs from "fs";
-import * as path from "path";
 import * as T from "./types";
 import { TutorialBuilder, Tutorial } from "./services/tutorial";
 import { GitService } from "./services/git";
@@ -59,7 +57,7 @@ async function cloneTutorial(context: vscode.ExtensionContext, uiService: UIServ
       throw new Error("Failed to load Tutorial inside the Tutorial Service");
     }
 
-    promptToOpenTutorial(tutorial, uiService);
+    promptToOpenTutorial(tutorial, uiService, context);
   } catch (error) {
     vscode.window.showErrorMessage(`Failed to clone tutorial: ${error}`);
   }
@@ -90,7 +88,7 @@ async function openTutorialSelector(
     case USE_CURRENT:
       //Open current
       //We check inside `scanWorkspaceFolderForGitorial` is the gitorial exists and is valid qed.
-      openTutorial(tutorial!, uiService);
+      openTutorial(tutorial!, uiService, context);
       break;
     case SELECT_DIRECTORY:
       const folderPick = await vscode.window.showOpenDialog({
@@ -106,7 +104,7 @@ async function openTutorialSelector(
         if (!tutorial) {
           throw new Error("Path was not valid");
         }
-        openTutorial(tutorial!, uiService);
+        openTutorial(tutorial!, uiService, context);
       }
       break;
   }
@@ -138,21 +136,21 @@ async function scanWorkspaceFoldersForGitorial(context: vscode.ExtensionContext)
 /**
  * Ask user if they want to open the tutorial immediately
  */
-async function promptToOpenTutorial(tutorial: Tutorial, uiService: UIService): Promise<void> {
+async function promptToOpenTutorial(tutorial: Tutorial, uiService: UIService, context: vscode.ExtensionContext): Promise<void> {
   const openNow = await vscode.window.showInformationMessage(
     "Tutorial loaded successfully. Would you like to open it now?",
     "Open Now"
   );
 
   if (openNow === "Open Now") {
-    openTutorial(tutorial, uiService);
+    openTutorial(tutorial, uiService, context);
   }
 }
 
 /**
  * Open and display a tutorial in a webview panel
  */
-function openTutorial(tutorial: Tutorial, uiService: UIService): void {
+function openTutorial(tutorial: Tutorial, uiService: UIService, _context: vscode.ExtensionContext): void {
   const panel = vscode.window.createWebviewPanel(
     "gitorial",
     tutorial.title,
@@ -169,7 +167,7 @@ function openTutorial(tutorial: Tutorial, uiService: UIService): void {
           .then(() => {
             panel.webview.html = uiService.generateTutorialHtml(tutorial, step);
 
-            handleStepType(step, tutorial.localPath, uiService, tutorial.gitService);
+            uiService.handleStepType(tutorial);
           })
           .catch((error) => {
             console.error("Error updating step content:", error);
@@ -218,38 +216,6 @@ async function handleTutorialNavigation(msg: any, tutorial: Tutorial): Promise<v
     tutorial.currentStep
   );
 }
-
-/**
- * Handle different behaviors based on step type
- */
-async function handleStepType(step: T.TutorialStep, repoPath: string, uiService: UIService, gitSerivce: GitService): Promise<void> {
-  const changedFiles = await gitSerivce.getChangedFiles();
-  switch (step.type) {
-    case "section":
-      // For section steps, just show the README - no need to reveal files
-      break;
-
-    case "template":
-      // For template steps, reveal files and allow editing
-      uiService.revealFiles(repoPath, changedFiles);
-      break;
-
-    case "solution":
-      // For solution steps, reveal files but possibly in read-only mode
-      uiService.revealFiles(repoPath, changedFiles);
-      break;
-
-    case "action":
-      // For action steps, reveal files and allow editing
-      uiService.revealFiles(repoPath, changedFiles);
-      break;
-
-    default:
-      console.warn(`Unknown step type: ${step.type}`);
-      break;
-  }
-}
-
 
 /**
  * Extension deactivation

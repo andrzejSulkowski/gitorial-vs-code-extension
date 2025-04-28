@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import * as path from "path";
 import * as fs from "fs";
 import * as T from "../types";
+import { Tutorial } from "./tutorial";
 
 /**
  * UI service handling webview and editor interactions
@@ -101,5 +102,47 @@ export class UIService {
       `tutorial:${tutorialId}:step`,
       tutorial.currentStep
     );
+  }
+
+  /**
+   * Handle different behaviors based on step type
+   * @param tutorial - The tutorial 
+   */
+  async handleStepType(tutorial: Tutorial): Promise<void> {
+    const step = tutorial.steps[tutorial.currentStep];
+    const gitService = tutorial.gitService;
+    const repoPath = tutorial.localPath;
+
+    switch (step.type) {
+      case "section":
+        // For section steps, just show the README - no need to reveal files
+        break;
+        
+      case "template":
+        // For template steps, reveal files and allow editing
+        const templateFiles = await gitService.getChangedFiles();
+        await this.revealFiles(repoPath, templateFiles);
+        break;
+        
+      case "solution":
+        // For solution steps, show the diff to compare with user's work
+        const parentCommitHash = tutorial.steps.at(tutorial.currentStep + 1)?.id;
+        if (parentCommitHash) {
+          await gitService.showCommitChanges(parentCommitHash);
+        }else{
+          throw new Error("No parent commit hash found");
+        }
+        break;
+        
+      case "action":
+        // For action steps, reveal files and allow editing
+        const actionFiles = await gitService.getChangedFiles();
+        await this.revealFiles(repoPath, actionFiles);
+        break;
+        
+      default:
+        console.warn(`Unknown step type: ${step.type}`);
+        break;
+    }
   }
 }

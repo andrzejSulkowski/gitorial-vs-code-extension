@@ -222,7 +222,7 @@ export class TutorialPanel {
   }
 
   // Keep solution logic in extension
-  private showSolution() {
+  private async showSolution() {
     this.isShowingSolution = true;
     this.updateWebview();
   }
@@ -230,6 +230,7 @@ export class TutorialPanel {
   // Update webview with new state
   private updateWebview() {
     console.log("Updating webview with new state");
+    this.tutorial.updateStepContent(this.tutorial.steps[this.tutorial.currentStep]);
     this._panel.webview.postMessage({
       command: 'updateTutorial',
       data: {

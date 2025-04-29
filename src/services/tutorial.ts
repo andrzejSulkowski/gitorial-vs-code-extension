@@ -129,7 +129,7 @@ export class Tutorial {
    * @param step - The tutorial step to update
    * @returns A promise that resolves when the step content has been updated
    */
-  async updateStepContent(step: T.TutorialStep): Promise<void> {
+  updateStepContent(step: T.TutorialStep): void {
     const repoPath = this.data.localPath;
     let readmePath = path.join(repoPath, "README.md");
 

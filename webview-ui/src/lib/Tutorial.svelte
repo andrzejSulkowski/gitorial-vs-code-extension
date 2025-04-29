@@ -25,6 +25,16 @@
 
     // Computed values
     $: step = tutorial?.steps[currentStep];
+    $: {
+        if (step) {
+            console.log('Current Step:', {
+                index: currentStep,
+                type: step.type,
+                title: step.title,
+                content: step.htmlContent
+            });
+        }
+    }
 </script>
 
 {#if tutorial}

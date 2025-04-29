@@ -3,6 +3,8 @@ import * as path from 'path';
 import { Disposable, Webview, WebviewPanel, window, Uri, ViewColumn } from "vscode";
 import { getUri } from "../utilities/getUri";
 import { getNonce } from "../utilities/getNonce";
+import * as T from "../types";
+import { Tutorial } from '../services/tutorial';
 
 /**
  * This class manages the state and behavior of HelloWorld webview panels.
@@ -14,18 +16,20 @@ import { getNonce } from "../utilities/getNonce";
  * - Setting the HTML (and by proxy CSS/JavaScript) content of the webview panel
  * - Setting message listeners so data can be passed between the webview and extension
  */
-export class HelloWorldPanel {
-  public static currentPanel: HelloWorldPanel | undefined;
+export class TutorialPanel {
+  public static currentPanel: TutorialPanel | undefined;
   private readonly _panel: WebviewPanel;
   private _disposables: Disposable[] = [];
+  private tutorial: Tutorial;
+  private isShowingSolution: boolean = false;
 
   /**
-   * The HelloWorldPanel class private constructor (called only from the render method).
+   * The TutorialPanel class private constructor (called only from the render method).
    *
    * @param panel A reference to the webview panel
    * @param extensionUri The URI of the directory containing the extension
    */
-  private constructor(panel: WebviewPanel, extensionUri: Uri) {
+  private constructor(panel: WebviewPanel, extensionUri: Uri, tutorial: Tutorial) {
     this._panel = panel;
 
     // Set an event listener to listen for when the panel is disposed (i.e. when the user closes
@@ -37,6 +41,11 @@ export class HelloWorldPanel {
 
     // Set an event listener to listen for messages passed from the webview context
     this._setWebviewMessageListener(this._panel.webview);
+
+    this.tutorial = tutorial;
+
+    // Send initial tutorial data to the webview
+    this.updateWebview();
   }
 
   /**
@@ -45,18 +54,18 @@ export class HelloWorldPanel {
    *
    * @param extensionUri The URI of the directory containing the extension.
    */
-  public static render(extensionUri: Uri) {
-    if (HelloWorldPanel.currentPanel) {
+  public static render(extensionUri: Uri, tutorial: Tutorial) {
+    if (TutorialPanel.currentPanel) {
       // If the webview panel already exists reveal it
-      HelloWorldPanel.currentPanel._panel.reveal(ViewColumn.One);
+      TutorialPanel.currentPanel._panel.reveal(ViewColumn.One);
     } else {
       // If a webview panel does not already exist create and show a new one
       const panel = window.createWebviewPanel(
         // Panel view type
-        "showHelloWorld",
+        "gitorial",
         // Panel title
-        "Hello World",
-        // The editor column the panel should be displayed in
+        tutorial.title,
+        // The editor column the panel should be displayed in, On the right side of the editor while the editor is split into two columns
         ViewColumn.One,
         // Extra panel configurations
         {
@@ -67,7 +76,7 @@ export class HelloWorldPanel {
         }
       );
 
-      HelloWorldPanel.currentPanel = new HelloWorldPanel(panel, extensionUri);
+      TutorialPanel.currentPanel = new TutorialPanel(panel, extensionUri, tutorial);
     }
   }
 
@@ -75,7 +84,7 @@ export class HelloWorldPanel {
    * Cleans up and disposes of webview resources when the webview panel is closed.
    */
   public dispose() {
-    HelloWorldPanel.currentPanel = undefined;
+    TutorialPanel.currentPanel = undefined;
 
     // Dispose of the current webview panel
     this._panel.dispose();
@@ -155,7 +164,7 @@ export class HelloWorldPanel {
     <!DOCTYPE html>
     <html lang="en">
       <head>
-        <title>Hello World</title>
+        <title>Tutorial</title>
         <meta charset="UTF-8" />
         <link rel="icon" type="image/svg+xml" href="${viteSvgUri}" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -180,20 +189,54 @@ export class HelloWorldPanel {
   private _setWebviewMessageListener(webview: Webview) {
     webview.onDidReceiveMessage(
       (message: any) => {
-        const command = message.command;
-        const text = message.text;
-
-        switch (command) {
-          case "hello":
-            // Code that should run in response to the hello message command
-            window.showInformationMessage(text);
-            return;
-          // Add more switch case statements here as more webview message commands
-          // are created within the webview context (i.e. inside media/main.js)
+        switch (message.command) {
+          case "prev":
+            this.goToPreviousStep();
+            break;
+          case "next":
+            this.goToNextStep();
+            break;
+          case "showSolution":
+            this.showSolution();
+            break;
         }
       },
       undefined,
       this._disposables
     );
+  }
+
+  // Keep navigation logic in extension
+  private goToPreviousStep() {
+    if (this.tutorial.currentStep > 0) {
+      this.tutorial.currentStep--;
+      this.updateWebview();
+    }
+  }
+
+  private goToNextStep() {
+    if (this.tutorial.currentStep < this.tutorial.steps.length - 1) {
+      this.tutorial.currentStep++;
+      this.updateWebview();
+    }
+  }
+
+  // Keep solution logic in extension
+  private showSolution() {
+    this.isShowingSolution = true;
+    this.updateWebview();
+  }
+
+  // Update webview with new state
+  private updateWebview() {
+    console.log("Updating webview with new state");
+    this._panel.webview.postMessage({
+      command: 'updateTutorial',
+      data: {
+        tutorial: this.tutorial.getTutorial(),
+        currentStep: this.tutorial.currentStep,
+        isShowingSolution: this.isShowingSolution
+      }
+    });
   }
 }

@@ -1,7 +1,4 @@
 <script lang="ts">
-  import svelteLogo from './assets/svelte.svg'
-  import viteLogo from '/vite.svg'
-  import Counter from './lib/Counter.svelte'
   import Tutorial from './lib/Tutorial.svelte'
   import { onMount } from 'svelte'
 
@@ -12,6 +9,7 @@
   onMount(() => {
     // Listen for messages from the extension
     const handleMessage = (event: MessageEvent) => {
+      console.log("handleMessage", event)
       const message = event.data
       switch (message.command) {
         case 'updateTutorial':
@@ -30,33 +28,13 @@
 </script>
 
 <main>
-  <h1>Gitorial</h1>
-
-  {#if tutorialData}
-    <Tutorial
-      tutorial={tutorialData}
-      currentStep={currentStep}
-      isShowingSolution={isShowingSolution}
-    />
-  {:else}
-    <p>Loading...</p>
-  {/if}
+  <Tutorial />
 </main>
 
 <style>
-  .logo {
-    height: 6em;
-    padding: 1.5em;
-    will-change: filter;
-    transition: filter 300ms;
-  }
-  .logo:hover {
-    filter: drop-shadow(0 0 2em #646cffaa);
-  }
-  .logo.svelte:hover {
-    filter: drop-shadow(0 0 2em #ff3e00aa);
-  }
-  .read-the-docs {
-    color: #888;
+  main {
+    height: 100vh;
+    margin: 0;
+    padding: 0;
   }
 </style>

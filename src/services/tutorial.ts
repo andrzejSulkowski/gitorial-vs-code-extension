@@ -176,6 +176,13 @@ export class Tutorial {
   get currentStep() {
     return this.data.currentStep;
   }
+  set currentStep(step: number) {
+    if (step < 0 || step >= this.data.steps.length) {
+      throw new Error("Invalid step number");
+    }
+    this.data.currentStep = step;
+    this.context.globalState.update(`gitorial:${this.id}:step`, step);
+  }
   async incCurrentStep(increment: number = 1) {
     const nextStep = this.data.currentStep + increment;
     if (nextStep < this.data.steps.length) {

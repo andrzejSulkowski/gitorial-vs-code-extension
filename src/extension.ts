@@ -2,7 +2,7 @@ import * as vscode from "vscode";
 import { TutorialBuilder, Tutorial } from "./services/tutorial";
 import { GitService } from "./services/git";
 import { UIService } from "./services/ui";
-import { HelloWorldPanel } from "./panels/HelloWorldPanel";
+import { TutorialPanel } from "./panels/TutorialPanel";
 
 /**
  * Main extension activation point
@@ -20,9 +20,6 @@ export async function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand("gitorial.openTutorial", () =>
       openTutorialSelector(context, uiService)
     ),
-    vscode.commands.registerCommand("gitorial.showHomePage", () =>
-      HelloWorldPanel.render(context.extensionUri)
-    )
   );
 
   //TODO: Detect and prompt the user if to load an existing gitorial
@@ -155,18 +152,23 @@ async function promptToOpenTutorial(tutorial: Tutorial, uiService: UIService, co
 /**
  * Open and display a tutorial in a webview panel
  */
-async function openTutorial(tutorial: Tutorial, uiService: UIService, _context: vscode.ExtensionContext) {
+async function openTutorial(tutorial: Tutorial, _uiService: UIService, context: vscode.ExtensionContext) {
   console.log("opening tutorial...");
-  let isShowingSolution = false; // Flag to track if we are showing the solution diff
+  //let isShowingSolution = false; // Flag to track if we are showing the solution diff
   
-  const panel = vscode.window.createWebviewPanel(
+
+
+    TutorialPanel.render(context.extensionUri, tutorial);
+
+    /*
+    const render = async () => {
+
+      const panel = vscode.window.createWebviewPanel(
     "gitorial",
     tutorial.title,
     vscode.ViewColumn.One,
     { enableScripts: true }
   );
-
-  const render = async () => {
     console.log("rendering step");
     // Reset flag if we are not on a template step anymore
     if (tutorial.steps[tutorial.currentStep].type !== 'template') {
@@ -197,14 +199,15 @@ async function openTutorial(tutorial: Tutorial, uiService: UIService, _context: 
       console.error("Error updating step content:", error);
       panel.webview.html = uiService.generateErrorHtml(error.toString());
     }
-  };
-
   panel.webview.onDidReceiveMessage(async (msg) => {
     isShowingSolution = await handleTutorialNavigation(msg, tutorial, isShowingSolution); // Update state based on navigation
     await render();
   });
 
   await render();
+  };
+  */
+
 }
 
 /**

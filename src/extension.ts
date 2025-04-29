@@ -154,6 +154,8 @@ async function promptToOpenTutorial(tutorial: Tutorial, uiService: UIService, co
  */
 async function openTutorial(tutorial: Tutorial, uiService: UIService, _context: vscode.ExtensionContext) {
   console.log("opening tutorial...");
+  let isShowingSolution = false; // Flag to track if we are showing the solution diff
+  
   const panel = vscode.window.createWebviewPanel(
     "gitorial",
     tutorial.title,
@@ -163,31 +165,39 @@ async function openTutorial(tutorial: Tutorial, uiService: UIService, _context: 
 
   const render = async () => {
     console.log("rendering step");
+    // Reset flag if we are not on a template step anymore
+    if (tutorial.steps[tutorial.currentStep].type !== 'template') {
+      isShowingSolution = false;
+    }
+    
     const step = tutorial.steps[tutorial.currentStep];
     console.log("step.type", step.type);
+    console.log("isShowingSolution", isShowingSolution);
 
     const currentCommitHash = await tutorial.gitService.getCommitHash();
     if (currentCommitHash !== step.id) {
       try {
         await tutorial.gitService.checkoutCommit(step.id);
-        try {
-          await tutorial.updateStepContent(step)
-          panel.webview.html = uiService.generateTutorialHtml(tutorial, step);
-          uiService.handleStepType(tutorial);
-        } catch (error: any) {
-          console.error("Error updating step content:", error);
-          panel.webview.html = uiService.generateErrorHtml(error.toString());
-        }
       } catch (error: any) {
-        //TODO: handle cases where there are changes and we can't checkout without force
+        // If checkout fails due to local changes, it should be handled in checkoutCommit (force checkout)
         console.error("Error checking out commit:", error);
         panel.webview.html = uiService.generateErrorHtml(error.toString());
+        return; // Stop rendering if checkout fails
       }
+    }
+    
+    try {
+      await tutorial.updateStepContent(step)
+      panel.webview.html = uiService.generateTutorialHtml(tutorial, step, isShowingSolution); // Pass the flag
+      uiService.handleStepType(tutorial);
+    } catch (error: any) {
+      console.error("Error updating step content:", error);
+      panel.webview.html = uiService.generateErrorHtml(error.toString());
     }
   };
 
   panel.webview.onDidReceiveMessage(async (msg) => {
-    handleTutorialNavigation(msg, tutorial);
+    isShowingSolution = await handleTutorialNavigation(msg, tutorial, isShowingSolution); // Update state based on navigation
     await render();
   });
 
@@ -197,19 +207,42 @@ async function openTutorial(tutorial: Tutorial, uiService: UIService, _context: 
 /**
  * Handle navigation events from the tutorial webview
  */
-async function handleTutorialNavigation(msg: any, tutorial: Tutorial): Promise<void> {
+async function handleTutorialNavigation(msg: any, tutorial: Tutorial, isShowingSolution: boolean): Promise<boolean> {
+  const currentStep = tutorial.steps[tutorial.currentStep];
+  let nextIsShowingSolution = isShowingSolution; // Default to current state
+
   if (msg.cmd === "next") {
-    await tutorial.incCurrentStep();
-  }
-  if (msg.cmd === "prev") {
+    if (currentStep.type === 'template' && !isShowingSolution) {
+      // ---> Clicked "Solution" button on a template step <--- 
+      const solutionCommitHash = tutorial.steps.at(tutorial.currentStep + 1)?.id;
+      if (solutionCommitHash) {
+        console.log("Showing solution diff against commit:", solutionCommitHash);
+        await tutorial.gitService.showCommitChanges(solutionCommitHash); // Show the diff
+        nextIsShowingSolution = true; // Set flag to indicate solution is now shown
+        // We DON'T advance the step here, just re-render with "Next" button
+      } else {
+        console.error("Could not find solution commit hash for template step.");
+        // Potentially show error to user
+      }
+    } else {
+      // ---> Clicked regular "Next" or "Next" after solution shown <--- 
+      const increment = (currentStep.type === 'template' && isShowingSolution) ? 2 : 1;
+      await tutorial.incCurrentStep(increment); // Advance 1 or 2 steps
+      nextIsShowingSolution = false; // Reset flag after advancing
+    }
+  } else if (msg.cmd === "prev") {
     await tutorial.decCurrentStep();
+    nextIsShowingSolution = false; // Reset flag when going back
   }
 
+  // Update context for potentially other VS Code features
   vscode.commands.executeCommand(
     "setContext",
     `tutorial:${tutorial.id}:step`,
     tutorial.currentStep
   );
+  
+  return nextIsShowingSolution; // Return the updated state
 }
 
 /**

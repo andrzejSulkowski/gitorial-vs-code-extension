@@ -9,7 +9,9 @@ import { Tutorial } from "./tutorial";
  */
 export class UIService {
   //TODO: create proper html components with a solid ui library or framework
-  generateTutorialHtml(tutorial: T.Tutorial, step: T.TutorialStep): string {
+  generateTutorialHtml(tutorial: T.Tutorial, step: T.TutorialStep, isShowingSolution: boolean = false): string {
+    const nextButtonText = (step.type === 'template' && !isShowingSolution) ? 'Solution →' : 'Next →';
+    
     return `
       <!DOCTYPE html><html><head><meta charset="UTF-8">
       <style>
@@ -37,7 +39,7 @@ export class UIService {
     })</span>
           <button id="next" ${
             tutorial.currentStep === tutorial.steps.length - 1 ? "disabled" : ""
-          }>Next →</button>
+          }>${nextButtonText}</button>
         </div>
         ${step.htmlContent}
         <script>

@@ -168,9 +168,9 @@ export class GitService {
       
       await vscode.commands.executeCommand(
         'vscode.diff',
-        oldUri,      // Left side (old version)
-        currentUri,  // Right side (current version)
-        `${path.basename(file)} (${commitHash.slice(0, 7)} ↔ Working Tree)`,
+        currentUri,  // Left side (User's code)
+        oldUri,      // Right side (Solution)
+        `${path.basename(file)} (Your Code ↔ Solution ${commitHash.slice(0, 7)})`,
         { preview: false }
       );
     }

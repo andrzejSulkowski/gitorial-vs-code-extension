@@ -176,15 +176,17 @@ export class Tutorial {
   get currentStep() {
     return this.data.currentStep;
   }
-  async incCurrentStep() {
-    if (this.data.steps.length > this.data.currentStep + 1) {
-      this.data.currentStep++;
+  async incCurrentStep(increment: number = 1) {
+    const nextStep = this.data.currentStep + increment;
+    if (nextStep < this.data.steps.length) {
+      this.data.currentStep = nextStep;
       await this.saveCurrentStep();
     }
   }
-  async decCurrentStep() {
-    if (this.data.currentStep > 0) {
-      this.data.currentStep--;
+  async decCurrentStep(decrement: number = 1) {
+    const prevStep = this.data.currentStep - decrement;
+    if (prevStep >= 0) {
+      this.data.currentStep = prevStep;
       await this.saveCurrentStep();
     }
   }

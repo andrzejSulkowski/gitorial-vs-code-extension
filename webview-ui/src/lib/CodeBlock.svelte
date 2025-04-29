@@ -47,7 +47,7 @@
   on:mouseleave={() => isHovered = false}
 >
   <pre class="code-container">
-    <code class="language-{language}" bind:this={codeElement}>{code}</code>
+    <code class="language-{language}" bind:this={codeElement}>{code.trim()}</code>
   </pre>
   
   {#if isHovered || copySuccess}

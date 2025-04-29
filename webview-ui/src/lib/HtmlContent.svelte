@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount, mount } from 'svelte';
-  import CodeBlockWrapper from './CodeBlockWrapper.svelte';
+  import CodeBlock from './CodeBlock.svelte';
 
   export let content: string;
 
@@ -21,12 +21,10 @@
           const codeContent = code.textContent || '';
           console.log('Language:', language, 'Content:', codeContent);
           
-          // Create a wrapper element
           const wrapper = document.createElement('div');
           wrapper.className = 'code-block-wrapper';
           
-          // Create and mount the Svelte component
-          mount(CodeBlockWrapper, {
+          mount(CodeBlock, {
             target: wrapper,
             props: {
               code: codeContent,
@@ -34,7 +32,6 @@
             }
           });
 
-          // Replace the pre element with our wrapper
           pre.parentNode?.replaceChild(wrapper, pre);
         }
       });

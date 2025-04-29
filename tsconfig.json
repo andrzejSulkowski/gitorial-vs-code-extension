@@ -7,22 +7,27 @@
 			"ES2022"
 		],
 		"sourceMap": true,
-		"rootDir": "src",
+		"rootDir": ".",
 		"strict": true,
 		//"noImplicitReturns": true,
 		"noFallthroughCasesInSwitch": true,
 		"noUnusedParameters": true,
 		"moduleResolution": "node",
 		"esModuleInterop": true,
-		"skipLibCheck": true
+		"skipLibCheck": false,
+		"paths": {
+			"@shared/*": ["./shared/*"]
+		}
 	},
 	"include": [
-		"src"
+		"src/**/*",
+		"shared/**/*"
 	],
 	"exclude": [
 		"node_modules",
 		"out",
 		"example-tutorial",
-		"**/*.md"
+		"**/*.md",
+		"webview-ui/node_modules"
 	]
 }

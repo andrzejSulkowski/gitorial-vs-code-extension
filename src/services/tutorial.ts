@@ -1,6 +1,6 @@
 import * as path from "path";
 import * as fs from "fs";
-import * as T from "../types";
+import * as T from "@shared/types";
 import * as vscode from "vscode";
 import MarkdownIt from "markdown-it";
 import { GitService } from "./git";

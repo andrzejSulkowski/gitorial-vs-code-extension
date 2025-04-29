@@ -15,7 +15,10 @@
     "checkJs": true,
     "isolatedModules": true,
     "moduleDetection": "force",
-    "composite": true
+    "composite": true,
+    "paths": {
+      "@shared/*": ["../shared/*"]
+    }
   },
-  "include": ["src/**/*.ts", "src/**/*.js", "src/**/*.svelte"]
+  "include": ["src/**/*.ts", "src/**/*.js", "src/**/*.svelte", "../shared/**/*.ts"]
 }

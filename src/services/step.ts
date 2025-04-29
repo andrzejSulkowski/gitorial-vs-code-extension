@@ -1,7 +1,7 @@
 import * as path from "path";
 import * as fs from "fs";
 import MarkdownIt from "markdown-it";
-import { TutorialStep, StepType } from "../types";
+import { TutorialStep, StepType } from "@shared/types";
 import { GitService } from "./git";
 import { DefaultLogFields } from "simple-git";
 import { ListLogLine } from "simple-git";

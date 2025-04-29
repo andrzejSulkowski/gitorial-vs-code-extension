@@ -21,6 +21,10 @@
       {
         "command": "gitorial.openTutorial",
         "title": "Gitorial: Open Tutorial"
+      },
+      {
+        "command": "gitorial.showHomePage",
+        "title": "Gitorial: Show Home Page"
       }
     ]
   },

@@ -12,7 +12,7 @@ export class UIService {
   generateTutorialHtml(tutorial: T.Tutorial, step: T.TutorialStep, isShowingSolution: boolean = false): string {
     const nextButtonText = (step.type === 'template' && !isShowingSolution) ? 'Solution →' : 'Next →';
     
-    return `
+    return /*html*/ `
       <!DOCTYPE html><html><head><meta charset="UTF-8">
       <style>
         body { font-family: var(--vscode-font-family); padding:16px; }
@@ -54,7 +54,7 @@ export class UIService {
    * Generate HTML for error display
    */
   generateErrorHtml(errorMessage: string): string {
-    return `
+    return /*html*/ `
       <!DOCTYPE html><html><head><meta charset="UTF-8">
       <style>
         body { font-family: var(--vscode-font-family); padding:16px; }

@@ -1,8 +1,8 @@
 import * as vscode from "vscode";
-import simpleGit, { SimpleGit } from "simple-git";
 import { TutorialBuilder, Tutorial } from "./services/tutorial";
 import { GitService } from "./services/git";
 import { UIService } from "./services/ui";
+import { HelloWorldPanel } from "./panels/HelloWorldPanel";
 
 /**
  * Main extension activation point
@@ -19,6 +19,9 @@ export async function activate(context: vscode.ExtensionContext) {
     ),
     vscode.commands.registerCommand("gitorial.openTutorial", () =>
       openTutorialSelector(context, uiService)
+    ),
+    vscode.commands.registerCommand("gitorial.showHomePage", () =>
+      HelloWorldPanel.render(context.extensionUri)
     )
   );
 

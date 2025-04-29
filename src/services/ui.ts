@@ -113,6 +113,8 @@ export class UIService {
     const gitService = tutorial.gitService;
     const repoPath = tutorial.localPath;
 
+    console.log("about to handle step", step);
+
     switch (step.type) {
       case "section":
         // For section steps, just show the README - no need to reveal files

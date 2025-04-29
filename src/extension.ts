@@ -1,6 +1,5 @@
 import * as vscode from "vscode";
 import simpleGit, { SimpleGit } from "simple-git";
-import * as T from "./types";
 import { TutorialBuilder, Tutorial } from "./services/tutorial";
 import { GitService } from "./services/git";
 import { UIService } from "./services/ui";
@@ -70,6 +69,7 @@ async function openTutorialSelector(
   context: vscode.ExtensionContext,
   uiService: UIService
 ): Promise<void> {
+  console.log("opening tutorial selector...");
   const USE_CURRENT = "Use Current Workspace";
   const SELECT_DIRECTORY = "Select Directory";
   let option: string | undefined = SELECT_DIRECTORY;
@@ -84,11 +84,13 @@ async function openTutorialSelector(
     if (quickPickChoice) option = quickPickChoice;
   }
 
+  console.log("selected option: ", option);
+
   switch (option) {
     case USE_CURRENT:
       //Open current
       //We check inside `scanWorkspaceFolderForGitorial` is the gitorial exists and is valid qed.
-      openTutorial(tutorial!, uiService, context);
+      await openTutorial(tutorial!, uiService, context);
       break;
     case SELECT_DIRECTORY:
       const folderPick = await vscode.window.showOpenDialog({
@@ -104,7 +106,7 @@ async function openTutorialSelector(
         if (!tutorial) {
           throw new Error("Path was not valid");
         }
-        openTutorial(tutorial!, uiService, context);
+        await openTutorial(tutorial!, uiService, context);
       }
       break;
   }
@@ -143,14 +145,15 @@ async function promptToOpenTutorial(tutorial: Tutorial, uiService: UIService, co
   );
 
   if (openNow === "Open Now") {
-    openTutorial(tutorial, uiService, context);
+    await openTutorial(tutorial, uiService, context);
   }
 }
 
 /**
  * Open and display a tutorial in a webview panel
  */
-function openTutorial(tutorial: Tutorial, uiService: UIService, _context: vscode.ExtensionContext): void {
+async function openTutorial(tutorial: Tutorial, uiService: UIService, _context: vscode.ExtensionContext) {
+  console.log("opening tutorial...");
   const panel = vscode.window.createWebviewPanel(
     "gitorial",
     tutorial.title,
@@ -158,45 +161,37 @@ function openTutorial(tutorial: Tutorial, uiService: UIService, _context: vscode
     { enableScripts: true }
   );
 
-  const render = () => {
+  const render = async () => {
+    console.log("rendering step");
     const step = tutorial.steps[tutorial.currentStep];
-    checkoutCommit(tutorial.localPath, step.id)
-      .then(() => {
-        tutorial
-          .updateStepContent(step)
-          .then(() => {
-            panel.webview.html = uiService.generateTutorialHtml(tutorial, step);
+    console.log("step.type", step.type);
 
-            uiService.handleStepType(tutorial);
-          })
-          .catch((error) => {
-            console.error("Error updating step content:", error);
-            panel.webview.html = uiService.generateErrorHtml(error.toString());
-          });
-      })
-      .catch((error) => {
+    const currentCommitHash = await tutorial.gitService.getCommitHash();
+    if (currentCommitHash !== step.id) {
+      try {
+        await tutorial.gitService.checkoutCommit(step.id);
+        try {
+          await tutorial.updateStepContent(step)
+          panel.webview.html = uiService.generateTutorialHtml(tutorial, step);
+          uiService.handleStepType(tutorial);
+        } catch (error: any) {
+          console.error("Error updating step content:", error);
+          panel.webview.html = uiService.generateErrorHtml(error.toString());
+        }
+      } catch (error: any) {
+        //TODO: handle cases where there are changes and we can't checkout without force
         console.error("Error checking out commit:", error);
         panel.webview.html = uiService.generateErrorHtml(error.toString());
-      });
+      }
+    }
   };
 
-  panel.webview.onDidReceiveMessage((msg) => {
+  panel.webview.onDidReceiveMessage(async (msg) => {
     handleTutorialNavigation(msg, tutorial);
-    render();
+    await render();
   });
 
-  render();
-}
-
-/**
- * Checkout a specific commit in the repository
- */
-async function checkoutCommit(
-  repoPath: string,
-  commitHash: string
-): Promise<void> {
-  const git: SimpleGit = simpleGit({ baseDir: repoPath });
-  await git.checkout(commitHash);
+  await render();
 }
 
 /**

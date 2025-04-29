@@ -73,7 +73,16 @@ export class GitService {
    * Checkout a specific commit
    */
   async checkoutCommit(commitHash: string): Promise<void> {
-    await this.git.checkout(commitHash);
+    try {
+      await this.git.checkout(commitHash);
+    } catch (error: any) {
+      // If there are local changes, force checkout
+      if (error.message?.includes('Your local changes')) {
+        await this.git.checkout(['-f', commitHash]);
+      } else {
+        throw error;
+      }
+    }
   }
 
   /**
@@ -135,6 +144,8 @@ export class GitService {
     const changedFiles = await this.getChangedFiles();
     
     const scheme = `git-${commitHash}`;
+
+    console.log("before registerTextDocumentContentProvider");
     
     const disposable = vscode.workspace.registerTextDocumentContentProvider(scheme, {
       provideTextDocumentContent: async (uri: vscode.Uri) => {
@@ -148,6 +159,8 @@ export class GitService {
         }
       }
     });
+
+    console.log("before showing diffs of changed files...");
     
     for (const file of changedFiles) {
       const oldUri = vscode.Uri.parse(`${scheme}:/${file}`);
@@ -164,5 +177,10 @@ export class GitService {
     
     // Clean up the content provider when done
     disposable.dispose();
+  }
+
+  async getCommitHash(): Promise<string> {
+    const currentHash = await this.git.revparse(['HEAD']);
+    return currentHash;
   }
 }

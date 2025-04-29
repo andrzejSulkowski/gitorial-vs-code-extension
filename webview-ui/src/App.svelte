@@ -2,30 +2,45 @@
   import svelteLogo from './assets/svelte.svg'
   import viteLogo from '/vite.svg'
   import Counter from './lib/Counter.svelte'
+  import Tutorial from './lib/Tutorial.svelte'
+  import { onMount } from 'svelte'
+
+  let tutorialData: any = null
+  let currentStep = 0
+  let isShowingSolution = false
+
+  onMount(() => {
+    // Listen for messages from the extension
+    const handleMessage = (event: MessageEvent) => {
+      const message = event.data
+      switch (message.command) {
+        case 'updateTutorial':
+          tutorialData = message.data
+          break
+        case 'updateStep':
+          currentStep = message.step
+          isShowingSolution = message.isShowingSolution
+          break
+      }
+    }
+
+    window.addEventListener('message', handleMessage)
+    return () => window.removeEventListener('message', handleMessage)
+  })
 </script>
 
 <main>
-  <div>
-    <a href="https://vite.dev" target="_blank" rel="noreferrer">
-      <img src={viteLogo} class="logo" alt="Vite Logo" />
-    </a>
-    <a href="https://svelte.dev" target="_blank" rel="noreferrer">
-      <img src={svelteLogo} class="logo svelte" alt="Svelte Logo" />
-    </a>
-  </div>
-  <h1>Vite + Svelte</h1>
+  <h1>Gitorial</h1>
 
-  <div class="card">
-    <Counter />
-  </div>
-
-  <p>
-    Check out <a href="https://github.com/sveltejs/kit#readme" target="_blank" rel="noreferrer">SvelteKit</a>, the official Svelte app framework powered by Vite!
-  </p>
-
-  <p class="read-the-docs">
-    Click on the Vite and Svelte logos to learn more
-  </p>
+  {#if tutorialData}
+    <Tutorial
+      tutorial={tutorialData}
+      currentStep={currentStep}
+      isShowingSolution={isShowingSolution}
+    />
+  {:else}
+    <p>Loading...</p>
+  {/if}
 </main>
 
 <style>

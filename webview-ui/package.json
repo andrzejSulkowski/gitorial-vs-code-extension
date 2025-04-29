@@ -16,5 +16,8 @@
     "svelte-check": "^4.1.5",
     "typescript": "~5.7.2",
     "vite": "^6.3.1"
+  },
+  "dependencies": {
+    "@types/vscode-webview": "^1.57.5"
   }
 }

@@ -1,12 +1,16 @@
 <script lang="ts">
-  import { onMount, mount } from 'svelte';
+  import { mount } from 'svelte';
   import CodeBlock from './CodeBlock.svelte';
 
-  export let content: string;
+  let { content }: { content: string } = $props();
+  let contentElement: HTMLElement | null= null;
 
-  let contentElement: HTMLElement;
+  $effect(() => {
+    updateCodeBlocks(content);
+  });
 
-  onMount(() => {
+
+  function updateCodeBlocks(content: string) {
     if (contentElement) {
       console.log('Content element found');
       const preElements = contentElement.querySelectorAll('pre');
@@ -36,7 +40,7 @@
         }
       });
     }
-  });
+  }
 </script>
 
 <div class="markdown-content" bind:this={contentElement}>

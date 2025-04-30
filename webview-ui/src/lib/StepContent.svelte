@@ -1,17 +1,11 @@
 <script lang="ts">
-  import HtmlContent from './HtmlContent.svelte';
-  import * as T from '@shared/types';
-  
-  export let step: T.TutorialStep;
+  import HtmlContent from "./HtmlContent.svelte";
+  import * as T from "@shared/types";
 
-  // Log step changes
-  $: {
-    console.log('StepContent - Current step:', {
-      type: step?.type,
-      title: step?.title,
-      content: step?.htmlContent,
-    });
+  interface Props {
+    step: T.TutorialStep;
   }
+  const { step } = $props();
 </script>
 
 <div class="content">
@@ -48,7 +42,8 @@
     margin-bottom: 1em;
   }
 
-  .content :global(ul), .content :global(ol) {
+  .content :global(ul),
+  .content :global(ol) {
     margin-bottom: 1em;
     padding-left: 2em;
   }
@@ -104,7 +99,8 @@
     margin-bottom: 1em;
   }
 
-  .content :global(th), .content :global(td) {
+  .content :global(th),
+  .content :global(td) {
     border: 1px solid var(--vscode-panel-border);
     padding: 0.5em;
   }
@@ -112,4 +108,5 @@
   .content :global(th) {
     background-color: var(--vscode-textBlockQuote-background);
   }
-</style> 
+</style>
+

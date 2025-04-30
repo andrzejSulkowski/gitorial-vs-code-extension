@@ -4,6 +4,9 @@
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
+#app {
+  width: 100%;
+}
 
 a {
   font-weight: 500;

@@ -1,30 +1,29 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
-  import Prism from 'prismjs';
-  import 'prismjs/themes/prism-tomorrow.css';
-  import 'prismjs/components/prism-javascript';
-  import 'prismjs/components/prism-typescript';
-  import 'prismjs/components/prism-json';
-  import 'prismjs/components/prism-bash';
-  import 'prismjs/components/prism-rust';
-  import 'prismjs/components/prism-python';
-  import 'prismjs/components/prism-css';
-  import 'prismjs/components/prism-markdown';
-  import CopyToClipboard from 'svelte-copy-to-clipboard';
+  import Prism from "prismjs";
+  import "prismjs/themes/prism-tomorrow.css";
+  import "prismjs/components/prism-javascript";
+  import "prismjs/components/prism-typescript";
+  import "prismjs/components/prism-json";
+  import "prismjs/components/prism-bash";
+  import "prismjs/components/prism-rust";
+  import "prismjs/components/prism-python";
+  import "prismjs/components/prism-css";
+  import "prismjs/components/prism-markdown";
+  import CopyToClipboard from "svelte-copy-to-clipboard";
 
-  export let code: string;
-  export let language: string = 'javascript';
+  interface Props {
+    code: string;
+    language: string;
+  }
+  let { code, language }: Props = $props();
 
+  let isHovered = $state(false);
+  let copySuccess = $state(false);
+  let codeElement: HTMLElement | null = $state(null);
 
-  let isHovered = false;
-  let copySuccess = false;
-  let codeElement: HTMLElement;
-
-  onMount(() => {
+  $effect(() => {
     if (codeElement) {
       Prism.highlightElement(codeElement);
-    } else {
-      console.warn('No codeElement found for highlighting');
     }
   });
 
@@ -36,17 +35,19 @@
   }
 </script>
 
-<div 
+<div
   class="code-block"
   role="region"
   aria-label="Code block with {language} syntax highlighting"
-  on:mouseenter={() => isHovered = true}
-  on:mouseleave={() => isHovered = false}
+  onmouseenter={() => (isHovered = true)}
+  onmouseleave={() => (isHovered = false)}
 >
   <pre class="code-container">
-    <code class="language-{language}" bind:this={codeElement}>{code.trim()}</code>
+    <code class="language-{language}" bind:this={codeElement}
+      >{code.trim()}</code
+    >
   </pre>
-  
+
   {#if isHovered || copySuccess}
     <CopyToClipboard text={code} on:copy={handleCopy}>
       <button class="copy-button" class:success={copySuccess}>
@@ -113,8 +114,17 @@
   }
 
   :global(.code-container code) {
-    font-family: var(--vscode-editor-font-family, 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace);
+    font-family: var(
+      --vscode-editor-font-family,
+      "SFMono-Regular",
+      Consolas,
+      "Liberation Mono",
+      Menlo,
+      Courier,
+      monospace
+    );
     font-size: 14px;
     line-height: 1.5;
   }
-</style> 
+</style>
+

@@ -1,39 +1,41 @@
 <script lang="ts">
-  import { mount } from 'svelte';
-  import CodeBlock from './CodeBlock.svelte';
+  import { mount } from "svelte";
+  import CodeBlock from "./CodeBlock.svelte";
 
-  let { content }: { content: string } = $props();
-  let contentElement: HTMLElement | null= null;
+  interface Props {
+    content: string;
+  }
+
+  let { content }: Props = $props();
+  let contentElement: HTMLElement | null = $state(null);
 
   $effect(() => {
-    updateCodeBlocks(content);
+    //TODO: find a better way to react on content to update contentElement
+    let _ = content;
+    updateCodeBlocks();
   });
 
-
-  function updateCodeBlocks(content: string) {
+  function updateCodeBlocks() {
     if (contentElement) {
-      console.log('Content element found');
-      const preElements = contentElement.querySelectorAll('pre');
-      console.log('Found pre elements:', preElements.length);
-      
-      preElements.forEach(pre => {
-        const code = pre.querySelector('code');
-        console.log('Code element:', code);
-        
+      const preElements = contentElement.querySelectorAll("pre");
+
+      preElements.forEach((pre) => {
+        const code = pre.querySelector("code");
+
         if (code) {
-          const language = code.className.replace('language-', '') || 'javascript';
-          const codeContent = code.textContent || '';
-          console.log('Language:', language, 'Content:', codeContent);
-          
-          const wrapper = document.createElement('div');
-          wrapper.className = 'code-block-wrapper';
-          
+          const language =
+            code.className.replace("language-", "") || "javascript";
+          const codeContent = code.textContent || "";
+
+          const wrapper = document.createElement("div");
+          wrapper.className = "code-block-wrapper";
+
           mount(CodeBlock, {
             target: wrapper,
             props: {
               code: codeContent,
-              language
-            }
+              language,
+            },
           });
 
           pre.parentNode?.replaceChild(wrapper, pre);
@@ -51,7 +53,19 @@
   .markdown-content {
     color: var(--vscode-foreground, #333);
     line-height: 1.6;
-    font-family: var(--vscode-font-family, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif);
+    font-family: var(
+      --vscode-font-family,
+      -apple-system,
+      BlinkMacSystemFont,
+      "Segoe UI",
+      Roboto,
+      Oxygen,
+      Ubuntu,
+      Cantarell,
+      "Open Sans",
+      "Helvetica Neue",
+      sans-serif
+    );
     padding: 1em;
     max-width: 100%;
     overflow-x: auto;
@@ -94,7 +108,8 @@
     line-height: 1.6;
   }
 
-  .markdown-content :global(ul), .markdown-content :global(ol) {
+  .markdown-content :global(ul),
+  .markdown-content :global(ol) {
     margin: 0.8em 0;
     padding-left: 2em;
   }
@@ -105,7 +120,15 @@
   }
 
   .markdown-content :global(code:not(.language-*)) {
-    font-family: var(--vscode-editor-font-family, 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace);
+    font-family: var(
+      --vscode-editor-font-family,
+      "SFMono-Regular",
+      Consolas,
+      "Liberation Mono",
+      Menlo,
+      Courier,
+      monospace
+    );
     background-color: var(--vscode-textBlockQuote-background, #f5f5f5);
     padding: 0.2em 0.4em;
     border-radius: 3px;
@@ -145,7 +168,8 @@
     border: 1px solid var(--vscode-panel-border, #ccc);
   }
 
-  .markdown-content :global(th), .markdown-content :global(td) {
+  .markdown-content :global(th),
+  .markdown-content :global(td) {
     border: 1px solid var(--vscode-panel-border, #ccc);
     padding: 0.5em;
     text-align: left;
@@ -161,4 +185,5 @@
     border-top: 1px solid var(--vscode-panel-border, #ccc);
     margin: 1.5em 0;
   }
-</style> 
+</style>
+

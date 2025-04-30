@@ -1,10 +1,9 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { Disposable, Webview, WebviewPanel, window, Uri, ViewColumn } from "vscode";
-import { getUri } from "../utilities/getUri";
 import { getNonce } from "../utilities/getNonce";
-import * as T from "../types";
 import { Tutorial } from '../services/tutorial';
+import * as vscode from 'vscode';
 
 /**
  * This class manages the state and behavior of HelloWorld webview panels.
@@ -40,6 +39,7 @@ export class TutorialPanel {
     this._panel.webview.html = this._getWebviewContent(this._panel.webview, extensionUri);
 
     // Set an event listener to listen for messages passed from the webview context
+    console.log("Setting up webview message listener...");
     this._setWebviewMessageListener(this._panel.webview);
 
     this.tutorial = tutorial;
@@ -73,9 +73,11 @@ export class TutorialPanel {
           enableScripts: true,
           // Restrict the webview to only load resources from the `out` and `webview-ui/dist` directories
           localResourceRoots: [Uri.joinPath(extensionUri, "out"), Uri.joinPath(extensionUri, "webview-ui/dist")],
+          retainContextWhenHidden: true
         }
       );
 
+      console.log("Creating new TutorialPanel instance...");
       TutorialPanel.currentPanel = new TutorialPanel(panel, extensionUri, tutorial);
     }
   }
@@ -170,7 +172,7 @@ export class TutorialPanel {
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <meta http-equiv="Content-Security-Policy" content="${csp}">
         <link rel="stylesheet" type="text/css" href="${cssUri}">
-        <script defer nonce="${nonce}" src="${jsUri}"></script>
+        <script defer type="module" nonce="${nonce}" src="${jsUri}"></script>
       </head>
       <body>
         <div id="app"></div>
@@ -187,17 +189,21 @@ export class TutorialPanel {
    * @param context A reference to the extension context
    */
   private _setWebviewMessageListener(webview: Webview) {
+    console.log('Setting up webview message listener...');
     webview.onDidReceiveMessage(
-      (message: any) => {
+      async (message: any) => {
+        console.log("Received message:", message);
+        console.log("Message type:", typeof message);
+        console.log("Message keys:", Object.keys(message));
         switch (message.command) {
           case "prev":
-            this.goToPreviousStep();
+            await this.goToPreviousStep();
             break;
           case "next":
-            this.goToNextStep();
+            await this.goToNextStep();
             break;
           case "showSolution":
-            this.showSolution();
+            await this.showSolution();
             break;
         }
       },
@@ -207,30 +213,30 @@ export class TutorialPanel {
   }
 
   // Keep navigation logic in extension
-  private goToPreviousStep() {
+  private async goToPreviousStep() {
     if (this.tutorial.currentStep > 0) {
       this.tutorial.currentStep--;
-      this.updateWebview();
+      await this.updateWebview();
     }
   }
 
-  private goToNextStep() {
+  private async goToNextStep() {
     if (this.tutorial.currentStep < this.tutorial.steps.length - 1) {
       this.tutorial.currentStep++;
-      this.updateWebview();
+      await this.updateWebview();
     }
   }
 
   // Keep solution logic in extension
   private async showSolution() {
     this.isShowingSolution = true;
-    this.updateWebview();
+    await this.updateWebview();
   }
 
   // Update webview with new state
-  private updateWebview() {
+  private async updateWebview() {
     console.log("Updating webview with new state");
-    this.tutorial.updateStepContent(this.tutorial.steps[this.tutorial.currentStep]);
+    await this.tutorial.updateStepContent(this.tutorial.steps[this.tutorial.currentStep]);
     this._panel.webview.postMessage({
       command: 'updateTutorial',
       data: {

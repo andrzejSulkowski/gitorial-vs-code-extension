@@ -90,7 +90,7 @@ async function openTutorialSelector(
     case USE_CURRENT:
       //Open current
       //We check inside `scanWorkspaceFolderForGitorial` is the gitorial exists and is valid qed.
-      await openTutorial(tutorial!, uiService, context);
+      openTutorial(tutorial!, uiService, context);
       break;
     case SELECT_DIRECTORY:
       const folderPick = await vscode.window.showOpenDialog({
@@ -106,7 +106,7 @@ async function openTutorialSelector(
         if (!tutorial) {
           throw new Error("Path was not valid");
         }
-        await openTutorial(tutorial!, uiService, context);
+        openTutorial(tutorial!, uiService, context);
       }
       break;
   }
@@ -145,20 +145,20 @@ async function promptToOpenTutorial(tutorial: Tutorial, uiService: UIService, co
   );
 
   if (openNow === "Open Now") {
-    await openTutorial(tutorial, uiService, context);
+    openTutorial(tutorial, uiService, context);
   }
 }
 
 /**
  * Open and display a tutorial in a webview panel
  */
-async function openTutorial(tutorial: Tutorial, _uiService: UIService, context: vscode.ExtensionContext) {
+function openTutorial(tutorial: Tutorial, _uiService: UIService, context: vscode.ExtensionContext) {
   console.log("opening tutorial...");
   //let isShowingSolution = false; // Flag to track if we are showing the solution diff
   
 
 
-    TutorialPanel.render(context.extensionUri, tutorial);
+  TutorialPanel.render(context.extensionUri, tutorial);
 
     /*
     const render = async () => {

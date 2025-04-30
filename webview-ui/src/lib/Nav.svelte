@@ -16,11 +16,21 @@
 
     // Event handlers
     function handlePrev() {
-        vscode.postMessage({ cmd: 'prev' });
+        if (!vscode) {
+            console.error('vscode object is not initialized!');
+            return;
+        }
+        vscode.postMessage({ command: 'prev' });
+        console.log("post {command: 'prev'}")
     }
 
     function handleNext() {
-        vscode.postMessage({ cmd: 'next' });
+        if (!vscode) {
+            console.error('vscode object is not initialized!');
+            return;
+        }
+        vscode.postMessage({ command: 'next' });
+        console.log("post {command: 'next'}")
     }
 </script>
 

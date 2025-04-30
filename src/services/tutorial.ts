@@ -129,7 +129,9 @@ export class Tutorial {
    * @param step - The tutorial step to update
    * @returns A promise that resolves when the step content has been updated
    */
-  updateStepContent(step: T.TutorialStep): void {
+  async updateStepContent(step: T.TutorialStep) {
+    console.log("Updating step content for step:", step.id);
+    await this.gitService.checkoutCommit(step.id);
     const repoPath = this.data.localPath;
     let readmePath = path.join(repoPath, "README.md");
 

@@ -1,8 +1,17 @@
 <script lang="ts">
   import HtmlContent from './HtmlContent.svelte';
+  import * as T from '@shared/types';
   
-  export let step: any; // Replace with your Step type
-  export let isShowingSolution: boolean;
+  export let step: T.TutorialStep;
+
+  // Log step changes
+  $: {
+    console.log('StepContent - Current step:', {
+      type: step?.type,
+      title: step?.title,
+      content: step?.htmlContent,
+    });
+  }
 </script>
 
 <div class="content">

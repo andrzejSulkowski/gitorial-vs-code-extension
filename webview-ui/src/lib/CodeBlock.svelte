@@ -15,16 +15,13 @@
   export let code: string;
   export let language: string = 'javascript';
 
-  console.log('CodeBlock initialized with:', { code, language });
 
   let isHovered = false;
   let copySuccess = false;
   let codeElement: HTMLElement;
 
   onMount(() => {
-    console.log('CodeBlock mounted, codeElement:', codeElement);
     if (codeElement) {
-      console.log('Highlighting element with language:', language);
       Prism.highlightElement(codeElement);
     } else {
       console.warn('No codeElement found for highlighting');

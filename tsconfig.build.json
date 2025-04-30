@@ -1,0 +1,19 @@
+{
+	"extends": "./tsconfig.json",
+	"compilerOptions": {
+		"outDir": "out",
+		"rootDir": ".",
+		"composite": false
+	},
+	"include": [
+		"src/**/*",
+		"shared/**/*"
+	],
+	"exclude": [
+		"node_modules",
+		"out",
+		"example-tutorial",
+		"**/*.md",
+		"webview-ui/node_modules"
+	]
+} 

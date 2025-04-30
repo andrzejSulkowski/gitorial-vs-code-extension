@@ -2,15 +2,18 @@
     import Nav from './Nav.svelte';
     import StepContent from './StepContent.svelte';
     import { onMount } from 'svelte';
+    import * as T from '@shared/types';
 
     // State
-    let tutorial: any = null;
+    let tutorial: T.Tutorial | null = null;
     let currentStep: number = 0;
     let isShowingSolution: boolean = false;
 
     // Listen for messages from the extension
     onMount(() => {
         const handleMessage = (event: MessageEvent) => {
+            console.log("svelte tutorial received message event")
+            console.log(event)
             const message = event.data;
             if (message.command === 'updateTutorial') {
                 tutorial = message.data.tutorial;
@@ -25,19 +28,9 @@
 
     // Computed values
     $: step = tutorial?.steps[currentStep];
-    $: {
-        if (step) {
-            console.log('Current Step:', {
-                index: currentStep,
-                type: step.type,
-                title: step.title,
-                content: step.htmlContent
-            });
-        }
-    }
 </script>
 
-{#if tutorial}
+{#if tutorial && step}
     <div class="tutorial">
         <Nav
             currentStep={currentStep}
@@ -48,7 +41,6 @@
         />
         <StepContent
             {step}
-            {isShowingSolution}
         />
     </div>
 {:else}

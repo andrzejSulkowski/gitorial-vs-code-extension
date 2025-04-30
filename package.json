@@ -30,8 +30,11 @@
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
-    "compile": "cd webview-ui && npm run build && cd .. && tsc -p ./ && echo 'Compilation complete'",
-    "watch": "tsc -watch -p ./",
+    "compile": "npm run compile:webview && npm run compile:extension && npm run post-build",
+    "compile:webview": "cd webview-ui && npm run build && cd ..",
+    "compile:extension": "tsc -p ./tsconfig.build.json",
+    "post-build": "node scripts/post-build.js",
+    "watch": "tsc -watch -p ./tsconfig.build.json",
     "pretest": "npm run compile && npm run lint",
     "lint": "eslint src",
     "test": "vscode-test"

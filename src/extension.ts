@@ -69,7 +69,6 @@ async function openTutorialSelector(
   context: vscode.ExtensionContext,
   uiService: UIService
 ): Promise<void> {
-  console.log("opening tutorial selector...");
   const USE_CURRENT = "Use Current Workspace";
   const SELECT_DIRECTORY = "Select Directory";
   let option: string | undefined = SELECT_DIRECTORY;
@@ -84,7 +83,6 @@ async function openTutorialSelector(
     if (quickPickChoice) option = quickPickChoice;
   }
 
-  console.log("selected option: ", option);
 
   switch (option) {
     case USE_CURRENT:
@@ -153,61 +151,7 @@ async function promptToOpenTutorial(tutorial: Tutorial, uiService: UIService, co
  * Open and display a tutorial in a webview panel
  */
 function openTutorial(tutorial: Tutorial, _uiService: UIService, context: vscode.ExtensionContext) {
-  console.log("opening tutorial...");
-  //let isShowingSolution = false; // Flag to track if we are showing the solution diff
-  
-
-
   TutorialPanel.render(context.extensionUri, tutorial);
-
-    /*
-    const render = async () => {
-
-      const panel = vscode.window.createWebviewPanel(
-    "gitorial",
-    tutorial.title,
-    vscode.ViewColumn.One,
-    { enableScripts: true }
-  );
-    console.log("rendering step");
-    // Reset flag if we are not on a template step anymore
-    if (tutorial.steps[tutorial.currentStep].type !== 'template') {
-      isShowingSolution = false;
-    }
-    
-    const step = tutorial.steps[tutorial.currentStep];
-    console.log("step.type", step.type);
-    console.log("isShowingSolution", isShowingSolution);
-
-    const currentCommitHash = await tutorial.gitService.getCommitHash();
-    if (currentCommitHash !== step.id) {
-      try {
-        await tutorial.gitService.checkoutCommit(step.id);
-      } catch (error: any) {
-        // If checkout fails due to local changes, it should be handled in checkoutCommit (force checkout)
-        console.error("Error checking out commit:", error);
-        panel.webview.html = uiService.generateErrorHtml(error.toString());
-        return; // Stop rendering if checkout fails
-      }
-    }
-    
-    try {
-      await tutorial.updateStepContent(step)
-      panel.webview.html = uiService.generateTutorialHtml(tutorial, step, isShowingSolution); // Pass the flag
-      uiService.handleStepType(tutorial);
-    } catch (error: any) {
-      console.error("Error updating step content:", error);
-      panel.webview.html = uiService.generateErrorHtml(error.toString());
-    }
-  panel.webview.onDidReceiveMessage(async (msg) => {
-    isShowingSolution = await handleTutorialNavigation(msg, tutorial, isShowingSolution); // Update state based on navigation
-    await render();
-  });
-
-  await render();
-  };
-  */
-
 }
 
 /**

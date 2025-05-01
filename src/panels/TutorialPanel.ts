@@ -3,7 +3,7 @@ import * as path from 'path';
 import { Disposable, Webview, WebviewPanel, window, Uri, ViewColumn } from "vscode";
 import { getNonce } from "../utilities/getNonce";
 import { Tutorial } from '../services/tutorial';
-import * as vscode from 'vscode';
+import * as vscode from "vscode";
 
 /**
  * This class manages the state and behavior of HelloWorld webview panels.
@@ -39,7 +39,6 @@ export class TutorialPanel {
     this._panel.webview.html = this._getWebviewContent(this._panel.webview, extensionUri);
 
     // Set an event listener to listen for messages passed from the webview context
-    console.log("Setting up webview message listener...");
     this._setWebviewMessageListener(this._panel.webview);
 
     this.tutorial = tutorial;
@@ -65,7 +64,7 @@ export class TutorialPanel {
         "gitorial",
         // Panel title
         tutorial.title,
-        // The editor column the panel should be displayed in, On the right side of the editor while the editor is split into two columns
+        // The webview will open on the left editor column
         ViewColumn.One,
         // Extra panel configurations
         {
@@ -77,7 +76,7 @@ export class TutorialPanel {
         }
       );
 
-      console.log("Creating new TutorialPanel instance...");
+      console.info("Creating new TutorialPanel instance...");
       TutorialPanel.currentPanel = new TutorialPanel(panel, extensionUri, tutorial);
     }
   }
@@ -122,10 +121,10 @@ export class TutorialPanel {
     // Read the index.html file content
     let htmlContent: string;
     try {
-        htmlContent = fs.readFileSync(indexHtmlPath, 'utf8');
+      htmlContent = fs.readFileSync(indexHtmlPath, 'utf8');
     } catch (e) {
-        console.error(`Error reading index.html from ${indexHtmlPath}: ${e}`);
-        return `<html><body>Error loading webview content. Details: ${e}</body></html>`;
+      console.error(`Error reading index.html from ${indexHtmlPath}: ${e}`);
+      return `<html><body>Error loading webview content. Details: ${e}</body></html>`;
     }
 
     // --- Find asset paths from the read HTML content ---
@@ -139,8 +138,8 @@ export class TutorialPanel {
     const relativeJsPath = jsMatch ? jsMatch[1] : null; // e.g., "/assets/index-BJufP5Ak.js"
 
     if (!relativeCssPath || !relativeJsPath) {
-        console.error("Could not extract CSS or JS paths from index.html content:", htmlContent);
-        return `<html><body>Error parsing index.html to find asset paths. Check regex or HTML structure.</body></html>`;
+      console.error("Could not extract CSS or JS paths from index.html content:", htmlContent);
+      return `<html><body>Error parsing index.html to find asset paths. Check regex or HTML structure.</body></html>`;
     }
 
     // --- Create webview URIs from the extracted relative paths ---
@@ -149,12 +148,11 @@ export class TutorialPanel {
     const jsUri = webview.asWebviewUri(Uri.joinPath(svelteAppBuildPath, relativeJsPath));
     // Also get URI for vite.svg, assuming it\'s in the root of the build path
     const viteSvgPath = Uri.joinPath(svelteAppBuildPath, 'vite.svg'); // Keep the Uri object
-    console.log("Attempting to load vite.svg from disk path:", viteSvgPath.fsPath); // Log fsPath
-    const viteSvgUri = webview.asWebviewUri(viteSvgPath); // Pass Uri object
+    const iconSvgUri = webview.asWebviewUri(viteSvgPath); // Pass Uri object
 
     console.log("Runtime determined Styles URI:", cssUri.toString());
     console.log("Runtime determined Script URI:", jsUri.toString());
-    console.log("Runtime determined Vite SVG URI:", viteSvgUri.toString());
+    console.log("Runtime determined Icon SVG URI:", iconSvgUri.toString());
 
     const nonce = getNonce();
 
@@ -168,7 +166,7 @@ export class TutorialPanel {
       <head>
         <title>Tutorial</title>
         <meta charset="UTF-8" />
-        <link rel="icon" type="image/svg+xml" href="${viteSvgUri}" />
+        <link rel="icon" type="image/svg+xml" href="${iconSvgUri}" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <meta http-equiv="Content-Security-Policy" content="${csp}">
         <link rel="stylesheet" type="text/css" href="${cssUri}">
@@ -189,12 +187,8 @@ export class TutorialPanel {
    * @param context A reference to the extension context
    */
   private _setWebviewMessageListener(webview: Webview) {
-    console.log('Setting up webview message listener...');
     webview.onDidReceiveMessage(
       async (message: any) => {
-        console.log("Received message:", message);
-        console.log("Message type:", typeof message);
-        console.log("Message keys:", Object.keys(message));
         switch (message.command) {
           case "prev":
             await this.goToPreviousStep();
@@ -205,6 +199,9 @@ export class TutorialPanel {
           case "showSolution":
             await this.showSolution();
             break;
+          case "hideSolution":
+            await this.hideSolution();
+            break;
         }
       },
       undefined,
@@ -212,17 +209,36 @@ export class TutorialPanel {
     );
   }
 
-  // Keep navigation logic in extension
+  //TODO: use 'goToPreviousStep' only as a bridge to tutorials decCurrentStep function
   private async goToPreviousStep() {
     if (this.tutorial.currentStep > 0) {
-      this.tutorial.currentStep--;
+      if (this.tutorial.steps[this.tutorial.currentStep - 1].type === "solution") {
+        if (this.tutorial.currentStep - 2 < 0) {
+          throw new Error("Spec Error: a solution can't be the first step of a gitorial")
+        } else {
+          this.tutorial.decCurrentStep(2);
+        }
+      } else {
+        this.tutorial.decCurrentStep();
+      }
       await this.updateWebview();
     }
   }
 
+  //TODO: use 'goToNextStep' only as a bridge to tutorials incCurrentStep function
   private async goToNextStep() {
     if (this.tutorial.currentStep < this.tutorial.steps.length - 1) {
-      this.tutorial.currentStep++;
+
+      //if next step is a solution we jump over it to the next step
+      if (this.tutorial.steps[this.tutorial.currentStep + 1].type === "solution") {
+        if (this.tutorial.currentStep + 2 >= this.tutorial.steps.length) {
+          throw new Error("Expect to receive another step after a 'solution' step");
+        } else {
+          this.tutorial.incCurrentStep(2)
+        }
+      } else {
+        this.tutorial.incCurrentStep()
+      }
       await this.updateWebview();
     }
   }
@@ -232,11 +248,78 @@ export class TutorialPanel {
     this.isShowingSolution = true;
     await this.updateWebview();
   }
+  private async hideSolution() {
+    this.isShowingSolution = false;
+    await this.updateWebview();
+  }
+
+  private async revealFiles(repoPath: string, changedFiles: string[]): Promise<void> {
+    if (changedFiles.length > 0) {
+      for (const file of changedFiles) {
+        const filePath = path.join(repoPath, file);
+
+        if (fs.existsSync(filePath)) {
+          const doc = await vscode.workspace.openTextDocument(filePath);
+          await vscode.window.showTextDocument(doc, { viewColumn: vscode.ViewColumn.Two, preview: false });
+        }
+      }
+    }
+
+    await vscode.commands.executeCommand("workbench.view.explorer");
+    await vscode.commands.executeCommand(
+      "revealInExplorer",
+      vscode.Uri.file(repoPath)
+    );
+  }
 
   // Update webview with new state
   private async updateWebview() {
-    console.log("Updating webview with new state");
-    await this.tutorial.updateStepContent(this.tutorial.steps[this.tutorial.currentStep]);
+    const currentStep = this.tutorial.steps[this.tutorial.currentStep];
+    await this.tutorial.updateStepContent(currentStep);
+
+    // Ensure our panel is revealed and close editors in other groups
+    this._panel.reveal(this._panel.viewColumn);
+    await vscode.commands.executeCommand('workbench.action.closeEditorsInOtherGroups');
+
+    // Short delay before manipulating views
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    // Show content in the second column
+    if (currentStep.type === "template" && this.isShowingSolution) {
+      const parentCommitHash = this.tutorial.steps.at(this.tutorial.currentStep + 1)?.id;
+      if (parentCommitHash) {
+        await this.tutorial.gitService.showCommitChanges(parentCommitHash);
+      } else {
+        throw new Error("No parent commit hash found");
+      }
+    } else if(currentStep.type === "template" && !this.isShowingSolution) {
+      const actionFiles = await this.tutorial.gitService.getChangedFiles();
+      await this.revealFiles(this.tutorial.localPath, actionFiles);
+    } else if (currentStep.type === "action") {
+      const actionFiles = await this.tutorial.gitService.getChangedFiles();
+      await this.revealFiles(this.tutorial.localPath, actionFiles);
+    }
+    
+    /*
+    //TODO: Think about it if this is acutally helpful
+    try {
+      await new Promise(resolve => setTimeout(resolve, 100));
+      if (this.isShowingSolution) {
+        await vscode.commands.executeCommand('workbench.action.focusSecondEditorGroup');
+        // Increase size multiple times (adjust count as needed)
+        for (let i = 0; i < 8; i++) { 
+          await vscode.commands.executeCommand('workbench.action.increaseViewSize');
+        }
+      } else {
+        await vscode.commands.executeCommand('workbench.action.evenEditorWidths');
+      }
+    } catch (error) {
+        console.error("Error adjusting editor layout:", error);
+        // Optionally show a less intrusive error or just log it
+        // vscode.window.showErrorMessage(`Failed to adjust editor layout: ${error}`);
+    }
+    */
+
     this._panel.webview.postMessage({
       command: 'updateTutorial',
       data: {

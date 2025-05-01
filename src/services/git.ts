@@ -145,8 +145,6 @@ export class GitService {
     
     const scheme = `git-${commitHash}`;
 
-    console.log("before registerTextDocumentContentProvider");
-    
     const disposable = vscode.workspace.registerTextDocumentContentProvider(scheme, {
       provideTextDocumentContent: async (uri: vscode.Uri) => {
         const filePath = uri.path.startsWith('/') ? uri.path.slice(1) : uri.path;
@@ -160,8 +158,6 @@ export class GitService {
       }
     });
 
-    console.log("before showing diffs of changed files...");
-    
     for (const file of changedFiles) {
       const oldUri = vscode.Uri.parse(`${scheme}:/${file}`);
       const currentUri = vscode.Uri.file(path.join(this.repoPath, file));
@@ -171,7 +167,7 @@ export class GitService {
         currentUri,  // Left side (User's code)
         oldUri,      // Right side (Solution)
         `${path.basename(file)} (Your Code ↔ Solution ${commitHash.slice(0, 7)})`,
-        { preview: false }
+        { preview: false, viewColumn: vscode.ViewColumn.Two }
       );
     }
     

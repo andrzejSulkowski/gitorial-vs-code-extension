@@ -1,12 +1,8 @@
 import * as path from "path";
-import * as fs from "fs";
 import * as T from "@shared/types";
 import * as vscode from "vscode";
-import MarkdownIt from "markdown-it";
 import { GitService } from "./git";
 import { StepService } from "./step";
-
-const md = new MarkdownIt();
 
 export class TutorialBuilder {
   /**
@@ -15,10 +11,10 @@ export class TutorialBuilder {
    * then loads the tutorial steps and metadata.
    *
    * @param folderPath - The absolute path to the tutorial directory
+   * @param context - The vscode extension context
    * @returns A promise that resolves to:
    *          - The tutorial ID (string) if loading was successful
    *          - null if the directory is not a valid tutorial repository
-   * @throws Error if the repository URL cannot be determined
    */
   static async build(folderPath: string, context: vscode.ExtensionContext): Promise<Tutorial | null> {
     try {
@@ -28,35 +24,16 @@ export class TutorialBuilder {
       if (!isRepo) {
         return null;
       }
+
       await gitService.setupGitorialBranch();
-
-      const { branches } = await gitService.getRepoInfo();
-      const hasGitorialBranch = branches.all.some(
-        (branch) => branch === "gitorial" || branch.includes("/gitorial")
-      );
-
-      if (!hasGitorialBranch) {
-        return null;
-      }
-
       const repoUrl = await gitService.getRepoUrl();
       const id = this.generateTutorialId(repoUrl);
       const humanTitle = this.formatTitleFromId(id);
+      const steps = await StepService.loadTutorialSteps(gitService);
+      const savedStep = StepService.readStepState(context, id);
 
-      const stepService = new StepService(folderPath);
-      const steps = await stepService.loadTutorialSteps();
 
-      const savedStep = context.globalState.get<number>(`gitorial:${id}:step`, 0);
-      const tutorial: T.Tutorial = {
-        id,
-        repoUrl,
-        localPath: folderPath,
-        title: humanTitle,
-        steps: steps,
-        currentStep: savedStep,
-      };
-
-      return new Tutorial(tutorial, gitService, context);
+      return new Tutorial({ id, repoUrl, localPath: folderPath, title: humanTitle, initialStep: savedStep, steps, gitService, context });
     } catch (error) {
       console.error("Error loading tutorial:", error);
       return null;
@@ -102,23 +79,32 @@ export class TutorialBuilder {
   }
 }
 
-export class Tutorial {
-  private data: T.Tutorial;
+export class Tutorial implements T.TutorialData {
   gitService: GitService;
   context: vscode.ExtensionContext;
 
-  constructor(data: T.Tutorial, gitService: GitService, context: vscode.ExtensionContext) {
-    this.data = data;
-    this.gitService = gitService;
-    this.context = context;
-  }
-  /**
-   * Gets the currently loaded tutorial.
-   *
-   * @returns The current tutorial object, or null if no tutorial is loaded
-   */
-  getTutorial(): T.Tutorial | null {
-    return this.data;
+  public id: string;
+  public repoUrl: string;
+  public localPath: string;
+  public title: string;
+  public steps: T.TutorialStep[];
+  private _currentStepIndex: number;
+
+
+  constructor(options: Omit<T.TutorialData, "currentStepIndex"> & {
+    initialStep: number,
+    context: vscode.ExtensionContext,
+    gitService: GitService
+  }) {
+    this.id = options.id;
+    this.repoUrl = options.repoUrl;
+    this.localPath = options.localPath;
+    this.title = options.title;
+    this.steps = options.steps;
+    this._currentStepIndex = options.initialStep ?? 0;
+
+    this.context = options.context;
+    this.gitService = options.gitService;
   }
 
   /**
@@ -128,85 +114,40 @@ export class Tutorial {
    * @param repoPath - The absolute path to the repository directory
    * @param step - The tutorial step to update
    * @returns A promise that resolves when the step content has been updated
+   *
+   * throws When commit could not be checked out
    */
   async updateStepContent(step: T.TutorialStep) {
-    await this.gitService.checkoutCommit(step.id);
-    const repoPath = this.data.localPath;
-    let readmePath = path.join(repoPath, "README.md");
-
-    if (fs.existsSync(readmePath)) {
-      const markdown = fs.readFileSync(readmePath, "utf8");
-      step.htmlContent = md.render(markdown);
-      return;
-    }
-
-    try {
-      const files = fs.readdirSync(repoPath);
-      const markdownFiles = files.filter(
-        (file) =>
-          file.toLowerCase().endsWith(".md") &&
-          fs.statSync(path.join(repoPath, file)).isFile()
-      );
-
-      if (markdownFiles.length > 0) {
-        const mdPath = path.join(repoPath, markdownFiles[0]);
-        const markdown = fs.readFileSync(mdPath, "utf8");
-        step.htmlContent = md.render(markdown);
-        return;
-      }
-    } catch (error) {
-      console.warn("Error looking for markdown files:", error);
-    }
-
-    step.htmlContent = md.render(`
-    > No markdown content found for step "${step.title}"
-    
-    This step is missing documentation. You can still examine the code changes by looking at the files in the workspace.
-    `);
+    await this.gitService.checkoutCommit(step.commitHash);
+    let readmePath = path.join(this.localPath, "README.md");
+    await StepService.updateStepContent(step, readmePath);
   }
 
-  get title() {
-    return this.data.title;
-  }
-  get id() {
-    return this.data.id;
-  }
-  get steps() {
-    return this.data.steps;
-  }
-  get currentStep() {
-    return this.data.currentStep;
-  }
-  set currentStep(step: number) {
-    if (step < 0 || step >= this.data.steps.length) {
-      throw new Error("Invalid step number");
-    }
-    this.data.currentStep = step;
-    this.context.globalState.update(`gitorial:${this.id}:step`, step);
-  }
-  async incCurrentStep(increment: number = 1) {
-    const nextStep = this.data.currentStep + increment;
-    if (nextStep < this.data.steps.length) {
-      this.data.currentStep = nextStep;
+  get currentStepIndex() { return this._currentStepIndex; }
+
+  async next(): Promise<Tutorial> {
+    const nextStep = this.currentStepIndex + 1;
+    if (nextStep < this.steps.length) {
+      this._currentStepIndex = nextStep;
       await this.saveCurrentStep();
+      return this;
+    }else{
+      throw new Error('Out of bounds');
     }
   }
-  async decCurrentStep(decrement: number = 1) {
-    const prevStep = this.data.currentStep - decrement;
+
+  async prev(): Promise<Tutorial> {
+    const prevStep = this.currentStepIndex - 1;
     if (prevStep >= 0) {
-      this.data.currentStep = prevStep;
+      this._currentStepIndex = prevStep;
       await this.saveCurrentStep();
+      return this;
+    }else {
+      throw new Error('Out of bounds');
     }
-  }
-  get repoUrl() {
-    return this.data.repoUrl;
-  }
-  //TODO: Remove after refactoring
-  get localPath() {
-    return this.data.localPath;
   }
 
   private async saveCurrentStep(): Promise<void> {
-    await this.context.globalState.update(`gitorial:${this.id}:step`, this.currentStep);
+    await this.context.globalState.update(`gitorial:${this.id}:step`, this.currentStepIndex);
   }
 }

@@ -1,10 +1,10 @@
-import * as path from "path";
 import * as fs from "fs";
 import MarkdownIt from "markdown-it";
 import { TutorialStep, StepType } from "@shared/types";
 import { GitService } from "./git";
 import { DefaultLogFields } from "simple-git";
 import { ListLogLine } from "simple-git";
+import * as vscode from "vscode";
 
 const md = new MarkdownIt();
 
@@ -12,50 +12,24 @@ const md = new MarkdownIt();
  * Service for handling tutorial steps
  */
 export class StepService {
-  private gitService: GitService;
 
-  constructor(repoPath: string) {
-    this.gitService = new GitService(repoPath);
-  }
-
+  constructor() { }
   /**
    * Load tutorial steps from git history
    */
-  async loadTutorialSteps(): Promise<TutorialStep[]> {
-    const commits = await this.gitService.getCommitHistory();
+  static async loadTutorialSteps(gitService: GitService): Promise<TutorialStep[]> {
+    const commits = await gitService.getCommitHistory();
     return this.extractStepsFromCommits(commits);
   }
 
   /**
    * Update step content by reading markdown files
    */
-  async updateStepContent(step: TutorialStep): Promise<void> {
-    const repoPath = path.dirname(step.id);
-    let readmePath = path.join(repoPath, "README.md");
-
+  static async updateStepContent(step: TutorialStep, readmePath: string): Promise<void> {
     if (fs.existsSync(readmePath)) {
       const markdown = fs.readFileSync(readmePath, "utf8");
       step.htmlContent = md.render(markdown);
       return;
-    }
-
-    //TODO: Maybe instead of doing this fallback try{}catch{} we just throw an error that no README.md was found
-    try {
-      const files = fs.readdirSync(repoPath);
-      const markdownFiles = files.filter(
-        (file) =>
-          file.toLowerCase().endsWith(".md") &&
-          fs.statSync(path.join(repoPath, file)).isFile()
-      );
-
-      if (markdownFiles.length > 0) {
-        const mdPath = path.join(repoPath, markdownFiles[0]);
-        const markdown = fs.readFileSync(mdPath, "utf8");
-        step.htmlContent = md.render(markdown);
-        return;
-      }
-    } catch (error) {
-      console.warn("Error looking for markdown files:", error);
     }
 
     step.htmlContent = md.render(`
@@ -68,13 +42,14 @@ export class StepService {
   /**
    * Extract tutorial steps from commit history
    */
-  private extractStepsFromCommits(
+  static extractStepsFromCommits(
     commits: readonly (DefaultLogFields & ListLogLine)[]
   ): TutorialStep[] {
     const steps: TutorialStep[] = [];
-    const validTypes = ["section", "template", "solution", "action"];
+    const validTypes: StepType[] = ["section", "template", "solution", "action"];
 
     // Skip the "readme" commit (is expected to be the last one)
+    // TODO: Right now it looks like there is no 'readme:'. Check again and adjust (02.May.25)
     const filteredCommits = commits.filter(
       (commit) => !commit.message.toLowerCase().startsWith("readme:")
     );
@@ -89,18 +64,19 @@ export class StepService {
         continue;
       }
 
-      const rawType = message.substring(0, colonIndex).toLowerCase();
-      if (!validTypes.includes(rawType)) {
-        console.warn(`Invalid step type: ${rawType}`);
+      const maybeStepType = message.substring(0, colonIndex).toLowerCase();
+      if (!validTypes.includes(maybeStepType as StepType)) {
+        console.warn(`Invalid step type: ${maybeStepType}`);
         continue;
       }
 
-      const type = rawType as StepType;
+      const type = maybeStepType as StepType;
       const title = message.substring(colonIndex + 1).trim();
       const hash = commit.hash;
 
       steps.push({
-        id: hash,
+        id: i,
+        commitHash: hash,
         type,
         title,
         htmlContent: "",
@@ -108,5 +84,11 @@ export class StepService {
     }
 
     return steps;
+  }
+  static async writeStepState(context: vscode.ExtensionContext, id: string, step: number) {
+    await context.globalState.update(`gitorial:${id}:step`, step);
+  }
+  static readStepState(context: vscode.ExtensionContext, id: string): number {
+    return context.globalState.get<number>(`gitorial:${id}:step`, 0);
   }
 }

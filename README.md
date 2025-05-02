@@ -33,11 +33,15 @@ Take a look at the official documentation [here](https://github.com/gitorial-sdk
 ## How It Works
 
 The extension:
-1. Clones the tutorial repository into a user-selected location
-2. Discovers steps by reading numbered directories in the `steps/` folder
-3. Parses metadata and README files to build the tutorial structure
-4. Renders tutorial content as a webview with navigation controls
-5. Maintains your progress between VS Code sessions
+1. Clones the tutorial repository (if needed) or uses a local one.
+2. Uses `TutorialBuilder` to load tutorial steps and metadata from the repository (based on commit history).
+3. Creates a `Tutorial` instance to hold the loaded tutorial data and manage the current step state.
+4. Creates a `TutorialController` to manage the active tutorial session state (like showing/hiding solutions) and orchestrate UI actions (layout changes, file reveals).
+5. Creates a `TutorialPanel` which renders the Svelte-based webview UI.
+6. The `TutorialPanel` acts as a bridge, forwarding user actions (Next, Prev, Show Solution) from the webview to the `TutorialController`.
+7. The `TutorialController` processes actions, updates the `Tutorial` state, interacts with `GitService` and VS Code APIs (for checkouts, diffs, file display, layout changes), and then sends simplified view data back to the `TutorialPanel`.
+8. The `TutorialPanel` sends this data to the Svelte webview for rendering.
+9. Progress (current step) is persisted via the `Tutorial` instance.
 
 ## Development
 
@@ -57,8 +61,18 @@ The extension:
 
 ### Project Structure
 
-- `src/extension.ts` - Main extension code
-- `src/types.ts` - TypeScript types and interfaces
+- `src/`
+  - `extension.ts` - Extension activation, command registration, main entry point.
+  - `controllers/`
+    - `TutorialController.ts` - Manages active tutorial session, state, UI logic, communication.
+  - `panels/`
+    - `TutorialPanel.ts` - Manages the webview panel lifecycle and communication bridge.
+  - `services/`
+    - `tutorial.ts` - (`TutorialBuilder`, `Tutorial`) Loads tutorial data, holds step state, manages git interaction for steps.
+    - `git.ts` - (`GitService`) Encapsulates all Git commands.
+  - `utilities/` - Helper functions (e.g., `getNonce`).
+- `shared/types/` - TypeScript types shared between extension and webview.
+- `webview-ui/` - Svelte code for the webview UI.
 
 ### Key Dependencies
 

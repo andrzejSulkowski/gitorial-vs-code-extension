@@ -3,6 +3,10 @@ import { TutorialBuilder, Tutorial } from "./services/tutorial";
 import { GitService } from "./services/git";
 import { UIService } from "./services/ui";
 import { TutorialPanel } from "./panels/TutorialPanel";
+import { TutorialController } from './controllers/TutorialController';
+
+// Keep track of the active controller to prevent multiple instances for the same tutorial
+let activeController: TutorialController | undefined;
 
 /**
  * Main extension activation point
@@ -148,10 +152,48 @@ async function promptToOpenTutorial(tutorial: Tutorial, uiService: UIService, co
 }
 
 /**
- * Open and display a tutorial in a webview panel
+ * Opens a tutorial in a new webview panel.
+ * @param tutorial - The tutorial object to open
+ * @param uiService - The UI service for interaction
+ * @param context - The extension context
  */
-function openTutorial(tutorial: Tutorial, _uiService: UIService, context: vscode.ExtensionContext) {
-  TutorialPanel.render(context.extensionUri, tutorial);
+async function openTutorial(tutorialData: Tutorial, _uiService: UIService, context: vscode.ExtensionContext) {
+  // Assuming tutorialData contains enough info to load the tutorial, e.g., folder path
+  // If tutorialData IS the loaded Tutorial instance, adjust logic below
+  const folderPath = tutorialData.localPath; // Adapt this based on what tutorialData actually is
+  if (!folderPath || typeof folderPath !== 'string') {
+    vscode.window.showErrorMessage('Invalid data provided to openTutorial.');
+    return;
+  }
+
+  try {
+    // Dispose previous controller/panel if exists
+    if (activeController) {
+      activeController.dispose(); 
+      activeController = undefined;
+    }
+
+    // 1. Load Tutorial Data using the path from the incoming data
+    const tutorialInstance = await TutorialBuilder.build(folderPath, context);
+
+    if (tutorialInstance) {
+      // 2. Create Controller (holds tutorial instance)
+      activeController = new TutorialController(tutorialInstance);
+
+      // 3. Render Panel (connects panel to controller)
+      TutorialPanel.render(context.extensionUri, activeController);
+
+    } else {
+      vscode.window.showWarningMessage(`Folder does not contain a valid Gitorial structure: ${folderPath}`);
+    }
+  } catch (error) {
+      console.error("Error opening tutorial:", error);
+      vscode.window.showErrorMessage(`Failed to open tutorial: ${error instanceof Error ? error.message : String(error)}`);
+      if (activeController) {
+          activeController.dispose();
+          activeController = undefined;
+      }
+  }
 }
 
 /**
@@ -199,5 +241,9 @@ async function handleTutorialNavigation(msg: any, tutorial: Tutorial, isShowingS
  * Extension deactivation
  */
 export function deactivate() {
-  // Nothing to clean up
+  // Clean up the controller and panel if the extension is deactivated
+  if (activeController) {
+    activeController.dispose();
+    activeController = undefined;
+  }
 }

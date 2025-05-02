@@ -9,7 +9,7 @@
   import "prismjs/components/prism-python";
   import "prismjs/components/prism-css";
   import "prismjs/components/prism-markdown";
-  import CopyToClipboard from "svelte-copy-to-clipboard";
+  import { copy } from "svelte-copy";
 
   interface Props {
     code: string;
@@ -49,15 +49,23 @@
   </pre>
 
   {#if isHovered || copySuccess}
-    <CopyToClipboard text={code} on:copy={handleCopy}>
-      <button class="copy-button" class:success={copySuccess}>
-        {#if copySuccess}
-          ✓
-        {:else}
-          Copy
-        {/if}
-      </button>
-    </CopyToClipboard>
+    <button
+      class="copy-button"
+      class:success={copySuccess}
+      use:copy={{
+        text: code,
+        events: ["click"],
+        onCopy() {
+          handleCopy();
+        },
+      }}
+    >
+      {#if copySuccess}
+        ✓
+      {:else}
+        Copy
+      {/if}
+    </button>
   {/if}
 </div>
 
@@ -127,4 +135,3 @@
     line-height: 1.5;
   }
 </style>
-

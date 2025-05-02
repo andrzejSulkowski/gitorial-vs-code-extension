@@ -1,15 +1,14 @@
 <script lang="ts">
   import HtmlContent from "./HtmlContent.svelte";
-  import * as T from "@shared/types";
 
   interface Props {
-    step: T.TutorialStep;
+    content: string;
   }
-  const { step } = $props();
+  const { content }: Props = $props();
 </script>
 
 <div class="content">
-  <HtmlContent content={step.htmlContent} />
+  <HtmlContent {content} />
 </div>
 
 <style>
@@ -19,7 +18,6 @@
     line-height: 1.5;
   }
 
-  /* Style markdown-like content */
   .content :global(h1) {
     font-size: 1.5em;
     margin-bottom: 1em;
@@ -109,4 +107,3 @@
     background-color: var(--vscode-textBlockQuote-background);
   }
 </style>
-

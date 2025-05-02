@@ -1,43 +1,47 @@
 <script lang="ts">
-  import Nav from "./Nav.svelte";
-  import StepContent from "./StepContent.svelte";
-  import { onMount } from "svelte";
-  import * as T from "@shared/types";
+  import Nav from './Nav.svelte';
+  import StepContent from './StepContent.svelte';
+  import { onMount } from 'svelte';
+  import type { TutorialStep, WebViewData } from '@shared/types';
 
-  // State
-  let tutorial = $state<T.Tutorial | null>(null);
-  let currentStep = $state(0);
+  // State based on `import { WebViewData } from "@shared/types"`
+  let tutorialTitle = $state('Loading...');
+  let currentStepIndex = $state(0);
+  let totalSteps = $state(0);
+  let step = $state<TutorialStep | null>(null);
   let isShowingSolution = $state(false);
 
-  // Listen for messages from the extension
   onMount(() => {
     const handleMessage = (event: MessageEvent) => {
-      console.log("svelte tutorial received message event");
-      console.log(event);
       const message = event.data;
-      if (message.command === "updateTutorial") {
-        tutorial = message.data.tutorial;
-        currentStep = message.data.currentStep;
-        isShowingSolution = message.data.isShowingSolution;
+      if (message.command === 'updateView') {
+        const data = message.data as WebViewData;
+        tutorialTitle = data.tutorialTitle;
+        currentStepIndex = data.currentStepIndex;
+        totalSteps = data.totalSteps;
+        step = data.stepData;
+        isShowingSolution = data.isShowingSolution;
+      } else {
+        console.log("Webview received unhandled command:", message.command);
       }
     };
+    window.addEventListener('message', handleMessage);
 
-    window.addEventListener("message", handleMessage);
-    return () => window.removeEventListener("message", handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
   });
-
-  const step = $derived(tutorial?.steps[currentStep]);
 </script>
 
-{#if tutorial && step}
+{#if step}
   <div class="tutorial-container">
     <div class="content-area">
-      <StepContent {step} />
+      <StepContent
+        content={step.htmlContent || ''}
+      />
     </div>
     <div class="nav-area">
       <Nav
-        {currentStep}
-        totalSteps={tutorial.steps.length}
+        currentStep={currentStepIndex}
+        {totalSteps}
         stepType={step.type}
         {isShowingSolution}
       />

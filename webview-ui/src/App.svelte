@@ -1,5 +1,5 @@
 <script lang="ts">
-  import Tutorial from './lib/Tutorial.svelte'
+  import Tutorial from "./lib/Tutorial.svelte";
 </script>
 
 <main>

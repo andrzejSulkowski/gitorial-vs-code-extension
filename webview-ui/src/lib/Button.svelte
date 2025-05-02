@@ -26,4 +26,3 @@
     cursor: not-allowed;
   }
 </style>
-

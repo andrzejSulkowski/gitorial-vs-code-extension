@@ -15,6 +15,7 @@
     "@types/prismjs": "^1.26.5",
     "svelte": "^5.23.1",
     "svelte-check": "^4.1.5",
+    "svelte-copy": "^2.0.0",
     "typescript": "~5.7.2",
     "vite": "^6.3.1"
   },
@@ -27,7 +28,6 @@
     "remark-gfm": "^4.0.1",
     "remark-parse": "^11.0.0",
     "remark-rehype": "^11.1.2",
-    "svelte-copy-to-clipboard": "^0.2.5",
     "unified": "^11.0.5"
   }
 }

@@ -1,4 +1,5 @@
-# VS Code Extension - Gitorial 
+# Gitorial
+
 ![Version](https://img.shields.io/badge/version-0.1.0--alpha.1-yellow)
 ![Status](https://img.shields.io/badge/status-experimental-orange)
 
@@ -29,6 +30,7 @@ A VS Code extension that enables interactive, step-by-step, [Gitorial-based](htt
    - Use the "Next" and "Back" buttons to navigate through tutorial steps
 
 ### For Tutorial Authors
+
 Take a look at the official documentation [here](https://github.com/gitorial-sdk)
 
 ## Development
@@ -50,6 +52,7 @@ Take a look at the official documentation [here](https://github.com/gitorial-sdk
 ### How It Works
 
 The extension:
+
 1. Clones the tutorial repository (if needed) or uses a local one.
 2. Uses `TutorialBuilder` to load tutorial steps and metadata from the repository (based on commit history).
 3. Creates a `Tutorial` instance to hold the loaded tutorial data and manage the current step state.

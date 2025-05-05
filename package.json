@@ -31,7 +31,9 @@
     "gitorial",
     "guide"
   ],
-  "activationEvents": [],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
   "main": "./out/extension.js",
   "contributes": {
     "commands": [
@@ -54,7 +56,8 @@
     "watch": "tsc -watch -p ./tsconfig.build.json",
     "pretest": "npm run compile && npm run lint",
     "lint": "eslint src",
-    "test": "vscode-test"
+    "test": "vscode-test",
+    "vscode:package": "vsce package"
   },
   "devDependencies": {
     "@types/markdown-it": "^14.1.2",

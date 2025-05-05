@@ -2,7 +2,7 @@ import * as vscode from "vscode";
 import { TutorialBuilder, Tutorial } from "./services/tutorial";
 import { GitService } from "./services/git";
 import { TutorialPanel } from "./panels/TutorialPanel";
-import { TutorialController } from './controllers/TutorialController';
+import { TutorialController } from "./controllers/TutorialController";
 import path from "path";
 import fs from "fs";
 
@@ -21,7 +21,7 @@ export async function activate(context: vscode.ExtensionContext) {
     ),
     vscode.commands.registerCommand("gitorial.openTutorial", () =>
       openTutorialSelector(context)
-    ),
+    )
   );
 }
 
@@ -56,7 +56,8 @@ async function cloneTutorial(context: vscode.ExtensionContext): Promise<void> {
       const overwrite = await vscode.window.showWarningMessage(
         `Folder "${repoName}" already exists. Overwrite?`,
         { modal: true },
-        "Yes", "No"
+        "Yes",
+        "No"
       );
       if (overwrite === "Yes") {
         fs.rmSync(targetDir, { recursive: true, force: true });
@@ -97,10 +98,9 @@ async function openTutorialSelector(
     if (quickPickChoice) option = quickPickChoice;
   }
 
-
   switch (option) {
     case USE_CURRENT:
-      openTutorial(tutorial!, context);
+      await openTutorial(tutorial!, context);
       break;
     case SELECT_DIRECTORY:
       const folderPick = await vscode.window.showOpenDialog({
@@ -116,7 +116,8 @@ async function openTutorialSelector(
         if (!tutorial) {
           throw new Error("Path was not valid");
         }
-        openTutorial(tutorial!, context);
+
+        await openFolderForTutorial(tutorial, context);
       }
       break;
   }
@@ -125,7 +126,9 @@ async function openTutorialSelector(
 /**
  * Detect if the current workspace is a Gitorial repository
  */
-async function findWorkspaceTutorial(context: vscode.ExtensionContext): Promise<Tutorial | null> {
+async function findWorkspaceTutorial(
+  context: vscode.ExtensionContext
+): Promise<Tutorial | null> {
   const workspaceFolders = vscode.workspace.workspaceFolders;
   if (!workspaceFolders || workspaceFolders.length === 0) {
     return null;
@@ -141,51 +144,68 @@ async function findWorkspaceTutorial(context: vscode.ExtensionContext): Promise<
   return null;
 }
 
-
-
 /**
- * Ask user if they want to open the tutorial immediately
+ * Ask user if they want to open the tutorial immediately after loading/cloning.
  */
-async function promptToOpenTutorial(tutorial: Tutorial, context: vscode.ExtensionContext): Promise<void> {
+async function promptToOpenTutorial(
+  tutorial: Tutorial,
+  context: vscode.ExtensionContext
+): Promise<void> {
   const openNow = await vscode.window.showInformationMessage(
     "Tutorial loaded successfully. Would you like to open it now?",
     "Open Now"
   );
 
   if (openNow === "Open Now") {
-    await openTutorial(tutorial, context);
+    await openFolderForTutorial(tutorial, context);
   }
 }
 
 /**
- * Opens a tutorial in a new webview panel.
- * @param tutorial - The tutorial object to open
- * @param uiService - The UI service for interaction
- * @param context - The extension context
+ * Helper function to validate tutorial path and open the folder.
+ * @param tutorial The loaded tutorial instance.
  */
-async function openTutorial(tutorialData: Tutorial, context: vscode.ExtensionContext) {
-  const folderPath = tutorialData.localPath;
-  if (!folderPath || typeof folderPath !== 'string') {
-    vscode.window.showErrorMessage('Invalid data provided to openTutorial.');
-    return;
-  }
+async function openFolderForTutorial(tutorial: Tutorial, context: vscode.ExtensionContext): Promise<boolean> {
+  const folderPath = tutorial.localPath;
 
+  try {
+    const folderUri = vscode.Uri.file(folderPath);
+    console.log(`Executing vscode.openFolder for: ${folderUri.fsPath}`);
+    await vscode.commands.executeCommand("vscode.openFolder", folderUri);
+    //If folder is already open in vs code we can directly load the tutorial
+    await openTutorial(tutorial, context);
+    return true;
+  } catch (error) {
+    console.error("Error executing vscode.openFolder:", error);
+    vscode.window.showErrorMessage(`Failed to open folder: ${folderPath}`);
+    return false;
+  }
+}
+
+/**
+ * Opens the tutorial panel for a given Tutorial instance.
+ * Assumes this is called *after* the correct workspace is already open.
+ * @param tutorial The loaded tutorial instance.
+ * @param context The extension context.
+ */
+async function openTutorial(
+  tutorial: Tutorial,
+  context: vscode.ExtensionContext
+) {
   try {
     if (activeController) {
       activeController.dispose();
       activeController = undefined;
     }
 
-    const tutorialInstance = await TutorialBuilder.build(folderPath, context);
-    if (tutorialInstance) {
-      activeController = new TutorialController(tutorialInstance);
-      TutorialPanel.render(context.extensionUri, activeController);
-    } else {
-      vscode.window.showWarningMessage(`Folder does not contain a valid Gitorial structure: ${folderPath}`);
-    }
+    activeController = new TutorialController(tutorial);
+    TutorialPanel.render(context.extensionUri, activeController);
   } catch (error) {
     console.error("Error opening tutorial:", error);
-    vscode.window.showErrorMessage(`Failed to open tutorial: ${error instanceof Error ? error.message : String(error)}`);
+    vscode.window.showErrorMessage(
+      `Failed to open tutorial: ${error instanceof Error ? error.message : String(error)
+      }`
+    );
     if (activeController) {
       activeController.dispose();
       activeController = undefined;

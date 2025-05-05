@@ -74,7 +74,6 @@ export class TutorialController {
   private async updateWebView(): Promise<void> {
     if (!this._panel) return;
 
-    // Use direct property access if getter isn't resolving for linter
     const currentStepIndex = this.tutorial.currentStepIndex;
 
     const step = this.tutorial.steps[currentStepIndex];
@@ -123,14 +122,30 @@ export class TutorialController {
         const currentTabs = this.getCurrentTabsInGroupTwo();
         const targetUriStrings = targetUris.map(u => u.toString());
 
-        const tabsToClose = currentTabs.filter(tab =>
-          !targetUriStrings.includes((tab.input as { uri: vscode.Uri })?.uri?.toString())
-        );
+        const tabsToClose = currentTabs.filter(tab => {
+          const input: any = tab.input;
+          if (input.original && input.modified) {
+            return true;
+          }
+          const uri: vscode.Uri | undefined = (input as { uri?: vscode.Uri }).uri;
+          if (uri) {
+            if (!fs.existsSync(uri.fsPath)) {
+              return true;
+            }
+            if (!targetUriStrings.includes(uri.toString())) {
+              return true;
+            }
+          }
+          return false;
+        });
 
         await this.openFilesInGroupTwo(targetUris);
         await this.closeSpecificTabs(tabsToClose);
 
         contentShown = targetUris.length > 0;
+      } else if (step.type === 'section') {
+        const groupTwoTabs = this.getCurrentTabsInGroupTwo();
+        await this.closeSpecificTabs(groupTwoTabs);
       }
 
       // --- Apply Layout Changes --- 
@@ -246,7 +261,8 @@ export class TutorialController {
   private async closeSpecificTabs(tabsToClose: vscode.Tab[]): Promise<void> {
     if (tabsToClose.length === 0) return;
 
-    const secondTabGroupTabs = this.getCurrentTabsInGroupTwo().filter(t => tabsToClose.map(t => t.label).includes(t.label))
+    const secondTabGroupTabs = this.getCurrentTabsInGroupTwo().filter(t => tabsToClose.map(t => t.label).includes(t.label));
+    console.log("secondTabGroupTabs: ", secondTabGroupTabs);
 
     try {
       await vscode.window.tabGroups.close(secondTabGroupTabs ?? [], false);

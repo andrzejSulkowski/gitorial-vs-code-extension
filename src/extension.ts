@@ -3,6 +3,8 @@ import { TutorialBuilder, Tutorial } from "./services/tutorial";
 import { GitService } from "./services/git";
 import { TutorialPanel } from "./panels/TutorialPanel";
 import { TutorialController } from './controllers/TutorialController';
+import path from "path";
+import fs from "fs";
 
 // Keep track of the active controller to prevent multiple instances for the same tutorial
 let activeController: TutorialController | undefined;
@@ -46,7 +48,23 @@ async function cloneTutorial(context: vscode.ExtensionContext): Promise<void> {
   }
 
   try {
-    const targetDir = folderPick[0].fsPath;
+    const parentDir = folderPick[0].fsPath;
+    const repoName = TutorialBuilder.generateTutorialId(repoUrl);
+    const targetDir = path.join(parentDir, repoName)
+
+    if (fs.existsSync(targetDir)) {
+      const overwrite = await vscode.window.showWarningMessage(
+        `Folder "${repoName}" already exists. Overwrite?`,
+        { modal: true },
+        "Yes", "No"
+      )
+      if (overwrite === "Yes") {
+        fs.rmSync(targetDir, { recursive: true, force: true })
+      } else {
+        return;
+      }
+    }
+
     await GitService.cloneRepo(repoUrl, targetDir);
     const tutorial = await TutorialBuilder.build(targetDir, context);
 

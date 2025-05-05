@@ -38,6 +38,7 @@ export class TutorialController {
       await this.tutorial.prev();
     }
 
+    this._isShowingSolution = false;
     await this.updateWebView();
   }
 
@@ -50,6 +51,7 @@ export class TutorialController {
       await this.tutorial.next();
     }
 
+    this._isShowingSolution = false;
     await this.updateWebView();
   }
 
@@ -72,6 +74,7 @@ export class TutorialController {
   private async updateWebView(): Promise<void> {
     if (!this._panel) return;
 
+    // Use direct property access if getter isn't resolving for linter
     const currentStepIndex = this.tutorial.currentStepIndex;
 
     const step = this.tutorial.steps[currentStepIndex];
@@ -94,37 +97,58 @@ export class TutorialController {
     }
 
     this._panel.reveal();
-    await this.closeEditorsInOtherGroups();
-    await this.wait(50);
 
-    let contentShownInSecondColumn = false;
     try {
+      let contentShown = false;
       if (this._isShowingSolution && step.type === 'template') {
+        // --- Solution Diff View --- 
+        const tabsToClose = this.getCurrentTabsInGroupTwo();
+
         const solutionCommitHash = this.findSolutionCommitHash(currentStepIndex);
         if (solutionCommitHash) {
           await this._gitService.showCommitChanges(solutionCommitHash);
-          contentShownInSecondColumn = true;
+          contentShown = true;
+
+          await this.closeSpecificTabs(tabsToClose);
         } else {
-          console.error('Controller: Could not find solution commit hash for step', currentStepIndex);
-          vscode.window.showWarningMessage('Could not determine solution commit to display.');
+          console.error(`Controller: No solution commit hash found for step ${currentStepIndex + 1}`);
+          vscode.window.showErrorMessage(`Error: No solution commit hash found for step ${currentStepIndex + 1}`);
         }
       } else if (step.type === 'template' || step.type === 'action') {
         const changedFiles = await this._gitService.getChangedFiles();
-        await this.revealFiles(this.tutorial.localPath, changedFiles);
-        contentShownInSecondColumn = true;
+        const targetUris = changedFiles
+          .map(file => vscode.Uri.file(path.join(this.tutorial.localPath, file)))
+          .filter(uri => fs.existsSync(uri.fsPath));
+
+        const currentTabs = this.getCurrentTabsInGroupTwo();
+        const targetUriStrings = targetUris.map(u => u.toString());
+
+        const tabsToClose = currentTabs.filter(tab =>
+          !targetUriStrings.includes((tab.input as { uri: vscode.Uri })?.uri?.toString())
+        );
+
+        await this.openFilesInGroupTwo(targetUris);
+        await this.closeSpecificTabs(tabsToClose);
+
+        contentShown = targetUris.length > 0;
+      }
+
+      // --- Apply Layout Changes --- 
+      if (contentShown) {
+        if (this._isShowingSolution) {
+          await this.maximizeSecondGroup();
+        } else {
+          if (vscode.window.tabGroups.activeTabGroup?.viewColumn !== vscode.ViewColumn.One) {
+            await vscode.commands.executeCommand('workbench.action.focusFirstEditorGroup');
+          }
+        }
       }
     } catch (error) {
-      console.error("Error showing files/diffs:", error);
-      vscode.window.showErrorMessage(`Error displaying step files/changes: ${error}`);
+      console.error("Error showing files/diffs or managing tabs:", error);
+      vscode.window.showErrorMessage(`Error displaying step content: ${error}`);
     }
 
-    if (contentShownInSecondColumn) {
-      await this.wait(100);
-      if (this._isShowingSolution) {
-        await this.maximizeSecondGroup();
-      } 
-    }
-
+    // --- Send Data to Webview --- 
     const viewData: T.WebViewData = {
       tutorialTitle: this.tutorial.title,
       currentStepIndex: currentStepIndex,
@@ -132,8 +156,8 @@ export class TutorialController {
       stepData: step,
       isShowingSolution: this._isShowingSolution,
     };
-
     this._panel.updateView(viewData);
+    console.log("Controller: Webview update message sent.");
   }
 
   // --- Step Calculation Helpers ---
@@ -166,7 +190,7 @@ export class TutorialController {
     if (solutionStepIndex < this.tutorial.steps.length) {
       const solutionStep = this.tutorial.steps[solutionStepIndex];
       if (solutionStep?.type === 'solution') {
-        return solutionStep.commitHash; // ID is the commit hash
+        return solutionStep.commitHash;
       }
     }
     return null;
@@ -177,7 +201,6 @@ export class TutorialController {
   private async restoreLayout(): Promise<void> {
     try {
       await vscode.commands.executeCommand('workbench.action.evenEditorWidths');
-      await this.wait(50);
     } catch (error) {
       console.error("Error evening editor widths:", error);
     }
@@ -186,42 +209,51 @@ export class TutorialController {
   private async maximizeSecondGroup(): Promise<void> {
     try {
       await vscode.commands.executeCommand('workbench.action.focusSecondEditorGroup');
-      await vscode.commands.executeCommand('workbench.action.maximizeEditor');
     } catch (error) {
       console.error("Error maximizing editor group:", error);
     }
   }
 
-  private async closeEditorsInOtherGroups(): Promise<void> {
-    try {
-      await vscode.commands.executeCommand('workbench.action.closeEditorsInOtherGroups');
-    } catch (error) {
-      console.error("Error closing editors in other groups:", error);
-    }
-  }
-
-  private async revealFiles(repoPath: string, changedFiles: string[]): Promise<void> {
-    if (!changedFiles || changedFiles.length === 0) {
-      console.log("Controller: No files to reveal.");
-      return;
-    }
-    try {
-      for (const file of changedFiles) {
-        const filePath = path.join(repoPath, file);
-        if (fs.existsSync(filePath)) {
-          const doc = await vscode.workspace.openTextDocument(filePath);
-          await vscode.window.showTextDocument(doc, { viewColumn: vscode.ViewColumn.Two, preview: false });
-        } else {
-          console.warn(`Controller: File not found, cannot reveal: ${filePath}`);
-        }
+  /** Gets all tabs currently open in the second editor group. */
+  private getCurrentTabsInGroupTwo(): vscode.Tab[] {
+    const groupTwoTabs: vscode.Tab[] = [];
+    for (const tabGroup of vscode.window.tabGroups.all) {
+      if (tabGroup.viewColumn === vscode.ViewColumn.Two) {
+        groupTwoTabs.push(...tabGroup.tabs);
       }
-    } catch (error) {
-      console.error("Error revealing files:", error);
-      vscode.window.showErrorMessage(`Failed to reveal files: ${error}`);
+    }
+    return groupTwoTabs;
+  }
+
+  private async openFilesInGroupTwo(uris: vscode.Uri[]): Promise<void> {
+    if (uris.length === 0) return;
+
+    for (const uri of uris) {
+      try {
+        if (fs.existsSync(uri.fsPath)) {
+          await vscode.window.showTextDocument(uri, { viewColumn: vscode.ViewColumn.Two, preview: false, preserveFocus: true });
+        } else {
+          console.warn(`Controller: File not found, cannot open: ${uri.fsPath}`);
+        }
+      } catch (error) {
+        console.error(`Controller: Error showing document ${uri.fsPath}:`, error);
+        vscode.window.showErrorMessage(`Failed to show file: ${path.basename(uri.fsPath)}`);
+      }
     }
   }
 
-  private wait(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
+  /** Closes a specific list of tabs. */
+  private async closeSpecificTabs(tabsToClose: vscode.Tab[]): Promise<void> {
+    if (tabsToClose.length === 0) return;
+
+    const secondTabGroupTabs = this.getCurrentTabsInGroupTwo().filter(t => tabsToClose.map(t => t.label).includes(t.label))
+
+    try {
+      await vscode.window.tabGroups.close(secondTabGroupTabs ?? [], false);
+    } catch (error) {
+      console.error("Error closing tabs:", error);
+    }
+
+    console.log(`Controller: Finished closing ${tabsToClose.length} tabs.`);
   }
 } 

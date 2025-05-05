@@ -6,14 +6,14 @@ import { TutorialController } from "./controllers/TutorialController";
 import path from "path";
 import fs from "fs";
 
-// Keep track of the active controller to prevent multiple instances for the same tutorial
+const PENDING_OPEN_KEY = 'gitorial:pendingOpenPath'; 
 let activeController: TutorialController | undefined;
 
 /**
  * Main extension activation point
  */
 export async function activate(context: vscode.ExtensionContext) {
-  console.log("🦀 Gitorial engine active");
+  console.log("📖 Gitorial engine active");
 
   context.subscriptions.push(
     vscode.commands.registerCommand("gitorial.cloneTutorial", () =>
@@ -23,6 +23,41 @@ export async function activate(context: vscode.ExtensionContext) {
       openTutorialSelector(context)
     )
   );
+
+  const pendingOpenPath = context.globalState.get<string>(PENDING_OPEN_KEY);
+  const currentWorkspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  let autoOpened = false;
+
+  if (pendingOpenPath && currentWorkspacePath && pendingOpenPath === currentWorkspacePath) {
+    await context.globalState.update(PENDING_OPEN_KEY, undefined);
+    try {
+      const tutorial = await TutorialBuilder.build(currentWorkspacePath, context);
+      if (tutorial) {
+        await openTutorial(tutorial, context);
+        autoOpened = true;
+      }
+    } catch (error) {
+        console.error("Error auto-opening tutorial:", error);
+        vscode.window.showErrorMessage(`Failed to auto-open Gitorial: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  } else if (pendingOpenPath) {
+    await context.globalState.update(PENDING_OPEN_KEY, undefined);
+  }
+
+  if (!autoOpened && currentWorkspacePath) { 
+    const detectedTutorial = await findWorkspaceTutorial(context);
+
+    if (detectedTutorial && activeController?.tutorial.id !== detectedTutorial.id) {
+      const loadChoice = await vscode.window.showInformationMessage(
+        `Gitorial '${detectedTutorial.title}' detected in this workspace. Load it?`,
+        "Load Gitorial", "Dismiss"
+      );
+
+      if (loadChoice === "Load Gitorial") {
+        await openTutorial(detectedTutorial, context);
+      }
+    }
+  }
 }
 
 /**

@@ -21,7 +21,9 @@
   ],
   "license": "MIT",
   "homepage": "https://github.com/andrzejSulkowski/gitorial-vs-code-plugin#readme",
-  "bugs": { "url": "https://github.com/andrzejSulkowski/gitorial-vs-code-plugin/issues" },
+  "bugs": {
+    "url": "https://github.com/andrzejSulkowski/gitorial-vs-code-plugin/issues"
+  },
   "keywords": [
     "git",
     "tutorial",
@@ -32,7 +34,9 @@
     "guide"
   ],
   "activationEvents": [
-    "onStartupFinished"
+    "onStartupFinished",
+    "onCommand:gitorial.cloneTutorial",
+    "onCommand:gitorial.openTutorial"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -51,9 +55,9 @@
     "vscode:prepublish": "npm run compile",
     "compile": "npm run compile:webview && npm run compile:extension && npm run post-build",
     "compile:webview": "cd webview-ui && npm run build && cd ..",
-    "compile:extension": "tsc -p ./tsconfig.build.json",
+    "compile:extension": "node ./esbuild.config.mjs",
     "post-build": "node scripts/post-build.js",
-    "watch": "tsc -watch -p ./tsconfig.build.json",
+    "watch:extension": "node ./esbuild.config.mjs --watch",
     "pretest": "npm run compile && npm run lint",
     "lint": "eslint src",
     "test": "vscode-test",
@@ -68,6 +72,7 @@
     "@typescript-eslint/parser": "^8.28.0",
     "@vscode/test-cli": "^0.0.10",
     "@vscode/test-electron": "^2.4.1",
+    "esbuild": "^0.25.3",
     "eslint": "^9.23.0",
     "typescript": "^5.8.2"
   },

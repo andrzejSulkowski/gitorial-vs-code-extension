@@ -1,6 +1,6 @@
 # Gitorial
 
-![Version](https://img.shields.io/badge/version-0.1.0--alpha.1-yellow)
+![Version](https://img.shields.io/badge/version-0.1.1--alpha-yellow)
 ![Status](https://img.shields.io/badge/status-experimental-orange)
 
 A VS Code extension that enables interactive, step-by-step, [Gitorial-based](https://github.com/gitorial-sdk) tutorials directly in your editor.

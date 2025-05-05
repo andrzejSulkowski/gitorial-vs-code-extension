@@ -5,6 +5,7 @@
   "version": "0.1.0-alpha.1",
   "private": true,
   "publisher": "Andrzej Sulkowski",
+  "icon": "images/gitorial-icon.png",
   "repository": {
     "type": "git",
     "url": "https://github.com/andrzejSulkowski/gitorial-vs-code-plugin"

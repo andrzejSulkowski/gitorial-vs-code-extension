@@ -85,6 +85,12 @@ export class GitService {
         throw error;
       }
     }
+    try {
+      // Use raw Git clean to bypass simple-git clean parsing: remove untracked files and directories
+      await this.git.raw(['clean', '-f', '-d']);
+    } catch (error) {
+      console.error("Error cleaning working directory after checkout:", error);
+    }
   }
 
   /**

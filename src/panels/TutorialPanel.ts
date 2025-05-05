@@ -43,17 +43,14 @@ export class TutorialPanel {
 
     if (TutorialPanel.currentPanel && TutorialPanel.currentPanel._controller === controller) {
       // If panel exists for the *same* controller, reveal it
-      console.log("Revealing existing TutorialPanel for controller");
       TutorialPanel.currentPanel._panel.reveal(ViewColumn.One);
     } else {
        // If panel exists but for a *different* controller, dispose the old one first
        if (TutorialPanel.currentPanel) {
-            console.log("Disposing TutorialPanel for different controller");
             TutorialPanel.currentPanel.dispose();
        }
 
       // Create a new panel
-      console.log(`Creating new TutorialPanel for: ${tutorialTitle}`);
       const panel = window.createWebviewPanel(
         "gitorial", 
         tutorialTitle,
@@ -73,7 +70,6 @@ export class TutorialPanel {
    * Cleans up resources (panel, controller, disposables).
    */
   public dispose() {
-    console.log("Disposing TutorialPanel...");
     TutorialPanel.currentPanel = undefined;
 
     // Dispose the controller associated with this panel
@@ -90,7 +86,6 @@ export class TutorialPanel {
         disposable.dispose();
       }
     }
-    console.log("TutorialPanel disposed.");
   }
 
   /**
@@ -104,7 +99,6 @@ export class TutorialPanel {
    * Method for the controller to send updated data to the webview.
    */
   public updateView(data: T.WebViewData) {
-    console.log("TutorialPanel: Posting updateView to webview", data);
     this._panel.webview.postMessage({ command: 'updateView', data });
   }
 
@@ -170,9 +164,6 @@ export class TutorialPanel {
       `</body>`
     );
 
-    console.log("Final HTML Content Head:", htmlContent.substring(0, htmlContent.indexOf('</head>') + 8));
-    console.log("Final HTML Content Body Scripts:", htmlContent.substring(htmlContent.indexOf('<script')));
-
     return htmlContent;
   }
 
@@ -183,7 +174,6 @@ export class TutorialPanel {
     webview.onDidReceiveMessage(
       (message: any) => {
         const command = message.command;
-        console.log("TutorialPanel received command:", command);
 
         switch (command) {
           case "prev":

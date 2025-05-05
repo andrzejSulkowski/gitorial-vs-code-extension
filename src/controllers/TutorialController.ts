@@ -24,14 +24,12 @@ export class TutorialController {
   }
 
   public dispose(): void {
-    console.log("Disposing TutorialController");
     this._panel = undefined;
   }
 
   // --- Message Handlers from Webview --- 
 
   public async handlePreviousStep(): Promise<void> {
-    console.log('Controller: Handling Previous Step');
     const prevStep = this.getPrevStep();
 
     if (prevStep?.type === 'solution') {
@@ -44,7 +42,6 @@ export class TutorialController {
   }
 
   public async handleNextStep(): Promise<void> {
-    console.log('Controller: Handling Next Step');
     const nextStep = this.getNextStep();
 
     if (nextStep?.type === 'solution') {
@@ -57,7 +54,6 @@ export class TutorialController {
   }
 
   public async handleShowSolution(): Promise<void> {
-    console.log('Controller: Handling Show Solution');
     if (!this._isShowingSolution) {
       this._isShowingSolution = true;
       await this.updateWebView();
@@ -65,7 +61,6 @@ export class TutorialController {
   }
 
   public async handleHideSolution(): Promise<void> {
-    console.log('Controller: Handling Hide Solution');
     if (this._isShowingSolution) {
       this._isShowingSolution = false;
       await this.updateWebView();
@@ -78,7 +73,6 @@ export class TutorialController {
     if (!this._panel) return;
 
     const currentStepIndex = this.tutorial.currentStepIndex;
-    console.log(`Controller: Updating Webview. Step: ${currentStepIndex}, Solution: ${this._isShowingSolution}`);
 
     const step = this.tutorial.steps[currentStepIndex];
     if (!step) {
@@ -128,9 +122,7 @@ export class TutorialController {
       await this.wait(100);
       if (this._isShowingSolution) {
         await this.maximizeSecondGroup();
-      } else {
-        console.log("Controller: Ensuring layout remains even.");
-      }
+      } 
     }
 
     const viewData: T.WebViewData = {
@@ -142,7 +134,6 @@ export class TutorialController {
     };
 
     this._panel.updateView(viewData);
-    console.log("Controller: Webview update message sent.");
   }
 
   // --- Step Calculation Helpers ---
@@ -185,7 +176,6 @@ export class TutorialController {
 
   private async restoreLayout(): Promise<void> {
     try {
-      console.log("Controller: Evening editor widths...");
       await vscode.commands.executeCommand('workbench.action.evenEditorWidths');
       await this.wait(50);
     } catch (error) {
@@ -195,10 +185,8 @@ export class TutorialController {
 
   private async maximizeSecondGroup(): Promise<void> {
     try {
-      console.log("Controller: Focusing second group and maximizing...");
       await vscode.commands.executeCommand('workbench.action.focusSecondEditorGroup');
       await vscode.commands.executeCommand('workbench.action.maximizeEditor');
-      console.log("Controller: Maximized second group.");
     } catch (error) {
       console.error("Error maximizing editor group:", error);
     }
@@ -217,7 +205,6 @@ export class TutorialController {
       console.log("Controller: No files to reveal.");
       return;
     }
-    console.log("Controller: Revealing files:", changedFiles);
     try {
       for (const file of changedFiles) {
         const filePath = path.join(repoPath, file);

@@ -50,16 +50,16 @@ async function cloneTutorial(context: vscode.ExtensionContext): Promise<void> {
   try {
     const parentDir = folderPick[0].fsPath;
     const repoName = TutorialBuilder.generateTutorialId(repoUrl);
-    const targetDir = path.join(parentDir, repoName)
+    const targetDir = path.join(parentDir, repoName);
 
     if (fs.existsSync(targetDir)) {
       const overwrite = await vscode.window.showWarningMessage(
         `Folder "${repoName}" already exists. Overwrite?`,
         { modal: true },
         "Yes", "No"
-      )
+      );
       if (overwrite === "Yes") {
-        fs.rmSync(targetDir, { recursive: true, force: true })
+        fs.rmSync(targetDir, { recursive: true, force: true });
       } else {
         return;
       }

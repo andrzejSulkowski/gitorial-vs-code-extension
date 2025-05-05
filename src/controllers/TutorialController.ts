@@ -172,7 +172,6 @@ export class TutorialController {
       isShowingSolution: this._isShowingSolution,
     };
     this._panel.updateView(viewData);
-    console.log("Controller: Webview update message sent.");
   }
 
   // --- Step Calculation Helpers ---
@@ -260,16 +259,11 @@ export class TutorialController {
   /** Closes a specific list of tabs. */
   private async closeSpecificTabs(tabsToClose: vscode.Tab[]): Promise<void> {
     if (tabsToClose.length === 0) return;
-
     const secondTabGroupTabs = this.getCurrentTabsInGroupTwo().filter(t => tabsToClose.map(t => t.label).includes(t.label));
-    console.log("secondTabGroupTabs: ", secondTabGroupTabs);
-
     try {
       await vscode.window.tabGroups.close(secondTabGroupTabs ?? [], false);
     } catch (error) {
       console.error("Error closing tabs:", error);
     }
-
-    console.log(`Controller: Finished closing ${tabsToClose.length} tabs.`);
   }
 } 

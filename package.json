@@ -2,9 +2,10 @@
   "name": "gitorial",
   "displayName": "Gitorial",
   "description": "Interactive VS Code extension that guides you step-by-step through Git-based tutorials with inline explanations and easy navigation.",
-  "version": "0.1.0-alpha.1",
+  "version": "0.1.0",
+  "preview": true,
   "private": true,
-  "publisher": "Andrzej Sulkowski",
+  "publisher": "AndrzejSulkowski",
   "icon": "images/gitorial-icon.png",
   "repository": {
     "type": "git",
@@ -12,11 +13,23 @@
   },
   "type": "commonjs",
   "engines": {
-    "vscode": "^1.99.0"
+    "vscode": "^1.87.0"
   },
   "categories": [
     "Education",
     "Other"
+  ],
+  "license": "MIT",
+  "homepage": "https://github.com/andrzejSulkowski/gitorial-vs-code-plugin#readme",
+  "bugs": { "url": "https://github.com/andrzejSulkowski/gitorial-vs-code-plugin/issues" },
+  "keywords": [
+    "git",
+    "tutorial",
+    "interactive",
+    "learning",
+    "education",
+    "gitorial",
+    "guide"
   ],
   "activationEvents": [],
   "main": "./out/extension.js",
@@ -47,7 +60,7 @@
     "@types/markdown-it": "^14.1.2",
     "@types/mocha": "^10.0.10",
     "@types/node": "20.x",
-    "@types/vscode": "^1.99.0",
+    "@types/vscode": "^1.87.0",
     "@typescript-eslint/eslint-plugin": "^8.28.0",
     "@typescript-eslint/parser": "^8.28.0",
     "@vscode/test-cli": "^0.0.10",

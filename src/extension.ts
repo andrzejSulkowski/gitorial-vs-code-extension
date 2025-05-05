@@ -170,7 +170,6 @@ async function openFolderForTutorial(tutorial: Tutorial, context: vscode.Extensi
 
   try {
     const folderUri = vscode.Uri.file(folderPath);
-    console.log(`Executing vscode.openFolder for: ${folderUri.fsPath}`);
     await vscode.commands.executeCommand("vscode.openFolder", folderUri);
     //If folder is already open in vs code we can directly load the tutorial
     await openTutorial(tutorial, context);

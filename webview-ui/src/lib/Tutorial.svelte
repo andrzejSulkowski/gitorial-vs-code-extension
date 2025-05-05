@@ -22,7 +22,7 @@
         step = data.stepData;
         isShowingSolution = data.isShowingSolution;
       } else {
-        console.log("Webview received unhandled command:", message.command);
+        console.warn("Webview received unhandled command:", message.command);
       }
     };
     window.addEventListener('message', handleMessage);

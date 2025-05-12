@@ -27,6 +27,7 @@
   function handleShowSolution() {
     vscode.postMessage({ command: "showSolution" });
   }
+
   function handleHideSolution() {
     vscode.postMessage({ command: "hideSolution" });
   }
@@ -35,19 +36,21 @@
 </script>
 
 <div class="nav">
+  <div>
+    <Button label="← Back" onClick={handlePrev} disabled={isPrevDisabled} />
+    <Button label="Next →" onClick={handleNext} disabled={isNextDisabled} />
+  </div>
   {#if stepType === "template" && isShowingSolution}
     <Button label="Hide Solution" onClick={handleHideSolution} />
   {:else if stepType === "template" && !isShowingSolution}
     <Button label="Show Solution" onClick={handleShowSolution} />
   {/if}
-  <Button label="← Back" onClick={handlePrev} disabled={isPrevDisabled} />
-  <Button label="Next →" onClick={handleNext} disabled={isNextDisabled} />
 </div>
 
 <style>
   .nav {
     display: flex;
-    justify-content: flex-end;
+    justify-content: space-between;
     width: 100%;
     align-items: end;
     margin-bottom: 12px;

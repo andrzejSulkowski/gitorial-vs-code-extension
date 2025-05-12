@@ -5,8 +5,6 @@
 
 A VS Code extension that enables interactive, step-by-step, [Gitorial-based](https://github.com/gitorial-sdk) gitorials directly in your editor.
 
-![Gitorial Icon](./images/gitorial-icon-hq.png)
-
 ## Table of Contents
 
 - [Features](#features)

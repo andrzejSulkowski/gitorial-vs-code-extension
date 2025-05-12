@@ -63,6 +63,7 @@ export class TutorialPanel {
       );
 
       TutorialPanel.currentPanel = new TutorialPanel(panel, extensionUri, controller);
+      TutorialPanel.currentPanel._panel.reveal(ViewColumn.One);
     }
   }
 

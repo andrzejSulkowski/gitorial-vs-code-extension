@@ -5,8 +5,8 @@ import { TutorialPanel } from "./panels/TutorialPanel";
 import { TutorialController } from "./controllers/TutorialController";
 import path from "path";
 import fs from "fs";
+import { GlobalState } from "./utilities/globalState";
 
-const PENDING_OPEN_KEY = 'gitorial:pendingOpenPath'; 
 let activeController: TutorialController | undefined;
 
 /**
@@ -15,21 +15,23 @@ let activeController: TutorialController | undefined;
 export async function activate(context: vscode.ExtensionContext) {
   console.log("📖 Gitorial engine active");
 
+  const state = new GlobalState(context);
+
   context.subscriptions.push(
     vscode.commands.registerCommand("gitorial.cloneTutorial", () =>
-      cloneTutorial(context)
+      cloneTutorial(context, state)
     ),
     vscode.commands.registerCommand("gitorial.openTutorial", () =>
-      openTutorialSelector(context)
+      openTutorialSelector(context, state)
     )
   );
 
-  const pendingOpenPath = context.globalState.get<string>(PENDING_OPEN_KEY);
+  const pendingOpenPath = state.pendingOpenPath.get();
   const currentWorkspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
   let autoOpened = false;
 
   if (pendingOpenPath && currentWorkspacePath && pendingOpenPath === currentWorkspacePath) {
-    await context.globalState.update(PENDING_OPEN_KEY, undefined);
+    await state.pendingOpenPath.set(undefined);
     try {
       const tutorial = await TutorialBuilder.build(currentWorkspacePath, context);
       if (tutorial) {
@@ -37,14 +39,14 @@ export async function activate(context: vscode.ExtensionContext) {
         autoOpened = true;
       }
     } catch (error) {
-        console.error("Error auto-opening tutorial:", error);
-        vscode.window.showErrorMessage(`Failed to auto-open Gitorial: ${error instanceof Error ? error.message : String(error)}`);
+      console.error("Error auto-opening tutorial:", error);
+      vscode.window.showErrorMessage(`Failed to auto-open Gitorial: ${error instanceof Error ? error.message : String(error)}`);
     }
   } else if (pendingOpenPath) {
-    await context.globalState.update(PENDING_OPEN_KEY, undefined);
+    await state.pendingOpenPath.set(undefined);
   }
 
-  if (!autoOpened && currentWorkspacePath) { 
+  if (!autoOpened && currentWorkspacePath) {
     const detectedTutorial = await findWorkspaceTutorial(context);
 
     if (detectedTutorial && activeController?.tutorial.id !== detectedTutorial.id) {
@@ -63,7 +65,7 @@ export async function activate(context: vscode.ExtensionContext) {
 /**
  * Clone a tutorial repository and load its structure
  */
-async function cloneTutorial(context: vscode.ExtensionContext): Promise<void> {
+async function cloneTutorial(context: vscode.ExtensionContext, state: GlobalState): Promise<void> {
   const repoUrl = await vscode.window.showInputBox({
     prompt: "Git URL of the Gitorial repo",
     value: "https://github.com/shawntabrizi/rust-state-machine.git",
@@ -108,7 +110,7 @@ async function cloneTutorial(context: vscode.ExtensionContext): Promise<void> {
       throw new Error("Failed to load Tutorial inside the Tutorial Service");
     }
 
-    await promptToOpenTutorial(tutorial, context);
+    await promptToOpenTutorial(tutorial, context, state);
   } catch (error) {
     vscode.window.showErrorMessage(`Failed to clone tutorial: ${error}`);
   }
@@ -118,7 +120,8 @@ async function cloneTutorial(context: vscode.ExtensionContext): Promise<void> {
  * Show a selector to choose from available tutorials
  */
 async function openTutorialSelector(
-  context: vscode.ExtensionContext
+  context: vscode.ExtensionContext,
+  state: GlobalState
 ): Promise<void> {
   const USE_CURRENT = "Use Current Workspace";
   const SELECT_DIRECTORY = "Select Directory";
@@ -152,7 +155,7 @@ async function openTutorialSelector(
           throw new Error("Path was not valid");
         }
 
-        await openFolderForTutorial(tutorial, context);
+        await openFolderForTutorial(tutorial, context, state);
       }
       break;
   }
@@ -184,7 +187,8 @@ async function findWorkspaceTutorial(
  */
 async function promptToOpenTutorial(
   tutorial: Tutorial,
-  context: vscode.ExtensionContext
+  context: vscode.ExtensionContext,
+  state: GlobalState
 ): Promise<void> {
   const openNow = await vscode.window.showInformationMessage(
     "Tutorial loaded successfully. Would you like to open it now?",
@@ -192,28 +196,36 @@ async function promptToOpenTutorial(
   );
 
   if (openNow === "Open Now") {
-    await openFolderForTutorial(tutorial, context);
+    await openFolderForTutorial(tutorial, context, state);
   }
 }
 
 /**
- * Helper function to validate tutorial path and open the folder.
+ * Helper function to open the folder.
  * @param tutorial The loaded tutorial instance.
+ * @context vscode.ExtensionContext
  */
-async function openFolderForTutorial(tutorial: Tutorial, context: vscode.ExtensionContext): Promise<boolean> {
+async function openFolderForTutorial(tutorial: Tutorial, context: vscode.ExtensionContext, state: GlobalState): Promise<boolean> {
   const folderPath = tutorial.localPath;
+  const currentWorkspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
 
-  try {
-    const folderUri = vscode.Uri.file(folderPath);
-    await vscode.commands.executeCommand("vscode.openFolder", folderUri);
-    //If folder is already open in vs code we can directly load the tutorial
+  if (folderPath === currentWorkspacePath) {
     await openTutorial(tutorial, context);
     return true;
-  } catch (error) {
-    console.error("Error executing vscode.openFolder:", error);
-    vscode.window.showErrorMessage(`Failed to open folder: ${folderPath}`);
-    return false;
+  } else {
+    try {
+      const folderUri = vscode.Uri.file(folderPath);
+      await state.pendingOpenPath.set(folderUri.fsPath);
+
+      await vscode.commands.executeCommand("vscode.openFolder", folderUri);
+      return true;
+    } catch (error) {
+      console.error("Error executing vscode.openFolder:", error);
+      vscode.window.showErrorMessage(`Failed to open folder: ${folderPath}`);
+      return false;
+    }
   }
+
 }
 
 /**

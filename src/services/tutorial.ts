@@ -3,6 +3,7 @@ import * as T from "@shared/types";
 import * as vscode from "vscode";
 import { GitService } from "./git";
 import { StepService } from "./step";
+import { GlobalState } from "src/utilities/globalState";
 
 export class TutorialBuilder {
   /**
@@ -81,7 +82,7 @@ export class TutorialBuilder {
 
 export class Tutorial implements T.TutorialData {
   gitService: GitService;
-  context: vscode.ExtensionContext;
+  state: GlobalState;
 
   public id: string;
   public repoUrl: string;
@@ -103,7 +104,7 @@ export class Tutorial implements T.TutorialData {
     this.steps = options.steps;
     this._currentStepIndex = options.initialStep ?? 0;
 
-    this.context = options.context;
+    this.state = new GlobalState(options.context);
     this.gitService = options.gitService;
   }
 
@@ -148,6 +149,6 @@ export class Tutorial implements T.TutorialData {
   }
 
   private async saveCurrentStep(): Promise<void> {
-    await this.context.globalState.update(`gitorial:${this.id}:step`, this.currentStepIndex);
+    await this.state.step.set(this.id, this.currentStepIndex);
   }
 }

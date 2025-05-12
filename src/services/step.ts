@@ -5,6 +5,7 @@ import { GitService } from "./git";
 import { DefaultLogFields } from "simple-git";
 import { ListLogLine } from "simple-git";
 import * as vscode from "vscode";
+import { GlobalState } from "src/utilities/globalState";
 
 const md = new MarkdownIt();
 
@@ -12,8 +13,11 @@ const md = new MarkdownIt();
  * Service for handling tutorial steps
  */
 export class StepService {
+  _state: GlobalState;
 
-  constructor() { }
+  constructor(context: vscode.ExtensionContext) {
+    this._state = new GlobalState(context);
+  }
   /**
    * Load tutorial steps from git history
    */
@@ -86,9 +90,9 @@ export class StepService {
     return steps;
   }
   static async writeStepState(context: vscode.ExtensionContext, id: string, step: number) {
-    await context.globalState.update(`gitorial:${id}:step`, step);
+    await new GlobalState(context).step.set(id, step);
   }
   static readStepState(context: vscode.ExtensionContext, id: string): number {
-    return context.globalState.get<number>(`gitorial:${id}:step`, 0);
+    return new GlobalState(context).step.get(id) ?? 0;
   }
 }

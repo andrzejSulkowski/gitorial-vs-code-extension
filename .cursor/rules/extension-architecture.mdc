@@ -1,0 +1,18 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Extension Architecture
+
+Principles for designing a well-structured VS Code extension.
+
+<rule>
+name: extension_architecture
+description: Guidelines for separation of concerns, message passing between webview/core, and state management.
+
+# Actual guidelines:
+- Implement a clear separation of concerns between different extension components
+- Use message passing for communication between the webview and the core extension
+- Implement proper state management using the GlobalState class
+</rule>

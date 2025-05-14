@@ -1,0 +1,17 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Accessibility (a11y)
+
+Guidelines for ensuring the extension is accessible to all users.
+
+<rule>
+name: accessibility_a11y
+description: Focuses on making custom UI elements accessible via ARIA guidelines and testing with keyboard/screen readers.
+
+# Actual guidelines:
+- Ensure custom UI elements (Webviews, TreeViews) are accessible by following ARIA guidelines.
+- Test UI with keyboard navigation and screen readers where applicable.
+</rule>

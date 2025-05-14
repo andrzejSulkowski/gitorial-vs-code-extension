@@ -1,0 +1,21 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# VS Code API Usage
+
+Best practices for utilizing the Visual Studio Code API effectively.
+
+<rule>
+name: vscode_api_usage
+description: Guidelines for using appropriate APIs, command registration, disposable management, configuration access, notifications, and API version awareness.
+
+# Actual guidelines:
+- Utilize appropriate VS Code APIs for core extension functionality (e.g., `vscode.window`, `vscode.commands`, `vscode.workspace`).
+- Follow best practices for registering and invoking commands (`vscode.commands.registerCommand`, `vscode.commands.executeCommand`).
+- Manage disposables effectively by adding them to the `context.subscriptions` array or by manually disposing them when no longer needed.
+- Use `vscode.workspace.getConfiguration` for accessing extension and workspace settings.
+- Employ `vscode.window.showInformationMessage`, `showWarningMessage`, `showErrorMessage` for user notifications.
+- Be mindful of API deprecations and updates in newer VS Code versions.
+</rule>

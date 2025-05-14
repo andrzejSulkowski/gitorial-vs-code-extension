@@ -15,6 +15,18 @@ export class GitService {
   }
 
   /**
+   * Centralized helper to check if a branch name matches gitorial patterns.
+   */
+  private static _isGitorialBranchNamePattern(branchName: string): boolean {
+    // Check if 'gitorial' is one of the path segments in the branch name.
+    // e.g., 'gitorial', 'origin/gitorial', 'remotes/origin/gitorial', 'feature/gitorial'
+    // This correctly handles cases like 'my/branch/is/ThisIsAFakeGitorialBranch' (evaluates to false)
+    // versus 'my/branch/is/gitorial' (evaluates to true).
+    const segments = branchName.split('/');
+    return segments.includes('gitorial');
+  }
+
+  /**
    * Clone a repository to a target directory
    */
   static async cloneRepo(repoUrl: string, targetDir: string): Promise<GitService> {
@@ -33,26 +45,45 @@ export class GitService {
   async setupGitorialBranch(): Promise<void> {
     const branches = await this.git.branch();
 
-    if (branches.all.includes("gitorial")) {
+    if (branches.current === 'gitorial' && branches.all.includes('gitorial')) {
       return;
     }
+    // Check if local 'gitorial' branch exists (but not current), try to checkout
+    if (branches.all.includes('gitorial')) {
+        try {
+            await this.git.checkout('gitorial');
+            return;
+        } catch (checkoutError) {
+            console.warn("Failed to checkout existing local 'gitorial' branch, will try to set up from remote.", checkoutError);
+        }
+    }
 
-    const remoteGitorial = branches.all.find(branch =>
-      branch.includes('/gitorial') ||
-      branch === 'remotes/origin/gitorial' ||
-      branch === 'origin/gitorial' ||
-      branch === 'refs/remotes/origin/hack'
+    const remoteGitorialCandidate = branches.all.find(branch =>
+      branch.startsWith('remotes/') && GitService._isGitorialBranchNamePattern(branch)
     );
 
-    if (remoteGitorial) {
+    if (remoteGitorialCandidate) {
+      const parts = remoteGitorialCandidate.split('/');
+      let remoteName = "origin";
+      let remoteBranchName = "gitorial";
+
+      if (parts.length >= 3 && parts[0] === "remotes") {
+        remoteName = parts[1];
+        remoteBranchName = parts.slice(2).join('/');
+      } else if (parts.length >= 2 && !parts[0].includes("remotes")) {
+        // Handles cases like 'origin/gitorial'
+        remoteName = parts[0];
+        remoteBranchName = parts.slice(1).join('/');
+      }
+
       try {
-        await this.git.checkout(["-b", "gitorial", "--track", "origin/gitorial"]);
+        await this.git.checkout(["-b", "gitorial", "--track", `${remoteName}/${remoteBranchName}`]);
       } catch (error) {
-        await this.git.fetch(["origin", "gitorial:gitorial"]);
+        await this.git.fetch([remoteName, `${remoteBranchName}:gitorial`]);
         await this.git.checkout("gitorial");
       }
     } else {
-      throw new Error("No gitorial branch found.");
+      throw new Error("No suitable remote gitorial branch found to set up.");
     }
   }
 
@@ -101,6 +132,38 @@ export class GitService {
   }
 
   /**
+   * Checks if a remote URL points to a valid Gitorial repository by looking for characteristic branches.
+   * @param repoUrl - The URL of the remote repository.
+   * @returns True if the repository is a valid Gitorial repository, false otherwise.
+   */
+  static async isValidRemoteGitorialRepo(repoUrl: string): Promise<boolean> {
+    const git = simpleGit();
+    try {
+      //        COMMIT_SHA_1<tab>refs/heads/BRANCH_NAME_1
+      //        COMMIT_SHA_2<tab>refs/heads/BRANCH_NAME_2
+      //        ...
+      const remoteInfo = await git.listRemote(['--heads', repoUrl]);
+      if (typeof remoteInfo !== 'string') return false;
+
+      const remoteBranches = remoteInfo.split('\n')
+        .map(line => {
+          const parts = line.split('\t');
+          return parts.length > 1 ? parts[1] : ''; //parts[1] = refs/heads/BRANCH_NAME_1
+        })
+        .filter(name => name);
+
+      const normalizedRemoteBranches = remoteBranches.map(ref =>
+        ref.startsWith('refs/heads/') ? ref.substring('refs/heads/'.length) : ref
+      );
+      
+      return normalizedRemoteBranches.some(branchName => GitService._isGitorialBranchNamePattern(branchName));
+    } catch (error) {
+      console.error(`Error checking remote gitorial repo ${repoUrl}:`, error);
+      return false;
+    }
+  }
+
+  /**
    * Gets the repo URL
    */
   async getRepoUrl(): Promise<string> {
@@ -125,18 +188,13 @@ export class GitService {
   }
 
   /**
-   * Check if the repository is a valid Gitorial repository
+   * Check if the repository is a valid Gitorial repository (based on local branches)
    */
   async isValidGitorialRepo(): Promise<boolean> {
-    //TODO: What about the remote branches? We should check them as well and think about how to treat remote branches (valid repo?, inform caller?)
     const { branches } = await this.getRepoInfo();
-    const hasGitorialBranch = branches.all.some(branch =>
-      branch === 'gitorial' ||
-      branch.includes('/gitorial')
-    );
-
-    return hasGitorialBranch;
+    return branches.all.some(branch => GitService._isGitorialBranchNamePattern(branch));
   }
+
   /**
    * Get commit history from the gitorial branch
    */

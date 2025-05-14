@@ -2,7 +2,7 @@
   "name": "gitorial",
   "displayName": "Gitorial",
   "description": "Interactive VS Code extension that guides you step-by-step through Git-based tutorials with inline explanations and easy navigation.",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "preview": true,
   "private": true,
   "publisher": "AndrzejSulkowski",
@@ -35,8 +35,7 @@
   ],
   "activationEvents": [
     "onStartupFinished",
-    "onCommand:gitorial.cloneTutorial",
-    "onCommand:gitorial.openTutorial"
+    "onUri"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -48,6 +47,16 @@
       {
         "command": "gitorial.openTutorial",
         "title": "Gitorial: Open Tutorial"
+      },
+      {
+        "command": "gitorial.signin",
+        "title": "Gitorial: Sign In"
+      }
+    ],
+    "uriHandler": [
+      {
+        "id": "gitorial-uri-handler",
+        "label": "Gitorial URI Handler"
       }
     ]
   },
@@ -61,19 +70,27 @@
     "pretest": "npm run compile && npm run lint",
     "lint": "eslint src",
     "test": "vscode-test",
-    "vscode:package": "vsce package"
+    "vscode:package": "vsce package",
+    "test:unit:js": "mocha dist/test/unit",
+    "test:unit": "mocha --require ts-node/register src/libs/**/*.test.ts"
   },
   "devDependencies": {
+    "@types/chai": "^5.2.2",
     "@types/markdown-it": "^14.1.2",
     "@types/mocha": "^10.0.10",
     "@types/node": "20.x",
+    "@types/sinon": "^17.0.4",
     "@types/vscode": "^1.87.0",
     "@typescript-eslint/eslint-plugin": "^8.28.0",
     "@typescript-eslint/parser": "^8.28.0",
     "@vscode/test-cli": "^0.0.10",
     "@vscode/test-electron": "^2.4.1",
+    "chai": "^5.2.0",
     "esbuild": "^0.25.3",
     "eslint": "^9.23.0",
+    "mocha": "^11.2.2",
+    "sinon": "^20.0.0",
+    "ts-node": "^10.9.2",
     "typescript": "^5.8.2"
   },
   "dependencies": {

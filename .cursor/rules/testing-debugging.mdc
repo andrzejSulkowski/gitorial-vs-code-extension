@@ -1,0 +1,18 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Testing and Debugging
+
+Approaches for effective testing and debugging of the extension.
+
+<rule>
+name: testing_and_debugging
+description: Guidelines for using VS Code Debugging, Chrome inspection, unit tests, and built-in extension debugging.
+
+# Actual guidelines:
+- Utilize VS Code Debugging with Chrome inspection for debugging
+- Implement unit tests for core extension functionality
+- Use VS Code's built-in extension debugging for testing during development
+</rule>

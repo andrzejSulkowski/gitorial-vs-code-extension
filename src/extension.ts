@@ -5,9 +5,13 @@ import { TutorialPanel } from "./panels/TutorialPanel";
 import { TutorialController } from "./controllers/TutorialController";
 import path from "path";
 import fs from "fs";
-import { GlobalState } from "./utilities/globalState";
+import { GlobalState } from "./utilities/GlobalState";
+import { UriParser } from "./libs/uri-parser/UriParser";
 
 let activeController: TutorialController | undefined;
+
+// This is ${publisher}.${name} from package.json
+const extensionId = 'AndrzejSulkowski.gitorial';
 
 /**
  * Main extension activation point
@@ -16,6 +20,26 @@ export async function activate(context: vscode.ExtensionContext) {
   console.log("📖 Gitorial engine active");
 
   const state = new GlobalState(context);
+
+  vscode.window.registerUriHandler({
+    handleUri: (uri: vscode.Uri): vscode.ProviderResult<void> => {
+      console.log("external uri hit");
+      const result = UriParser.parse(uri.toString());
+      if (!result) {
+        vscode.window.showErrorMessage("Invalid URI");
+        return;
+      }
+      const { repoUrl, commitHash } = result.payload;
+
+      GitService.isValidRemoteGitorialRepo(repoUrl).then(async isValid => {
+        if (isValid) {
+          // Ask the user if they want to open the tutorial or need to clone it first
+
+        }
+      });
+
+    }
+  });
 
   context.subscriptions.push(
     vscode.commands.registerCommand("gitorial.cloneTutorial", () =>

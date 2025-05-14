@@ -3,7 +3,7 @@ import * as T from "@shared/types";
 import * as vscode from "vscode";
 import { GitService } from "./git";
 import { StepService } from "./step";
-import { GlobalState } from "src/utilities/globalState";
+import { GlobalState } from "src/utilities/GlobalState";
 
 export class TutorialBuilder {
   /**

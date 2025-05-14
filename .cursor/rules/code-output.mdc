@@ -1,0 +1,20 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Code Output
+
+Standards for how AI-generated code should be presented.
+
+<rule>
+name: code_output_guidelines
+description: Rules for including necessary imports, comments for significant changes, and handling large files, plus adherence to VS Code docs.
+
+# Actual guidelines:
+- Include all necessary imports, declarations, and surrounding code to ensure the file is complete and functional
+- Provide comments or explanations for significant changes or additions within the file
+- If the file is too large to reasonably include in full, provide the most relevant complete section and clearly indicate where it fits in the larger file structure
+
+Follow VS Code Extension documentation for best practices
+</rule>

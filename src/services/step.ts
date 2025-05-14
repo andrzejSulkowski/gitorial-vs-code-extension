@@ -5,7 +5,7 @@ import { GitService } from "./git";
 import { DefaultLogFields } from "simple-git";
 import { ListLogLine } from "simple-git";
 import * as vscode from "vscode";
-import { GlobalState } from "src/utilities/globalState";
+import { GlobalState } from "src/utilities/GlobalState";
 
 const md = new MarkdownIt();
 

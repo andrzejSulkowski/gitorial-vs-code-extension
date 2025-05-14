@@ -1,0 +1,18 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Asynchronous Operations
+
+Best practices for handling asynchronous code in VS Code extensions.
+
+<rule>
+name: asynchronous_operations
+description: Recommends async/await, graceful Promise rejection handling, and awareness of async callback execution context.
+
+# Actual guidelines:
+- Use `async/await` for cleaner asynchronous code.
+- Handle Promise rejections gracefully to prevent unhandled errors.
+- Be aware of the execution context of asynchronous callbacks, especially when interacting with UI elements or VS Code APIs that expect to be run on the extension host.
+</rule>

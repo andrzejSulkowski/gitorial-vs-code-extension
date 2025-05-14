@@ -1,0 +1,17 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Security and Privacy
+
+Best practices for ensuring security and respecting user privacy in the extension.
+
+<rule>
+name: security_and_privacy
+description: Mandates HTTPS for network requests and proper error handling/logging.
+
+# Actual guidelines:
+- Use HTTPS for all network requests
+- Implement proper error handling and logging
+</rule>

@@ -47,6 +47,7 @@ export class TutorialController {
         const stepIdx = this._steps.findIndex(s => s.commitHash === commitHash);
         if (stepIdx !== -1) {
           stepId = stepIdx;
+          await this._gitService.checkoutCommit(commitHash);
         }else{
           throw new Error(`Step with commit hash ${stepId} not found`);
         }

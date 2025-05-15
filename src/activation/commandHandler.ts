@@ -12,6 +12,7 @@ import {
 } from "./tutorialOrchestrator";
 import * as T from "@shared/types";
 import { vscDiffDisplayer } from "../extension";
+import { handleExternalUri } from "./uriHandler";
 
 /**
  * The default URL to clone if the user doesn't provide one.
@@ -28,6 +29,9 @@ export function registerCommands(context: vscode.ExtensionContext, state: Global
     ),
     vscode.commands.registerCommand("gitorial.openTutorial", () =>
       openTutorialSelectorCommand(context, state)
+    ),
+    vscode.commands.registerCommand("gitorial.tempTestExternalUri", () => 
+        tempTestExternalUri(context, state)
     )
   );
 }
@@ -207,3 +211,8 @@ export async function openTutorialSelectorCommand(
     vscode.window.showErrorMessage(`Failed to open Gitorial: ${error instanceof Error ? error.message : String(error)}`);
   }
 } 
+
+function tempTestExternalUri(context: vscode.ExtensionContext, state: GlobalState) {
+  const uri = vscode.Uri.parse("cursor://AndrzejSulkowski.gitorial/sync?platform=github&creator=shawntabrizi&repo=rust-state-machine&commitHash=b74e58d9b3165a2e18f11f0fead411a754386c75");
+  handleExternalUri(uri, context, state);
+}

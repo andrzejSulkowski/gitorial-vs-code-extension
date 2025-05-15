@@ -21,7 +21,12 @@ export function registerUriHandler(
   state: GlobalState
 ): void {
   vscode.window.registerUriHandler({
-    handleUri: async (uri: vscode.Uri): Promise<void> => {
+    handleUri: (uri: vscode.Uri) => handleExternalUri(uri, context, state),
+  });
+  console.log("Gitorial: URI handler registered.");
+} 
+
+export const handleExternalUri = async (uri: vscode.Uri, context: vscode.ExtensionContext, state: GlobalState): Promise<void> => {
       console.log(`Gitorial: Received URI: ${uri.toString()}`);
       const { scheme, authority, path: uriPath, query } = uri;
 
@@ -68,8 +73,10 @@ export function registerUriHandler(
         const currentWorkspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
         if (currentWorkspacePath) {
           // Create a VS Code-specific diffDisplayer
+          const receivedTutorialId = TutorialBuilder.generateTutorialId(repoUrl);
           const workspaceTutorial = await TutorialBuilder.build(currentWorkspacePath, state, diffDisplayer);
-          if (workspaceTutorial && workspaceTutorial.repoUrl === repoUrl) {
+          const existingTutorialId = workspaceTutorial?.id;
+          if (existingTutorialId && existingTutorialId === receivedTutorialId) {
             console.log(`Gitorial: URI matches tutorial in current workspace: ${workspaceTutorial.title}`);
             // If a specific commit is requested, set it.
             if (commitHash) {
@@ -83,7 +90,6 @@ export function registerUriHandler(
             } // If no commitHash, it will open to its last known or initial step.
             
             await openTutorial(workspaceTutorial, context); // This handles opening/revealing
-            state.step.clear(tutorialId); // Clear temporary state after use
             return;
           }
         }
@@ -115,7 +121,4 @@ export function registerUriHandler(
         );
         state.step.clear(tutorialId); // Clear temporary state on error
       }
-    },
-  });
-  console.log("Gitorial: URI handler registered.");
-} 
+};

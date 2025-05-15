@@ -27,7 +27,9 @@ export async function openTutorial(
 ): Promise<void> {
   if (activeController && activeController.tutorial.id === tutorial.id) {
     console.log("Tutorial already active, revealing panel.");
+    const currentStep = tutorial.state.step.get(tutorial.id) || 0;
     activeController.revealPanel();
+    await activeController.loadStepToPanel(currentStep);
     return;
   }
 

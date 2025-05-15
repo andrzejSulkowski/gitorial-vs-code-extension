@@ -49,8 +49,8 @@
         "title": "Gitorial: Open Tutorial"
       },
       {
-        "command": "gitorial.signin",
-        "title": "Gitorial: Sign In"
+        "command": "gitorial.tempTestExternalUri",
+        "title": "Gitorial: Temp Test External URI"
       }
     ],
     "uriHandler": [

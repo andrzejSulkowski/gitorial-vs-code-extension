@@ -44,9 +44,11 @@ class TutorialBuilder {
         const stepIndex = steps.findIndex(step => step.commitHash === commitHash);
         if (stepIndex !== -1) {
           savedStep = stepIndex;
+          await state.step.set(id, stepIndex);
         } else {
           console.warn(`Commit hash ${commitHash} not found in steps for tutorial ${id}\nResetting to step 0`);
           savedStep = 0;
+          await state.step.set(id, 0);
         }
       }
 

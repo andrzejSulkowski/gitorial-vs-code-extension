@@ -1,9 +1,9 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
-import { Tutorial } from '../services/tutorial';
+import { Tutorial } from '../models/tutorial/tutorial';
 import { TutorialPanel } from '../panels/TutorialPanel';
-import { GitService } from '../services/git';
+import { GitService } from '../services/Git';
 import * as T from '@shared/types';
 
 /**
@@ -13,18 +13,57 @@ export class TutorialController {
   private _isShowingSolution: boolean = false;
   private _panel: TutorialPanel | undefined;
   private _gitService: GitService;
+  private _steps: T.TutorialStep[];
+  private _isInitialLoading: boolean = false;
 
   constructor(public readonly tutorial: Tutorial) {
     this._gitService = tutorial.gitService;
+    this._steps = tutorial.steps;
   }
 
   public async registerPanel(panel: TutorialPanel): Promise<void> {
     this._panel = panel;
-    await this.updateWebView();
+    // Only update the webview if we're not already in the process of loading a step
+    if (!this._isInitialLoading) {
+      await this.updateWebView();
+    }
   }
 
   public dispose(): void {
     this._panel = undefined;
+  }
+
+  public revealPanel(): void {
+    this._panel?.reveal();
+  }
+
+  public async loadStepToPanel(stepId: number | string): Promise<void> {
+    try {
+      // Set flag to prevent duplicate updates from panel registration
+      this._isInitialLoading = true;
+      
+      if (typeof stepId === 'string') {
+        const commitHash = stepId;
+        const stepIdx = this._steps.findIndex(s => s.commitHash === commitHash);
+        if (stepIdx !== -1) {
+          stepId = stepIdx;
+        }else{
+          throw new Error(`Step with commit hash ${stepId} not found`);
+        }
+      }
+      const success = await this.tutorial.goToStep(stepId);
+      if (success) {
+        this._isShowingSolution = false; // Reset solution view when directly loading a step
+        await this.updateWebView();
+      } else {
+        const errorMessage = `Cannot load step ${stepId + 1}. Step is out of bounds for tutorial "${this.tutorial.title}".`;
+        console.error(`TutorialController: ${errorMessage}`);
+        vscode.window.showErrorMessage(errorMessage);
+      }
+    } finally {
+      // Reset flag after loading is complete
+      this._isInitialLoading = false;
+    }
   }
 
   // --- Message Handlers from Webview --- 
@@ -84,6 +123,8 @@ export class TutorialController {
     }
 
     try {
+      console.log(`Controller: Updating step content for`);
+      console.log(step);
       await this.tutorial.updateStepContent(step);
     } catch (error) {
       console.error("Error preparing step content (checkout/render):", error);
@@ -230,18 +271,16 @@ export class TutorialController {
 
   /** Gets all tabs currently open in the second editor group. */
   private getCurrentTabsInGroupTwo(): vscode.Tab[] {
-    const groupTwoTabs: vscode.Tab[] = [];
-    for (const tabGroup of vscode.window.tabGroups.all) {
-      if (tabGroup.viewColumn === vscode.ViewColumn.Two) {
-        groupTwoTabs.push(...tabGroup.tabs);
-      }
+    const tabGroups = vscode.window.tabGroups;
+    if (tabGroups.all.length < 2) {
+      return [];
     }
-    return groupTwoTabs;
+    // Find the tab group with viewColumn === Two
+    const groupTwo = tabGroups.all.find(group => group.viewColumn === vscode.ViewColumn.Two);
+    return groupTwo?.tabs ? [...groupTwo.tabs] : [];
   }
 
   private async openFilesInGroupTwo(uris: vscode.Uri[]): Promise<void> {
-    if (uris.length === 0) return;
-
     for (const uri of uris) {
       try {
         if (fs.existsSync(uri.fsPath)) {

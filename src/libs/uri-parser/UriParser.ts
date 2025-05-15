@@ -20,10 +20,11 @@ type ParseResult = {
         command: K;
         payload: CommandPayloads[K];
     }
-}[UriCommand] | null;
+}[UriCommand] | Error;
 
 
 class UriParser {
+    //TODO: improve JS Docs
     /**
      * Parses a vscode.Uri object and returns a structured ParseResult object if the URI is valid and recognized.
      * The parsing is designed to be extensible for new commands.
@@ -34,6 +35,8 @@ class UriParser {
      * //   command: UriCommand.Sync,
      * //   payload: { commitHash: 'abc123', githubRepoUrl: 'https://github.com/andrzejSulkowski/gitorial' }
      * // }
+     * // or a more realistic example:
+     * // vscode://AndrzejSulkowski.gitorial/sync?platform=github&creator=shawntabrizi&repo=rust-state-machine&commitHash=b74e58d9b3165a2e18f11f0fead411a754386c75
      *
      * @param uri - The URI string to parse (e.g., "vscode://<extensionId>/<command>?<params>").
      * @returns A ParseResult object if successful, or null if the URI is invalid, unknown, or malformed.
@@ -41,11 +44,6 @@ class UriParser {
     static parse(uri: string): ParseResult {
         try {
             const url = new URL(uri);
-
-            if (url.protocol !== 'vscode:') {
-                console.warn(`Invalid URI protocol: ${url.protocol}. Expected 'vscode:'.`);
-                return null;
-            }
 
             // Extract the command name from the pathname (e.g., "/sync" -> "sync")
             // URI path commands are expected to be lowercase.
@@ -60,26 +58,24 @@ class UriParser {
             }
 
             if (!matchedCommand) {
-                console.warn(`Unknown or unsupported URI command: ${commandNameFromUri} from URI: ${uri.toString()}`);
-                return null;
+                return new Error(`Unknown or unsupported URI command: ${commandNameFromUri} from URI: ${uri.toString()}`);
             }
 
             switch (matchedCommand) {
                 case UriCommand.Sync: {
                     const payload = this.parseSyncPayload(url.searchParams);
-                    if (payload) {
+                    if (!(payload instanceof Error)) {
                         return { command: UriCommand.Sync, payload };
                     }
-                    console.warn(`Failed to parse payload for Sync command from URI: ${uri.toString()}`);
-                    return null;
+                    return new Error(`Failed to parse payload for Sync command from URI: ${uri.toString()}\n${payload.message}`);
                 }
                 default:
                     console.warn(`Unhandled matched command: ${matchedCommand} from URI: ${uri.toString()}`);
-                    return null;
+                    return new Error(`Unhandled matched command: ${matchedCommand} from URI: ${uri.toString()}`);
             }
         } catch (error) {
             console.error(`Error parsing URI: ${uri.toString()}`, error);
-            return null;
+            return new Error(`Error parsing URI: ${uri.toString()}`);
         }
     }
 
@@ -90,15 +86,14 @@ class UriParser {
      * @param searchParams - URLSearchParams object from the parsed URI.
      * @returns A SyncPayload object if all required parameters are present, otherwise null.
      */
-    private static parseSyncPayload(searchParams: URLSearchParams): SyncPayload | null {
+    private static parseSyncPayload(searchParams: URLSearchParams): SyncPayload | Error {
         const creator = searchParams.get('creator');
         const repo = searchParams.get('repo');
         const commitHash = searchParams.get('commitHash');
         const platform = searchParams.get('platform');
 
         if (!SUPPORTED_PLATFORMS.includes(platform as typeof SUPPORTED_PLATFORMS[number])) {
-            console.warn(`Unsupported platform: ${platform} for Sync command in query: ${searchParams.toString()}`);
-            return null;
+            return new Error(`Unsupported platform: ${platform} for Sync command in query: ${searchParams.toString()}`);
         }
 
         if (creator && repo && commitHash) {
@@ -107,8 +102,7 @@ class UriParser {
                 repoUrl: `https://${platform}.com/${creator}/${repo}`
             };
         }
-        console.warn('Missing required parameters (creator, repo, commitHash) for Sync command in query:', searchParams.toString());
-        return null;
+        return new Error(`Missing required parameters (creator, repo, commitHash) for Sync command in query: ${searchParams.toString()}`);
     }
 }
 

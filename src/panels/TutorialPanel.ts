@@ -16,13 +16,10 @@ export class TutorialPanel {
   private _controller: TutorialController; // Reference to the controller
   private _extensionUri: Uri; // Store for asset paths
 
-  private constructor(panel: WebviewPanel, extensionUri: Uri, controller: TutorialController) {
+  private constructor (panel: WebviewPanel, extensionUri: Uri, controller: TutorialController) {
     this._panel = panel;
     this._extensionUri = extensionUri;
     this._controller = controller;
-
-    // Register controller with the panel
-    this._controller.registerPanel(this);
 
     // Set webview html content
     this._panel.webview.html = this._getWebviewContent(this._panel.webview, this._extensionUri);
@@ -38,7 +35,7 @@ export class TutorialPanel {
    * Renders the webview panel, creating a new one if necessary.
    * Associates the panel with a TutorialController.
    */
-  public static render(extensionUri: Uri, controller: TutorialController) {
+  public static async render(extensionUri: Uri, controller: TutorialController) {
     const tutorialTitle = controller.tutorial.title; // Get title from controller's tutorial
 
     if (TutorialPanel.currentPanel && TutorialPanel.currentPanel._controller === controller) {
@@ -63,6 +60,7 @@ export class TutorialPanel {
       );
 
       TutorialPanel.currentPanel = new TutorialPanel(panel, extensionUri, controller);
+      await TutorialPanel.currentPanel._controller.registerPanel(TutorialPanel.currentPanel);
       TutorialPanel.currentPanel._panel.reveal(ViewColumn.One);
     }
   }

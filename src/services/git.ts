@@ -1,6 +1,27 @@
 import simpleGit, { BranchSummary, DefaultLogFields, ListLogLine, RemoteWithRefs, SimpleGit } from "simple-git";
 import path from "path";
-import vscode from "vscode";
+
+// --- Interfaces for VSCode Abstraction ---
+export interface DiffFilePayload {
+  /** Provides the content for the 'old' side of the diff (e.g., the file content from a specific commit). */
+  oldContentProvider: () => Promise<string>;
+  /** Absolute path to the 'current' or 'user's' version of the file on disk. */
+  currentPath: string;
+  /** Relative path of the file, used for display and URI generation. */
+  relativePath: string;
+  /** Short commit hash or identifier for display in the diff title (e.g., "Solution XYZ"). */
+  commitHashForTitle: string;
+  /** The full commit hash associated with the old content, used for internal logic like scheme naming. */
+  originalCommitHash: string;
+}
+
+export interface IDiffDisplayer {
+  /**
+   * Displays diff views for multiple files.
+   * @param filesToDisplay An array of file payloads, each describing a diff to be shown.
+   */
+  displayMultipleDiffs(filesToDisplay: DiffFilePayload[]): Promise<void>;
+}
 
 /**
  * Git service class handling all git-related operations
@@ -8,10 +29,12 @@ import vscode from "vscode";
 export class GitService {
   private git: SimpleGit;
   private repoPath: string;
+  private diffDisplayer: IDiffDisplayer;
 
-  constructor(repoPath: string) {
+  constructor(repoPath: string, diffDisplayer: IDiffDisplayer) {
     this.repoPath = repoPath;
     this.git = simpleGit({ baseDir: repoPath });
+    this.diffDisplayer = diffDisplayer;
   }
 
   /**
@@ -29,11 +52,11 @@ export class GitService {
   /**
    * Clone a repository to a target directory
    */
-  static async cloneRepo(repoUrl: string, targetDir: string): Promise<GitService> {
+  static async cloneRepo(repoUrl: string, targetDir: string, diffDisplayer: IDiffDisplayer): Promise<GitService> {
     const gitInitial = simpleGit();
     await gitInitial.clone(repoUrl, targetDir);
 
-    const service = new GitService(targetDir);
+    const service = new GitService(targetDir, diffDisplayer);
     await service.setupGitorialBranch();
     return service;
   }
@@ -204,40 +227,49 @@ export class GitService {
   }
 
   /**
-   * Show changes between current working directory state and the parent of a specific commit using VS Code's native Source Control diff view
-   * @param commitHash - The hash of the commit to compare against
+   * Prepares data and requests to show changes between current working directory files and their versions in a specific commit.
+   * The actual display is handled by the injected IDiffDisplayer.
+   * @param commitHash - The hash of the commit to compare against (this version will be on the right, "Solution" side).
    */
   async showCommitChanges(commitHash: string): Promise<void> {
-    const changedFiles = await this.getChangedFiles();
-    const scheme = `git-${commitHash}`;
-    const disposable = vscode.workspace.registerTextDocumentContentProvider(scheme, {
+    // Get files changed in the specified commit (compared to its parent).
+    // This determines *which* files to show diffs for.
+    // Assumes HEAD is at commitHash or this logic needs adjustment for arbitrary commitHash.
+    // If checkoutCommit(commitHash) was called, HEAD is commitHash.
+    // getChangedFiles() currently diffs HEAD^ vs HEAD.
+    const changedFilePaths = await this.getChangedFiles(); 
 
-      provideTextDocumentContent: async (uri: vscode.Uri) => {
-        const filePath = uri.path.startsWith('/') ? uri.path.slice(1) : uri.path;
-        try {
-          const content = await this.git.show([`${commitHash}:${filePath}`]);
-          return content;
-        } catch (error) {
-          console.error(`Error getting content for ${filePath} from commit ${commitHash}:`, error);
-          return '';
-        }
-      }
-    });
-
-    for (const file of changedFiles) {
-      const oldUri = vscode.Uri.parse(`${scheme}:/${file}`);
-      const currentUri = vscode.Uri.file(path.join(this.repoPath, file));
-
-      await vscode.commands.executeCommand(
-        'vscode.diff',
-        currentUri,
-        oldUri,
-        `${path.basename(file)} (Your Code ↔ Solution ${commitHash.slice(0, 7)})`,
-        { preview: false, viewColumn: vscode.ViewColumn.Two }
-      );
+    if (changedFilePaths.length === 0) {
+      // Consider informing the user, though an empty diff might also be valid.
+      console.log(`GitService: No changed files found for commit ${commitHash} via getChangedFiles().`);
+      // return; // Optionally return if no files changed
     }
 
-    disposable.dispose();
+    const filesToDisplay: DiffFilePayload[] = [];
+    for (const relativeFilePath of changedFilePaths) {
+      filesToDisplay.push({
+        oldContentProvider: async () => {
+          try {
+            // Fetch content of the file from the specified commit for the 'solution' side
+            return await this.git.show([`${commitHash}:${relativeFilePath}`]);
+          } catch (error) {
+            console.error(`GitService: Error getting content for ${relativeFilePath} from commit ${commitHash}:`, error);
+            return `// Error loading content for ${relativeFilePath}\n// ${error instanceof Error ? error.message : String(error)}`;
+          }
+        },
+        // Path to the user's current version of the file on disk
+        currentPath: path.join(this.repoPath, relativeFilePath),
+        relativePath: relativeFilePath,
+        commitHashForTitle: commitHash.slice(0, 7), // Short hash for the diff title
+        originalCommitHash: commitHash // Full hash for the displayer's internal use (e.g., URI scheme)
+      });
+    }
+    
+    try {
+      await this.diffDisplayer.displayMultipleDiffs(filesToDisplay);
+    } catch (error) {
+      console.error("GitService: Error while requesting to display diffs:", error);
+    }
   }
 
   async getCommitHash(): Promise<string> {

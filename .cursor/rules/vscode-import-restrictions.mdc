@@ -1,0 +1,69 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# VS Code Import Restrictions
+
+Restrict direct VS Code API imports to extension entry point and activation files only.
+
+<rule>
+name: vscode_import_restrictions
+description: Restricts VS Code API imports to extension.ts and src/activation/** files only
+filters:
+  # Match TypeScript files
+  - type: file_extension
+    pattern: "\\.tsx?$"
+  # Match import statements for VS Code API
+  - type: content
+    pattern: "import\\s+[*\\{]\\s+\\w+\\s+from\\s+['\"]vscode['\"]"
+
+actions:
+  - type: reject
+    conditions:
+      # Reject if not in allowed locations
+      - pattern: "^(?!extension\\.ts$|src\\/activation\\/.+).*$"
+        message: "Direct VS Code API imports are only allowed in extension.ts and src/activation/** files. Use dependency injection or interface abstractions instead."
+
+  - type: suggest
+    message: |
+      VS Code API imports (`import * from 'vscode'`) should only be used in:
+      - extension.ts (main entry point)
+      - src/activation/** files (command handlers, URI handlers, etc.)
+      - src/controllers/** files (controllers)
+      
+      For other files:
+      1. Create interfaces that abstract VS Code functionality
+      2. Use dependency injection to pass required functionality
+      3. This improves testability and decouples your code from the VS Code API
+
+examples:
+  - input: |
+      // Bad: VS Code import in a model file
+      // src/models/tutorial.ts
+      import * as vscode from 'vscode';
+      
+      export class Tutorial {
+        openFile(path: string) {
+          vscode.workspace.openTextDocument(path);
+        }
+      }
+    output: |
+      // Good: Using dependency injection and interfaces
+      // src/models/tutorial.ts
+      export interface IFileOpener {
+        openFile(path: string): Promise<void>;
+      }
+      
+      export class Tutorial {
+        constructor(private fileOpener: IFileOpener) {}
+        
+        async openFile(path: string) {
+          await this.fileOpener.openFile(path);
+        }
+      }
+
+metadata:
+  priority: high
+  version: 1.0
+</rule>

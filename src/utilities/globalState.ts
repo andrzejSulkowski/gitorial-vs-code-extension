@@ -1,30 +1,44 @@
-import * as vscode from "vscode";
+import * as T from "@shared/types";
+
+interface IDB {
+  get<T>(key: string): T | undefined;
+  get<T>(key: string, defaultValue: T): T;
+  update(key: string, value: any): Promise<void>;
+  clear(key: string): Promise<void>;
+}
 
 
 class GlobalState {
-  private _context: vscode.ExtensionContext;
+  private _db: IDB;
 
-  constructor(context: vscode.ExtensionContext) {
-    this._context = context;
+  constructor(db: IDB) {
+    this._db = db;
   }
 
   public pendingOpenPath = {
     get: (): string | null => {
-      return this._context.globalState.get<string>("gitorial:pendingOpenPath") ?? null;
+      return this._db.get<string>("gitorial:pendingOpenPath") ?? null;
     },
     set: async (fsPath: string | undefined): Promise<void> => {
-      await this._context.globalState.update("gitorial:pendingOpenPath", fsPath);
+      await this._db.update("gitorial:pendingOpenPath", fsPath);
     }
   };
 
   public step = {
-    get: (id: string): number | null => {
-      return this._context.globalState.get<number>(`gitorial:${id}:step`, 0) ?? null;
+    get: (id: T.TutorialId): number | string => {
+      return this._db.get<number>(`gitorial:${id}:step`, 0);
     },
-    set: async (id: string, step: number): Promise<void> => {
-      this._context.globalState.update(`gitorial:${id}:step`, step);
+    /**
+     * @param id - The tutorial ID
+     * @param step - The step index or commit hash
+     */
+    set: async (id: T.TutorialId, step: number | string): Promise<void> => {
+      this._db.update(`gitorial:${id}:step`, step);
+    },
+    clear: async (id: T.TutorialId): Promise<void> => {
+      await this._db.update(`gitorial:${id}:step`, undefined);
     }
   };
 }
 
-export { GlobalState };
+export { GlobalState, IDB };

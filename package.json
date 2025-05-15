@@ -60,6 +60,7 @@
       }
     ]
   },
+
   "scripts": {
     "vscode:prepublish": "npm run compile",
     "compile": "npm run compile:webview && npm run compile:extension && npm run post-build",
@@ -72,7 +73,7 @@
     "test": "vscode-test",
     "vscode:package": "vsce package",
     "test:unit:js": "mocha dist/test/unit",
-    "test:unit": "mocha --require ts-node/register src/libs/**/*.test.ts"
+    "test:unit": "mocha --require ts-node/register \"src/**/*.test.ts\" --exclude \"src/test/**/*.test.ts\""
   },
   "devDependencies": {
     "@types/chai": "^5.2.2",

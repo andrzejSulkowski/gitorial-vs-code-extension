@@ -1,35 +1,44 @@
 import * as fs from "fs";
 import MarkdownIt from "markdown-it";
-import { TutorialStep, StepType } from "@shared/types";
-import { GitService } from "./git";
+import { TutorialStep, StepType, TutorialId } from "@shared/types";
+import { GitService } from "./Git";
 import { DefaultLogFields } from "simple-git";
 import { ListLogLine } from "simple-git";
-import * as vscode from "vscode";
 import { GlobalState } from "src/utilities/GlobalState";
 
 const md = new MarkdownIt();
 
 /**
- * Service for handling tutorial steps
+ * Service for handling tutorial steps and their state.
+ * Provides methods for loading, updating, and managing tutorial steps.
  */
 export class StepService {
-  _state: GlobalState;
+  private globalState: GlobalState;
 
-  constructor(context: vscode.ExtensionContext) {
-    this._state = new GlobalState(context);
+  /**
+   * Creates a new StepService instance
+   * @param globalState - The global state service for persistent storage
+   */
+  constructor(globalState: GlobalState) {
+    this.globalState = globalState;
   }
+
   /**
    * Load tutorial steps from git history
+   * @param gitService - The git service to use for loading commits
+   * @returns A promise that resolves to an array of tutorial steps
    */
-  static async loadTutorialSteps(gitService: GitService): Promise<TutorialStep[]> {
+  async loadTutorialSteps(gitService: GitService): Promise<TutorialStep[]> {
     const commits = await gitService.getCommitHistory();
-    return this.extractStepsFromCommits(commits);
+    return StepService.extractStepsFromCommits(commits);
   }
 
   /**
    * Update step content by reading markdown files
+   * @param step - The tutorial step to update
+   * @param readmePath - Path to the markdown file
    */
-  static async updateStepContent(step: TutorialStep, readmePath: string): Promise<void> {
+  async updateStepContent(step: TutorialStep, readmePath: string): Promise<void> {
     if (fs.existsSync(readmePath)) {
       const markdown = fs.readFileSync(readmePath, "utf8");
       step.htmlContent = md.render(markdown);
@@ -44,7 +53,28 @@ export class StepService {
   }
 
   /**
-   * Extract tutorial steps from commit history
+   * Save the current step for a tutorial
+   * @param id - The tutorial ID
+   * @param step - The step number or commit hash
+   */
+  async writeStepState(id: TutorialId, step: number | string): Promise<void> {
+    await this.globalState.step.set(id, step);
+  }
+
+  /**
+   * Read the saved step for a tutorial
+   * @param id - The tutorial ID
+   * @returns The saved step number or commit hash, or 0 if none is saved
+   */
+  readStepState(id: TutorialId): number | string {
+    return this.globalState.step.get(id) ?? 0;
+  }
+
+  /**
+   * Extract tutorial steps from Git commit history
+   * This remains static as it's a pure utility function that doesn't depend on instance state
+   * @param commits - The list of Git commits
+   * @returns An array of tutorial steps
    */
   static extractStepsFromCommits(
     commits: readonly (DefaultLogFields & ListLogLine)[]
@@ -88,11 +118,5 @@ export class StepService {
     }
 
     return steps;
-  }
-  static async writeStepState(context: vscode.ExtensionContext, id: string, step: number) {
-    await new GlobalState(context).step.set(id, step);
-  }
-  static readStepState(context: vscode.ExtensionContext, id: string): number {
-    return new GlobalState(context).step.get(id) ?? 0;
   }
 }

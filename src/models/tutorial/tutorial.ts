@@ -80,6 +80,7 @@ export class Tutorial implements T.TutorialData {
     if (stepIndex >= 0 && stepIndex < this.steps.length) {
       this._currentStepIndex = stepIndex;
       await this.saveCurrentStep();
+      await this.updateStepContent(this.steps[stepIndex]);
       return true;
     }
     console.warn(`Attempted to go to invalid step index: ${stepIndex} for tutorial ${this.id}`);

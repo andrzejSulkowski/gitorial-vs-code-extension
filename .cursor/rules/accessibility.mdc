@@ -1,7 +1,7 @@
 ---
-description: 
+description: Editing HTML Markup
 globs: 
-alwaysApply: true
+alwaysApply: false
 ---
 # Accessibility (a11y)
 

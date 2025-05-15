@@ -1,7 +1,7 @@
 ---
 description: 
-globs: 
-alwaysApply: true
+globs: *.svelte,*.html,*.tsx
+alwaysApply: false
 ---
 # UI and Styling
 

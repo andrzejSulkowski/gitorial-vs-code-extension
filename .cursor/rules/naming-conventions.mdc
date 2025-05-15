@@ -1,7 +1,7 @@
 ---
 description: 
-globs: 
-alwaysApply: true
+globs: *.ts
+alwaysApply: false
 ---
 # Naming Conventions
 

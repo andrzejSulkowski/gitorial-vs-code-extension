@@ -1,6 +1,6 @@
 ---
 description: 
-globs: 
+globs: *.test.ts,*.test.spec.ts
 alwaysApply: false
 ---
 # Use Chai for Assertions

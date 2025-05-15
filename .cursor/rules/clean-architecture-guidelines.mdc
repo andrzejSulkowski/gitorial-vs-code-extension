@@ -1,0 +1,71 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Clean Architecture Guidelines
+
+This document outlines the Clean Architecture structure used in this project and the rules for adhering to it. Our architecture is divided into three main layers: UI, Domain, and Infrastructure.
+
+<rule>
+name: clean_architecture_adherence
+description: Ensures that code development follows the established Clean Architecture pattern with UI, Domain, and Infrastructure layers, maintaining proper separation of concerns and dependency directions.
+
+# Layer Definitions and Responsibilities:
+
+- **UI Layer (`src/ui/`)**:
+  - Responsible for all user interface elements and user interaction.
+  - Contains components like panels, views, and UI-specific controllers.
+  - Interacts with the Domain layer via services or use cases.
+  - Should not contain business logic directly.
+  - May depend on the Domain layer.
+  - Should not be directly depended upon by the Domain or Infrastructure layers.
+
+- **Domain Layer (`src/domain/`)**:
+  - The core of the application, containing all business logic, entities, and use cases (services).
+  - Contains domain models, repositories (interfaces), and domain services.
+  - Must be independent of UI and Infrastructure concerns. It should not have any dependencies on a specific UI framework or infrastructure detail (e.g., specific database, VS Code APIs directly).
+  - Defines interfaces (ports) that the Infrastructure layer implements (adapters).
+  - All other layers depend on the Domain layer.
+
+- **Infrastructure Layer (`src/infrastructure/`)**:
+  - Contains implementations for external concerns and technical details.
+  - Includes adapters for databases, file systems, network communications, third-party libraries (like `simple-git`), and VS Code API interactions.
+  - Implements interfaces defined in the Domain layer (ports).
+  - May depend on interfaces from the Domain layer but not on concrete Domain implementations or the UI layer.
+  - Translates data between the format required by external systems/libraries and the format used by the Domain layer.
+
+# Key Principles to Follow:
+
+1.  **Dependency Rule**: Dependencies must always point inwards.
+    *   UI can depend on Domain.
+    *   Infrastructure can depend on Domain (specifically, on interfaces defined in Domain).
+    *   Domain must NOT depend on UI or Infrastructure.
+
+2.  **Separation of Concerns**: Each layer has distinct responsibilities. Do not mix UI logic in the Domain, or business logic in the Infrastructure.
+
+3.  **Interfaces and Adapters (Ports and Adapters)**: The Domain layer defines interfaces (ports) for operations that require external implementation (e.g., data storage, git operations). The Infrastructure layer provides concrete implementations (adapters) for these interfaces.
+
+4.  **Dependency Injection**: Use dependency injection to provide concrete implementations (from Infrastructure) to the Domain layer, usually at the application's composition root or when a use case is initiated.
+
+5.  **Data Flow**:
+    *   User actions in the UI typically trigger use cases/services in the Domain layer.
+    *   The Domain layer processes the request, possibly using Infrastructure adapters via interfaces for data or external actions.
+    *   Results are passed back to the UI for presentation.
+
+# How this rule is enforced:
+This rule primarily serves as a guiding document. Manual code reviews and developer diligence are key to upholding these architectural principles. Future enhancements could involve linting rules or static analysis to partially automate checks (e.g., import restrictions between layers).
+
+**Example of a disallowed import (Illustrative):**
+```typescript
+// In a file within src/domain/...
+// FORBIDDEN: Domain importing from Infrastructure
+// import { SomeInfrastructureSpecificClass } from '../../infrastructure/some-adapter';
+
+// In a file within src/domain/...
+// FORBIDDEN: Domain importing from UI
+// import { MyUIPanel } from '../../ui/panels/my-ui-panel';
+```
+
+Adherence to this architecture ensures the application is maintainable, testable, and scalable.
+</rule>

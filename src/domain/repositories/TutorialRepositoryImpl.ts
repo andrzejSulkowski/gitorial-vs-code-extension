@@ -1,9 +1,12 @@
-import * as path from 'path';
 import { TutorialRepository } from './TutorialRepository';
 import { Tutorial } from '../models/Tutorial';
-import { IStateStorage } from '../../infrastructure/VSCodeState';
-import { IGitOperations } from '../../infrastructure/GitAdapter';
 import { TutorialBuilder } from '../services/TutorialBuilder';
+import { GitService } from '../services/GitService';
+import { IGitOperations } from '../ports/IGitOperations';
+import { IStateStorage } from '../ports/IStateStorage';
+import { IDiffDisplayer } from '../ports/IDiffDisplayer';
+import { IFileSystem } from '../ports/IFileSystem';
+import { IUserInteraction } from '../ports/IUserInteraction';
 
 /**
  * Factory function type for creating Git adapters
@@ -22,21 +25,32 @@ export class TutorialRepositoryImpl implements TutorialRepository {
   private stateStorage: IStateStorage;
   private gitAdapterFactory: GitAdapterFactory;
   private gitCloneAdapterFactory: GitCloneAdapterFactory;
-  
+  private diffDisplayer: IDiffDisplayer;
+  private fileSystem: IFileSystem;
+  private userInteraction: IUserInteraction;
+
   /**
    * Create a new TutorialRepositoryImpl
    * @param stateStorage Storage for persisting tutorial data
    * @param gitAdapterFactory Factory function to create Git adapters
    * @param gitCloneAdapterFactory Factory function to create Git adapters from clones
+   * @param fileSystem File system operations
+   * @param userInteraction User interaction operations
    */
   constructor(
     stateStorage: IStateStorage,
     gitAdapterFactory: GitAdapterFactory,
-    gitCloneAdapterFactory: GitCloneAdapterFactory
+    gitCloneAdapterFactory: GitCloneAdapterFactory,
+    diffDisplayer: IDiffDisplayer,
+    fileSystem: IFileSystem,
+    userInteraction: IUserInteraction
   ) {
     this.stateStorage = stateStorage;
     this.gitAdapterFactory = gitAdapterFactory;
     this.gitCloneAdapterFactory = gitCloneAdapterFactory;
+    this.diffDisplayer = diffDisplayer;
+    this.fileSystem = fileSystem;
+    this.userInteraction = userInteraction;
   }
   
   /**
@@ -47,7 +61,8 @@ export class TutorialRepositoryImpl implements TutorialRepository {
   public async findByPath(localPath: string): Promise<Tutorial | null> {
     try {
       const gitAdapter = this.gitAdapterFactory(localPath);
-      return await TutorialBuilder.buildFromLocalPath(localPath, this.stateStorage, gitAdapter);
+      const gitService = new GitService(gitAdapter, localPath, this.diffDisplayer);
+      return await TutorialBuilder.buildFromLocalPath(localPath, gitService);
     } catch (error) {
       console.error(`Error finding tutorial at path ${localPath}:`, error);
       return null;
@@ -62,7 +77,7 @@ export class TutorialRepositoryImpl implements TutorialRepository {
   public async findById(id: string): Promise<Tutorial | null> {
     // Tutorial IDs are derived from repo URLs, so we don't directly look them up
     // In a real implementation, you might store a mapping of IDs to paths
-    return null;
+    throw new Error("not implemented")
   }
   
   /**
@@ -72,8 +87,7 @@ export class TutorialRepositoryImpl implements TutorialRepository {
    */
   public async findByRepoUrl(repoUrl: string): Promise<Tutorial | null> {
     // In a real implementation, you would look up the repoUrl in your storage
-    // For now, we'll just return null
-    return null;
+    throw new Error("not implemented")
   }
   
   /**
@@ -84,11 +98,33 @@ export class TutorialRepositoryImpl implements TutorialRepository {
    */
   public async createFromClone(repoUrl: string, targetPath: string): Promise<Tutorial> {
     try {
+      // Check if targetPath exists and prompt for overwrite if necessary
+      if (await this.fileSystem.pathExists(targetPath)) {
+        if (await this.fileSystem.isDirectory(targetPath)) {
+          const confirmed = await this.userInteraction.askConfirmation(
+            'Directory Exists',
+            `The directory '${targetPath}' already exists. Do you want to delete its contents and proceed with the clone?`,
+            'Delete and Clone',
+            'Cancel'
+          );
+          if (!confirmed) {
+            throw new Error(`Clone operation cancelled by user: Directory '${targetPath}' not overwritten.`);
+          }
+          // If confirmed, delete the existing directory
+          await this.fileSystem.deleteDirectory(targetPath);
+        } else {
+          // It's a file, which is problematic for cloning into.
+          throw new Error(`Cannot clone into '${targetPath}' because a file with the same name already exists.`);
+        }
+      }
+
       // Clone the repository
       const gitAdapter = await this.gitCloneAdapterFactory(repoUrl, targetPath);
+      const gitService = new GitService(gitAdapter, targetPath, this.diffDisplayer);
+      await gitService.clone();
       
       // Use the builder to create the tutorial
-      const tutorial = await TutorialBuilder.buildFromLocalPath(targetPath, this.stateStorage, gitAdapter);
+      const tutorial = await TutorialBuilder.buildFromLocalPath(targetPath, gitService);
       
       if (!tutorial) {
         throw new Error(`Failed to build tutorial from cloned repository at ${targetPath}`);

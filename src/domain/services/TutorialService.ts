@@ -8,7 +8,7 @@ import { Tutorial } from '../models/Tutorial';
 import { TutorialRepository } from '../repositories/TutorialRepository';
 import { EventBus, EventPayload } from '../events/EventBus';
 import { EventType } from '../events/EventTypes';
-import { IGitOperations } from '../../infrastructure/GitAdapter';
+import { IGitOperations } from '../../infrastructure/adapters/GitAdapter';
 import { IDiffDisplayer, DiffFile } from '../../infrastructure/VSCodeDiffDisplayer';
 import * as path from 'path';
 import * as fs from 'fs';

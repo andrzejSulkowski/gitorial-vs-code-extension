@@ -11,7 +11,6 @@ import {
   openFolderForTutorial,
 } from "./tutorialOrchestrator";
 import * as T from "@shared/types";
-import { vscDiffDisplayer } from "../extension";
 import { handleExternalUri } from "./uriHandler";
 
 /**

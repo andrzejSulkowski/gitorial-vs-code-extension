@@ -22,5 +22,8 @@ export enum EventType {
   GIT_DIFF_DISPLAYED = 'git_diff_displayed',
   
   // Error events
-  ERROR_OCCURRED = 'error_occurred'
+  ERROR_OCCURRED = 'error_occurred',
+
+  // Informational events
+  INFO_MESSAGE_LOGGED = 'info_message_logged'
 }

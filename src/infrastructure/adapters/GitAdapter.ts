@@ -3,59 +3,11 @@
 - Provides Git operations (clone, checkout, etc.)
 */
 
-import simpleGit, { SimpleGit, BranchSummary, DefaultLogFields, ListLogLine, RemoteWithRefs } from 'simple-git';
+import simpleGit, { SimpleGit, BranchSummary, RemoteWithRefs, CommitResult, CheckRepoActions } from 'simple-git';
 import * as path from 'path';
-
-/**
- * Interface for Git operations
- * This is the "port" in the ports & adapters pattern
- */
-export interface IGitOperations {
-  /**
-   * Clone a repository to a target directory
-   */
-  cloneRepo(repoUrl: string, targetDir: string): Promise<void>;
-  
-  /**
-   * Checkout a specific commit
-   */
-  checkoutCommit(commitHash: string): Promise<void>;
-  
-  /**
-   * Get file content from a specific commit
-   */
-  getFileContent(commitHash: string, filePath: string): Promise<string>;
-  
-  /**
-   * Get changed files between current commit and its parent
-   */
-  getChangedFiles(): Promise<string[]>;
-  
-  /**
-   * Get commit history
-   */
-  getCommitHistory(): Promise<readonly (DefaultLogFields & ListLogLine)[]>;
-  
-  /**
-   * Get the repository URL
-   */
-  getRepoUrl(): Promise<string>;
-  
-  /**
-   * Get current commit hash
-   */
-  getCurrentCommitHash(): Promise<string>;
-  
-  /**
-   * Get repository information
-   */
-  getRepoInfo(): Promise<{ remotes: RemoteWithRefs[], branches: BranchSummary }>;
-  
-  /**
-   * Clean the working directory
-   */
-  cleanWorkingDirectory(): Promise<void>;
-}
+import { IGitOperations, DefaultLogFields, ListLogLine } from '../../domain/ports/IGitOperations';
+import { DiffFilePayload } from 'src/domain/ports/IDiffDisplayer';
+import { DiffFile } from 'src/domain/ports/IDiffDisplayer';
 
 /**
  * Adapter for Git operations using simple-git
@@ -71,7 +23,7 @@ export class GitAdapter implements IGitOperations {
    */
   constructor(repoPath: string) {
     this.repoPath = repoPath;
-    this.git = simpleGit({ baseDir: repoPath });
+    this.git = simpleGit({ baseDir: repoPath, binary: 'git', maxConcurrentProcesses: 6 });
   }
   
   /**
@@ -86,13 +38,10 @@ export class GitAdapter implements IGitOperations {
   /**
    * Clone a repository to a target directory
    */
-  public async cloneRepo(repoUrl: string, targetDir: string): Promise<void> {
-    // For existing instances, we'll just clone to the target
-    const git = simpleGit();
-    await git.clone(repoUrl, targetDir);
-    // Update this instance to use the new path
-    this.repoPath = targetDir;
-    this.git = simpleGit({ baseDir: targetDir });
+  static async cloneRepo(repoUrl: string, targetPath: string, progressCallback?: (message: string) => void): Promise<void> {
+    if (progressCallback) progressCallback(`Cloning ${repoUrl} into ${targetPath}...`);
+    await simpleGit().clone(repoUrl, targetPath);
+    if (progressCallback) progressCallback(`Cloned successfully.`);
   }
   
   /**
@@ -171,12 +120,12 @@ export class GitAdapter implements IGitOperations {
   /**
    * Get repository information
    */
-  public async getRepoInfo(): Promise<{ remotes: RemoteWithRefs[], branches: BranchSummary }> {
+  public async getRepoInfo(): Promise<{ webUrl: string; remotes: RemoteWithRefs[], branches: BranchSummary }> {
     const [remotes, branches] = await Promise.all([
       this.git.getRemotes(true),
       this.git.branch()
     ]);
-    return { remotes, branches };
+    return { webUrl: '', remotes, branches };
   }
   
   /**
@@ -199,6 +148,29 @@ export class GitAdapter implements IGitOperations {
     return path.join(this.repoPath, relativePath);
   }
 
+  async getRepoName(): Promise<string> {
+    // In a real implementation, parse from remote URL or other git data
+    return path.basename(this.repoPath);
+  }
+
+  async getCommits(branchOrHash?: string): Promise<Array<DefaultLogFields & ListLogLine>> {
+    const log = await this.git.log(branchOrHash ? [branchOrHash] : []);
+    return log.all as Array<DefaultLogFields & ListLogLine>; // Type assertion, ensure compatibility
+  }
+
+  async getCommitDiff(commitHash: string): Promise<DiffFilePayload[]> {
+    // This requires careful implementation with simple-git's diff parsing.
+    // The `diffSummary` and `diff` methods provide different levels of detail.
+    // For content, `git.show` is needed for each file in the diff.
+    console.warn(`GitAdapter.getCommitDiff for ${commitHash} is schematic and needs full implementation.`);
+    // Example: const diffResult = await this.git.diff([`${commitHash}^!S`]);
+    // Parse diffResult to create DiffFilePayload[]
+    return []; // Placeholder
+  }
+
+  async isGitRepository(): Promise<boolean> {
+    return this.git.checkIsRepo(CheckRepoActions.IS_REPO_ROOT);
+  }
 }
 
 /**

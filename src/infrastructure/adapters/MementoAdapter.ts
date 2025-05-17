@@ -4,44 +4,18 @@
 */
 
 import * as vscode from 'vscode';
+import { IStateStorage } from '../../domain/ports/IStateStorage'; // Import from new location
 
-/**
- * Interface for generic state operations
- * This is the "port" in the ports & adapters pattern
- */
-export interface IStateStorage {
-  /**
-   * Get a value from storage
-   * @param key The key to retrieve
-   * @param defaultValue Optional default value if key doesn't exist
-   */
-  get<T>(key: string, defaultValue?: T): T | undefined;
-  
-  /**
-   * Update a value in storage
-   * @param key The key to update
-   * @param value The value to store
-   */
-  update<T>(key: string, value: T): Promise<void>;
-  
-  /**
-   * Clear a value from storage
-   * @param key The key to clear
-   */
-  clear(key: string): Promise<void>;
-  
-  /**
-   * Check if a key exists in storage
-   * @param key The key to check
-   */
-  has(key: string): boolean;
-}
+// IStateStorage interface is now defined in src/domain/ports/IStateStorage.ts
+// ... existing code ...
+// export interface IStateStorage { ... } // This block should be removed
+// ... existing code ...
 
 /**
  * Adapter for VS Code's Memento state storage
  * This is the "adapter" in the ports & adapters pattern
  */
-export class VSCodeStateAdapter implements IStateStorage {
+export class MementoAdapter implements IStateStorage {
   private memento: vscode.Memento;
 
   constructor(memento: vscode.Memento) {
@@ -66,14 +40,14 @@ export class VSCodeStateAdapter implements IStateStorage {
 }
 
 /**
- * Factory function to create a VSCodeStateAdapter
+ * Factory function to create a MementoAdapter
  * @param context The VS Code extension context
  * @param useWorkspaceState Whether to use workspace state instead of global state
  */
-export function createVSCodeStateAdapter(
+export function createMementoAdapter(
   context: vscode.ExtensionContext,
   useWorkspaceState: boolean = false
-): IStateStorage {
+): MementoAdapter {
   const memento = useWorkspaceState ? context.workspaceState : context.globalState;
-  return new VSCodeStateAdapter(memento);
-}
+  return new MementoAdapter(memento);
+} 

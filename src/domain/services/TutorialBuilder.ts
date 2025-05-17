@@ -5,15 +5,15 @@
 
 import * as path from 'path';
 import * as crypto from 'crypto';
-import { Tutorial } from '../models/Tutorial';
-import { TutorialStep, StepType } from '../models/TutorialStep';
-import { IStateStorage } from '../../infrastructure/VSCodeState';
-import { IGitOperations } from '../../infrastructure/GitAdapter';
+import { Tutorial, TutorialData } from '../models/Tutorial';
+import { Step, StepData } from '../models/Step';
+import { StepState } from '../models/StepState';
 import { GitService } from './GitService';
+import { TutorialId } from '../models/types/TutorialId';
 
 /**
- * Service responsible for building Tutorial instances
- * from various sources (local git repos, etc.)
+ * Constructs Tutorial domain objects from raw data (e.g., repository information,
+ * commit lists, step states). It encapsulates the logic of assembling a valid Tutorial.
  */
 export class TutorialBuilder {
   /**
@@ -26,53 +26,41 @@ export class TutorialBuilder {
    */
   public static async buildFromLocalPath(
     repoPath: string,
-    stateStorage: IStateStorage,
     gitService: GitService
   ): Promise<Tutorial | null> {
     try {
-      // Verify it's a valid Gitorial repo
-      const isValid = await gitService.isValidGitorialRepository();
-      if (!isValid) {
-        console.log(`Not a valid Gitorial repository: ${repoPath}`);
-        return null;
-      }
-      
-      // Get repository info
-      const repoUrl = await gitService.getRepositoryUrl();
+      const repoUrl = await gitService.getRepoName();
       const id = this.generateTutorialId(repoUrl);
       const title = path.basename(repoPath);
       
-      // Get commit history to build steps
-      const commits = await gitService.getCommitHistory();
+      const commits = await gitService.getTutorialCommits();
       if (commits.length === 0) {
         console.log(`No commits found in repository: ${repoPath}`);
         return null;
       }
       
-      // Create steps from commits
-      const steps = commits.map((commit, index) => {
-        const stepId = `step-${index}`;
+      const steps: Step[] = commits.map((commit, index) => {
+        const stepId = `${id}-step-${index + 1}-${commit.hash.substring(0,7)}`;
         const stepTitle = this.extractStepTitle(commit.message, index);
-        const type = this.determineStepType(commit.message);
         
-        // Content will be loaded later when needed
-        return new TutorialStep(
-          stepId,
-          stepTitle,
-          type,
-          '', // Empty content initially
-          commit.hash
-        );
+        const stepData: StepData = {
+          id: stepId,
+          title: stepTitle,
+          commitHash: commit.hash,
+          description: commit.message.substring(commit.message.indexOf('\n') + 1).trim() || undefined,
+        };
+        return new Step(stepData, StepState.PENDING);
       });
       
-      return new Tutorial(
+      const tutorialData: TutorialData = {
         id,
         title,
-        repoUrl,
-        repoPath,
+        repoUrl: repoUrl || undefined,
+        localPath: repoPath,
         steps,
-        stateStorage
-      );
+        description: undefined,
+      };
+      return new Tutorial(tutorialData);
     } catch (error) {
       console.error(`Error building tutorial from path ${repoPath}:`, error);
       return null;
@@ -95,29 +83,10 @@ export class TutorialBuilder {
   }
   
   /**
-   * Determine the step type from a commit message
-   */
-  private static determineStepType(message: string): StepType {
-    const lowerMessage = message.toLowerCase();
-    
-    // Look for keywords in the commit message to determine step type
-    if (lowerMessage.includes('[template]') || lowerMessage.includes('#template')) {
-      return StepType.TEMPLATE;
-    }
-    
-    if (lowerMessage.includes('[action]') || lowerMessage.includes('#action')) {
-      return StepType.ACTION;
-    }
-    
-    // Default type is content
-    return StepType.CONTENT;
-  }
-  
-  /**
    * Generate a tutorial ID from a repository URL
    */
-  public static generateTutorialId(repoUrl: string): string {
-    return crypto.createHash('md5').update(repoUrl).digest('hex');
+  public static generateTutorialId(repoUrl: string): TutorialId {
+    return crypto.createHash('md5').update(repoUrl).digest('hex') as TutorialId;
   }
   
   /**
@@ -163,6 +132,10 @@ export class TutorialBuilder {
    * Create a deep link URL for a tutorial step
    */
   public static createDeepLink(tutorial: Tutorial, stepIndex: number): string | null {
+    if (!tutorial.repoUrl) {
+      console.warn('Cannot create deep link: tutorial.repoUrl is undefined.');
+      return null;
+    }
     const repoDetails = this.extractRepoDetails(tutorial.repoUrl);
     if (!repoDetails) {
       return null;
@@ -173,7 +146,6 @@ export class TutorialBuilder {
       return null;
     }
     
-    // Generate a deep link in the format: gitorial://sync?platform=github&owner=username&repo=reponame&commitHash=abc123
     return `gitorial://sync?platform=${repoDetails.platform}&owner=${repoDetails.owner}&repo=${repoDetails.repo}&commitHash=${step.commitHash}`;
   }
 }

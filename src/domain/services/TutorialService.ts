@@ -8,11 +8,10 @@ import { Tutorial } from '../models/Tutorial';
 import { ITutorialRepository } from '../repositories/ITutorialRepository';
 import { EventBus, EventPayload } from '../events/EventBus';
 import { EventType } from '../events/EventTypes';
-import * as path from 'path';
-import * as fs from 'fs';
-import { IGitOperations } from '../ports/IGitOperations';
 import { IDiffDisplayer, DiffFile, DiffFilePayload } from '../ports/IDiffDisplayer';
-import { Step } from '../models/Step';
+import { IFileSystem } from '../ports/IFileSystem';
+import { IGitAdapterFactory } from '../ports/IGitOperationsFactory';
+import { IGitOperations } from '../ports/IGitOperations';
 
 /**
  * Options for loading a tutorial
@@ -36,9 +35,11 @@ export class TutorialService {
   private repository: ITutorialRepository;
   private eventBus: EventBus;
   private activeTutorial: Tutorial | null = null;
-  private gitAdapter: IGitOperations | null = null;
+  private gitAdapterFactory: IGitAdapterFactory;
+  private fs: IFileSystem;
   private diffDisplayer: IDiffDisplayer;
   private isShowingSolution: boolean = false;
+  private gitAdapter: IGitOperations | null = null;
   
   /**
    * Create a new TutorialService
@@ -46,11 +47,13 @@ export class TutorialService {
   constructor(
     repository: ITutorialRepository,
     diffDisplayer: IDiffDisplayer,
-    gitAdapter: IGitOperations
+    gitAdapterFactory: IGitAdapterFactory,
+    fs: IFileSystem
   ) {
     this.repository = repository;
     this.diffDisplayer = diffDisplayer;
-    this.gitAdapter = gitAdapter;
+    this.gitAdapterFactory = gitAdapterFactory;
+    this.fs = fs;
     this.eventBus = EventBus.getInstance();
     
     // Subscribe to relevant events
@@ -64,6 +67,7 @@ export class TutorialService {
   public async loadTutorialFromPath(localPath: string, options: LoadTutorialOptions = {}): Promise<Tutorial | null> {
     const tutorial = await this.repository.findByPath(localPath);
     if (!tutorial) {
+      console.warn(`TutorialService: No tutorial found at path ${localPath}`);
       return null;
     }
     await this.activateTutorial(tutorial, options);
@@ -97,11 +101,18 @@ export class TutorialService {
   }
   
   /**
+   * Get the active git adapter
+   */
+  public getActiveGitAdapter(): IGitOperations | null {
+    return this.gitAdapter;
+  }
+  
+  /**
    * Navigate to a specific step
    */
   public async navigateToStep(stepIndex: number): Promise<boolean> {
-    if (!this.activeTutorial || stepIndex < 0 || stepIndex >= this.activeTutorial.steps.length) {
-      console.warn('TutorialService: Invalid step index or no active tutorial for navigateToStep.');
+    if (!this.activeTutorial || !this.gitAdapter || stepIndex < 0 || stepIndex >= this.activeTutorial.steps.length) {
+      console.warn('TutorialService: Invalid step index, no active tutorial, or no git adapter for navigateToStep.');
       return false;
     }
 
@@ -129,7 +140,7 @@ export class TutorialService {
    * Navigate to the next step
    */
   public async navigateToNextStep(): Promise<boolean> {
-    if (!this.activeTutorial) return false;
+    if (!this.activeTutorial || !this.gitAdapter) return false;
     const currentIndex = this.activeTutorial.steps.findIndex(s => s.id === this.activeTutorial!.currentStepId);
     if (currentIndex === -1 || currentIndex >= this.activeTutorial.steps.length - 1) {
       return false; // No next step or current step not found
@@ -141,7 +152,7 @@ export class TutorialService {
    * Navigate to the previous step
    */
   public async navigateToPreviousStep(): Promise<boolean> {
-    if (!this.activeTutorial) return false;
+    if (!this.activeTutorial || !this.gitAdapter) return false;
     const currentIndex = this.activeTutorial.steps.findIndex(s => s.id === this.activeTutorial!.currentStepId);
     if (currentIndex <= 0) {
       return false; // No previous step or current step not found
@@ -166,10 +177,10 @@ export class TutorialService {
    */
   public async closeTutorial(): Promise<void> {
     if (!this.activeTutorial) return;
-    const tutorial = this.activeTutorial;
+    const tutorialId = this.activeTutorial.id;
     this.activeTutorial = null;
-    this.gitAdapter = null; 
-    this.eventBus.publish(EventType.TUTORIAL_CLOSED, { tutorialId: tutorial.id });
+    this.gitAdapter = null;
+    this.eventBus.publish(EventType.TUTORIAL_CLOSED, { tutorialId });
   }
   
   /**
@@ -242,7 +253,7 @@ export class TutorialService {
    */
   private async handleSolutionToggled(payload: EventPayload): Promise<void> {
     const { showing } = payload;
-    if (showing) {
+    if (showing && this.activeTutorial && this.gitAdapter) {
       await this.showStepSolution();
     }
   }
@@ -307,7 +318,7 @@ export class TutorialService {
           if (!this.gitAdapter) throw new Error("Git adapter not available");
           return this.gitAdapter.getFileContent(payload.commitHash, payload.relativeFilePath);
         },
-        currentPath: path.join(tutorialLocalPath, payload.relativeFilePath),
+        currentPath: this.fs.join(tutorialLocalPath, payload.relativeFilePath),
         relativePath: payload.relativeFilePath,
         commitHashForTitle: currentStep.commitHash.slice(0, 7),
         commitHash: currentStep.commitHash // Using currentStep.commitHash as originalCommitHash

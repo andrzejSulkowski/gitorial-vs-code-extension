@@ -15,6 +15,7 @@ import { createUserInteractionAdapter } from "./infrastructure/adapters/VSCodeUs
 import { createFileSystemAdapter } from "./infrastructure/adapters/VSCodeFileSystemAdapter";
 import { ITutorialRepository } from "./domain/repositories/ITutorialRepository";
 import { TutorialPanelManager } from "./ui/panels/TutorialPanelManager";
+import { TutorialService } from "./domain/services/TutorialService";
 
 // Create a singleton instance of the VS Code diff displayer to be used throughout the application
 export const diffDisplayer = createDiffDisplayerAdapter();
@@ -55,16 +56,20 @@ export async function activate(context: vscode.ExtensionContext): Promise<vscode
     userInteractionAdapter
   );
 
+
+  const tutorialService = new TutorialService(tutorialRepository, diffDisplayerAdapter, gitAdapterFactory, fileSystemAdapter);
+
   // --- UI Layer Controllers/Handlers (still no direct vscode registration logic inside them) ---
   const tutorialController = new TutorialController(
-    context, // context can be passed for things like extensionUri, but avoid direct vscode API calls
+    context, // context can be passed for things like extensionUri, but avoid direct vscode API calls //TODO: refactor to not pass context
     tutorialRepository,
     diffDisplayer,
     progressReportAdapter,
     userInteractionAdapter,
     stepProgressService,
     gitAdapterFactory,
-    fileSystemAdapter
+    fileSystemAdapter,
+    tutorialService
   );
 
   const commandHandler = new CommandHandler(tutorialController);

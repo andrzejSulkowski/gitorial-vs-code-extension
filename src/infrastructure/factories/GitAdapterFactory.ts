@@ -9,11 +9,12 @@ Provides functions to create GitAdapter instances (e.g., createForPath(repoPath)
 
 // Provides factory methods for creating instances of GitAdapter (which implements IGitOperations).
 // This can be useful if the setup for GitAdapter is non-trivial or varies based on context.
+import { IGitAdapterFactory } from 'src/domain/ports/IGitOperationsFactory';
 import { IGitOperations } from '../../domain/ports/IGitOperations';
 import { GitAdapter } from '../adapters/GitAdapter';
 // Potentially import simple-git if direct clone operations are orchestrated here before adapter creation
 
-export class GitAdapterFactory {
+export class GitAdapterFactory implements IGitAdapterFactory {
   /**
    * Creates a GitAdapter for an existing local repository path.
    * @param repoPath The file system path to the repository.

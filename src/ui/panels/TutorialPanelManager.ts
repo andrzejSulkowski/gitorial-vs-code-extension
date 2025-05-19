@@ -75,4 +75,8 @@ export class TutorialPanelManager {
       // This will trigger the onDidDispose listener, which handles cleanup and unsetting currentPanelInstance.
     }
   }
+
+  public static isPanelVisible(): boolean {
+    return !!TutorialPanelManager.currentPanelInstance;
+  }
 } 

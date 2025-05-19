@@ -11,6 +11,9 @@ import { IFileSystem } from 'src/domain/ports/IFileSystem';
 // import { IFileSystem } from '../domain/ports/IFileSystem';
 
 export class FileSystemAdapter implements IFileSystem {
+  join(path1: string, path2: string): string {
+    return path.join(path1, path2);
+  }
   async isDirectory(path: string): Promise<boolean> {
     const stats = await fs.stat(path);
     return stats.isDirectory();

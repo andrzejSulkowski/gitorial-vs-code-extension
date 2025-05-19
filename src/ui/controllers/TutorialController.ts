@@ -12,7 +12,7 @@ import { TutorialPanelManager } from '../panels/TutorialPanelManager';
 import * as path from 'path';  //TODO: This need to be refactored to use our IFileSystem Abstraction
 import { IFileSystem } from 'src/domain/ports/IFileSystem';
 import { TutorialStepViewModel, TutorialViewModel } from '../viewmodels/TutorialViewModel';
-import { UriParser } from 'src/libs/uri-parser/UriParser';
+import { TutorialService } from '../../domain/services/TutorialService'; // Added import
 
 export class TutorialController {
   private activeTutorial: Tutorial | null = null;
@@ -26,7 +26,8 @@ export class TutorialController {
     private readonly userInteraction: IUserInteraction,
     private readonly stepProgressService: StepProgressService,
     private readonly gitAdapterFactory: GitAdapterFactory,
-    private readonly fs: IFileSystem
+    private readonly fs: IFileSystem,
+    private readonly tutorialService: TutorialService // Injected TutorialService
   ) { }
 
   public async checkWorkspaceForTutorial(): Promise<void> {
@@ -35,34 +36,36 @@ export class TutorialController {
     if (workspaceFolders && workspaceFolders.length > 0) {
       const workspacePath = workspaceFolders[0].uri.fsPath;
       try {
-        // Attempt to load tutorial metadata if it exists in the workspace
-        const tutorial = await this.tutorialRepository.findByPath(workspacePath);
+        this.progressReporter.reportStart('Checking workspace for tutorial...');
+        const tutorial = await this.tutorialService.loadTutorialFromPath(workspacePath);
+        this.progressReporter.reportEnd();
+
         if (tutorial) {
           this.activeTutorial = tutorial;
-          this.activeGitAdapter = this.gitAdapterFactory.createFromPath(tutorial.workspaceFolder || workspacePath);
-          console.log(`TutorialController: Found and loaded tutorial '${tutorial.title}' from workspace.`);
-          await this.updateUIAfterTutorialLoad(tutorial);
-          // Optionally, open the tutorial panel or show a notification
+          this.activeGitAdapter = this.tutorialService.getActiveGitAdapter();
+          console.log(`TutorialController: Found and loaded tutorial '${tutorial.title}' from workspace via TutorialService.`);
+
           this.userInteraction.showInformationMessage(`Tutorial "${tutorial.title}" is active in this workspace.`);
           this.activateTutorialMode(tutorial);
         } else {
           console.log('TutorialController: No Gitorial tutorial found in the current workspace.');
         }
       } catch (error) {
+        this.progressReporter.reportEnd();
         console.error('TutorialController: Error checking workspace for tutorial:', error);
-        // this.userInteraction.showErrorMessage(`Error checking for tutorial in workspace: ${(error as Error).message}`);
+        this.userInteraction.showErrorMessage(`Error checking for tutorial: ${error instanceof Error ? error.message : String(error)}`);
+        this.clearActiveTutorialState();
       }
     }
   }
 
-  public async initiateCloneTutorial(): Promise<void> {
-    const repoUrl = await this.userInteraction.showInputBox({
+  public async initiateCloneTutorial(initialRepoUrl?: string, cloneOptions?: { targetStepId?: string }): Promise<void> {
+    const repoUrl = initialRepoUrl || await this.userInteraction.showInputBox({
       prompt: 'Enter the Git URL of the tutorial repository to clone',
       placeHolder: 'https://github.com/user/gitorial-tutorial.git',
       defaultValue: 'https://github.com/shawntabrizi/rust-state-machine'
     });
     if (!repoUrl) return;
-
 
     const dirAbsPathResult = await this.userInteraction.showOpenDialog({
       canSelectFolders: true,
@@ -74,48 +77,57 @@ export class TutorialController {
 
     if (!dirAbsPathResult || dirAbsPathResult.length === 0) return;
     const cloneTargetFsPath = dirAbsPathResult;
-
     const repoName = repoUrl.substring(repoUrl.lastIndexOf('/') + 1).replace('.git', '');
-    const finalClonePath = path.join(cloneTargetFsPath, repoName);
 
-    if (await this.fs.isDirectory(finalClonePath)) {
+    if (await this.fs.hasSubdirectory(cloneTargetFsPath, repoName)) {
       const overwriteChoice = await this.userInteraction.askConfirmation({
-        message: `Folder "${repoName}" already exists in the selected location. Do you want to overwrite it?\nDEBUG: ${finalClonePath}`,
+        message: `Folder "${repoName}" already exists. Overwrite it?`,
         confirmActionTitle: 'Overwrite',
         cancelActionTitle: 'Cancel'
       });
       if (!overwriteChoice) return;
-      else {
-        await this.fs.deleteDirectory(finalClonePath);
-      };
+      await this.fs.deleteDirectory(cloneTargetFsPath);
     }
 
-    this.progressReporter.reportStart(`Cloning ${repoUrl}...`);
-    const tutorial = await this.tutorialRepository.createFromClone(repoUrl, finalClonePath);
-    this.progressReporter.reportEnd();
+    const finalClonePath = path.join(cloneTargetFsPath, repoName);
 
-    if (!tutorial) {
-      this.userInteraction.showErrorMessage('Failed to clone tutorial.');
-      return;
-    } else {
-      // Now something should come like: "open tutorial now"
-      this.userInteraction.showInformationMessage(`Tutorial "${tutorial.title}" cloned to ${finalClonePath}.`);
-      const openNowChoice = await this.userInteraction.askConfirmation({
+
+    try {
+      this.progressReporter.reportStart(`Cloning ${repoUrl}...`);
+      //I dont like that we interact with the repository here. I guess it would make more sense to let the TutorialService handle this
+      const clonedTutorialMetadata = await this.tutorialRepository.createFromClone(repoUrl, finalClonePath);
+      this.progressReporter.reportEnd();
+
+      if (!clonedTutorialMetadata) {
+        this.userInteraction.showErrorMessage('Failed to clone tutorial repository.');
+        return;
+      }
+
+      this.userInteraction.showInformationMessage(`Tutorial "${clonedTutorialMetadata.title || repoName}" cloned to ${finalClonePath}.`);
+
+      const openNowChoice = initialRepoUrl ? true : await this.userInteraction.askConfirmation({
         message: `Do you want to open the tutorial now?`,
         confirmActionTitle: 'Open Now',
         cancelActionTitle: 'Open Later'
       });
+
       if (openNowChoice) {
-        //TODO: we need to open VSCode with the path to the tutorial
-        this.openTutorialFromUri(vscode.Uri.file(finalClonePath));
+        await this.openTutorialFromPath(finalClonePath, { 
+          initialStepId: cloneOptions?.targetStepId, 
+          isNewClone: true 
+        });
       }
+    } catch (error) {
+      this.progressReporter.reportEnd();
+      console.error('TutorialController: Error cloning tutorial:', error);
+      this.userInteraction.showErrorMessage(`Failed to clone tutorial: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
   public async initiateOpenLocalTutorial(): Promise<void> {
     const absolutePathResult = await this.userInteraction.showOpenDialog({
       canSelectFolders: true,
-      canSelectFiles: false, // Or true if we look for a specific manifest file
+      canSelectFiles: false,
       canSelectMany: false,
       openLabel: 'Select Tutorial Folder',
       title: 'Open Local Gitorial Tutorial'
@@ -123,141 +135,186 @@ export class TutorialController {
 
     if (absolutePathResult && absolutePathResult.length > 0) {
       const folderPath = absolutePathResult;
-      try {
-        this.progressReporter.reportStart('Loading tutorial metadata...');
-        const tutorial = await this.tutorialRepository.findByPath(folderPath);
-        if (!tutorial) {
-          throw new Error('Could not find or load Gitorial metadata in the selected folder.');
-        }
-        this.activeTutorial = tutorial;
-        this.activeGitAdapter = this.gitAdapterFactory.createFromPath(folderPath);
-        this.progressReporter.reportEnd();
-
-        console.log(`TutorialController: Successfully opened local tutorial '${tutorial.title}'.`);
-        await this.updateUIAfterTutorialLoad(tutorial);
-        this.userInteraction.showInformationMessage(`Tutorial "${tutorial.title}" is now active.`);
-        this.activateTutorialMode(tutorial);
-      } catch (error) {
-        console.error('TutorialController: Error opening local tutorial:', error);
-        this.userInteraction.showErrorMessage(`Failed to open local tutorial: ${(error as Error).message}`);
-        this.clearActiveTutorialState();
-      }
+      await this.openTutorialFromPath(folderPath);
     }
   }
 
-  public async openTutorialFromUri(tutorialUri: vscode.Uri, stepCommitOrId?: string): Promise<void> {
-    console.log(`Gitorial: Received URI: ${tutorialUri.toString()}`);
-    const { scheme, authority, path: uriPath, query } = tutorialUri;
-
-
-      // Reconstruct the URI string carefully for the parser
-      // UriParser expects a full URI string including scheme.
-      const pathPrefix = uriPath.startsWith('/') || uriPath === '' ? '' : '/';
-      const authorityString = authority ? `//${authority}` : '';
-      const uriStringToParse = `${scheme}:${authorityString}${pathPrefix}${uriPath}${query ? `?${query}` : ''}`;
-
-      const result = UriParser.parse(uriStringToParse);
-      if (result instanceof Error) {
-        vscode.window.showErrorMessage(`Gitorial: Invalid URI format - ${result.message}`);
-        return;
-      }
-      const { repoUrl, commitHash } = result.payload;
-
-    console.log(`TutorialController: Attempting to open from URI: ${tutorialUri.toString()}, step: ${stepCommitOrId}`);
-    // Example URI: vscode://<publisher>.gitorial/open?tutorialUrl=https://github.com/user/repo.git&step=commitHashOrStepId
-    // Or: vscode://<publisher>.gitorial/open?localPath=/path/to/tutorial&step=...
-
-    const queryParams = new URLSearchParams(tutorialUri.query);
-    const remoteTutorialUrl = queryParams.get('tutorialUrl');
-    const localTutorialPath = queryParams.get('localPath');
-
+  public async openTutorialFromPath(folderPath: string, options?: { initialStepId?: string, isNewClone?: boolean }): Promise<void> {
     try {
-      if (remoteTutorialUrl) {
-        // This is complex: involves cloning to a temp/managed location if not already cloned,
-        // then opening it. For simplicity, we might prompt user for clone location like handleCloneTutorial.
-        // Or, check if it's already cloned and present in a known workspace.
-        // This might be better handled by prompting a clone first via a specific command.
-        this.userInteraction.showInformationMessage(`To open tutorial from URL ${remoteTutorialUrl}, please use the "Gitorial: Clone New Tutorial" command.`);
-        return; // Or trigger clone flow
-      } else if (localTutorialPath) {
-        const tutorial = await this.tutorialRepository.findByPath(localTutorialPath);
-        if (!tutorial) {
-          throw new Error(`Could not load tutorial from local path: ${localTutorialPath}`);
-        }
+      this.progressReporter.reportStart('Loading tutorial...');
+      const tutorial = await this.tutorialService.loadTutorialFromPath(folderPath, {
+        initialStepIndex: options?.initialStepId ? undefined : undefined,
+      });
+      this.progressReporter.reportEnd();
+
+      if (tutorial) {
         this.activeTutorial = tutorial;
-        this.activeGitAdapter = this.gitAdapterFactory.createFromPath(localTutorialPath);
-        console.log(`TutorialController: Loaded tutorial '${this.activeTutorial.title}' from URI.`);
-        await this.updateUIAfterTutorialLoad(this.activeTutorial, stepCommitOrId);
-        this.activateTutorialMode(this.activeTutorial, stepCommitOrId);
+        this.activeGitAdapter = this.tutorialService.getActiveGitAdapter();
+
+        if (!this.activeGitAdapter) {
+          console.error("TutorialController: GitAdapter is null after loading tutorial from service.");
+          this.userInteraction.showErrorMessage("Failed to initialize Git operations for the tutorial.");
+          this.clearActiveTutorialState();
+          return;
+        }
+
+        console.log(`TutorialController: Successfully opened local tutorial '${tutorial.title}' via TutorialService.`);
+
+        this.userInteraction.showInformationMessage(`Tutorial "${tutorial.title}" is now active.`);
+        this.activateTutorialMode(tutorial, options?.initialStepId);
       } else {
-        throw new Error('Invalid tutorial URI: Missing tutorialUrl or localPath.');
+        this.userInteraction.showErrorMessage(`Could not load Gitorial from: ${folderPath}`);
+        this.clearActiveTutorialState();
       }
     } catch (error) {
-      console.error('TutorialController: Error opening tutorial from URI:', error);
-      this.userInteraction.showErrorMessage(`Failed to open tutorial from URI: ${(error as Error).message}`);
+      this.progressReporter.reportEnd();
+      console.error('TutorialController: Error opening local tutorial from path:', error);
+      this.userInteraction.showErrorMessage(`Failed to open local tutorial: ${error instanceof Error ? error.message : String(error)}`);
       this.clearActiveTutorialState();
     }
   }
 
-  public async openTutorialFromPath(path: string): Promise<void> {
-    const tutorial = await this.tutorialRepository.findByPath(path);
-    if (!tutorial) {
-      throw new Error(`Could not load tutorial from local path: ${path}`);
+  public async handleExternalTutorialRequest(
+    options: { repoUrl: string; commitHash?: string } // Primarily expects repoUrl and optional commitHash
+  ): Promise<void> {
+    const { repoUrl, commitHash } = options;
+    this.progressReporter.reportStart(`Processing tutorial request for ${repoUrl}...`);
+    console.log(`TutorialController: Handling external request. RepoURL: ${repoUrl}, Commit: ${commitHash}`);
+
+    try {
+      // Ask the user to choose between cloning or opening a local directory.
+      // We'll use showQuickPick if available, otherwise a simpler confirmation.
+      // For IUserInteraction, let's assume a generic way to present choices or use sequential confirmations.
+      // Since IUserInteraction might not have showQuickPick directly, we'll use two confirmations.
+
+      const cloneConfirmation = await this.userInteraction.askConfirmation({
+        message: `Gitorial from "${repoUrl}".\nWould you like to clone it?`,
+        confirmActionTitle: 'Clone and Sync',
+        cancelActionTitle: 'Open Local Instead' // Or simply "Use Local"
+      });
+
+      if (cloneConfirmation) {
+        // User chose to Clone
+        await this.initiateCloneTutorial(repoUrl, { targetStepId: commitHash });
+      } else {
+        // User chose to Open Local (or cancelled the first dialog and implicitly wants to use local or cancel entirely)
+        const openLocalConfirmation = await this.userInteraction.askConfirmation({
+            message: `Open a local version of the Gitorial from "${repoUrl}"?`,
+            confirmActionTitle: 'Select Local Folder and Sync',
+            cancelActionTitle: 'Cancel'
+        });
+
+        if (openLocalConfirmation) {
+            const dirAbsPathResult = await this.userInteraction.showOpenDialog({
+              canSelectFolders: true,
+              canSelectFiles: false,
+              canSelectMany: false,
+              openLabel: 'Select Local Tutorial Folder to Sync',
+              title: 'Open Local Gitorial for Syncing'
+            });
+    
+            if (dirAbsPathResult && dirAbsPathResult.length > 0) {
+              const localPath = dirAbsPathResult; 
+              console.log(`TutorialController: User selected local path "${localPath}" for repo "${repoUrl}". Attempting to open and sync.`);
+              await this.openTutorialFromPath(localPath, { initialStepId: commitHash });
+            } else {
+              this.userInteraction.showInformationMessage('Open local operation cancelled: No folder selected.');
+            }
+        } else {
+             this.userInteraction.showInformationMessage('Tutorial request cancelled.');
+        }
+      }
+    } catch (error) {
+      console.error(`TutorialController: Error handling external tutorial request for ${repoUrl}:`, error);
+      this.userInteraction.showErrorMessage(`Failed to process tutorial request: ${error instanceof Error ? error.message : String(error)}`);
+      this.clearActiveTutorialState();
+    } finally {
+      this.progressReporter.reportEnd();
     }
-    this.activeTutorial = tutorial;
-    this.activeGitAdapter = this.gitAdapterFactory.createFromPath(path);
-    await this.updateUIAfterTutorialLoad(tutorial);
   }
 
   public async selectStep(step: Step | string): Promise<void> {
     if (!this.activeTutorial || !this.activeGitAdapter) {
-      this.userInteraction.showWarningMessage('No active tutorial to select a step from.');
+      this.userInteraction.showWarningMessage('No active tutorial or Git adapter to select a step from.');
       return;
     }
-    // Ensure activeTutorial is not null before using its properties
-    const tutorial = this.activeTutorial;
 
     let targetStep: Step | undefined;
-    if (typeof step === 'string') { // step is commit hash or ID
-      targetStep = tutorial.steps.find(s => s.id === step || s.commitHash === step);
+    let targetStepId: string | undefined;
+
+    if (typeof step === 'string') {
+      targetStep = this.activeTutorial.steps.find(s => s.id === step || s.commitHash === step);
+      targetStepId = targetStep?.id;
     } else {
       targetStep = step;
+      targetStepId = step.id;
     }
 
-    if (!targetStep) {
-      this.userInteraction.showErrorMessage(`Step not found: ${step}`);
+    if (!targetStep || !targetStepId) {
+      this.userInteraction.showErrorMessage(`Step not found: ${typeof step === 'string' ? step : step.id}`);
+      return;
+    }
+
+    if (this.activeTutorial.currentStepId === targetStepId) {
+      console.log(`TutorialController: Step '${targetStep.title}' is already active.`);
+      await this._updateTutorialPanel();
       return;
     }
 
     console.log(`TutorialController: Selecting step '${targetStep.title}' (Commit: ${targetStep.commitHash})`);
     try {
-      this.progressReporter.reportStart(`Checking out step '${targetStep.title}'...`);
-      await this.activeGitAdapter!.checkout(targetStep!.commitHash);
-      await this.stepProgressService.setCurrentStep(this.activeTutorial!.id, targetStep!.id);
-      this.activeTutorial!.currentStepId = targetStep!.id;
+      this.progressReporter.reportStart(`Switching to step '${targetStep.title}'...`);
 
-      await this._updateTutorialPanel();
-      this.userInteraction.showInformationMessage(`Switched to step: ${targetStep.title}`);
+      const stepIndex = this.activeTutorial.steps.findIndex(s => s.id === targetStepId);
+      if (stepIndex === -1) {
+        this.userInteraction.showErrorMessage(`Could not find index for step: ${targetStepId}`);
+        this.progressReporter.reportEnd();
+        return;
+      }
+
+      const navigationSuccess = await this.tutorialService.navigateToStep(stepIndex);
+
+      if (navigationSuccess) {
+        this.activeTutorial.currentStepId = targetStepId;
+        await this.stepProgressService.setCurrentStep(this.activeTutorial.id, targetStepId);
+        this.progressReporter.reportEnd();
+        await this._updateTutorialPanel();
+        this.userInteraction.showInformationMessage(`Switched to step: ${targetStep.title}`);
+      } else {
+        this.progressReporter.reportEnd();
+        this.userInteraction.showErrorMessage(`Failed to switch to step '${targetStep.title}'.`);
+        await this._updateTutorialPanel();
+      }
     } catch (error) {
+      this.progressReporter.reportEnd();
       console.error(`TutorialController: Error selecting step '${targetStep.title}':`, error);
-      this.userInteraction.showErrorMessage(`Failed to switch to step '${targetStep.title}': ${(error as Error).message}`);
+      this.userInteraction.showErrorMessage(`Failed to switch to step '${targetStep.title}': ${error instanceof Error ? error.message : String(error)}`);
+      await this._updateTutorialPanel();
     }
   }
 
   public async showDiffForStep(step: Step | string): Promise<void> {
     if (!this.activeTutorial || !this.activeGitAdapter) {
-      this.userInteraction.showWarningMessage('No active tutorial for diffing.');
+      this.userInteraction.showWarningMessage('No active tutorial or Git adapter for diffing.');
       return;
     }
 
     const commitHash = typeof step === 'string' ? step : step.commitHash;
-    const diffFilePayload = await this.activeGitAdapter.getCommitDiff(commitHash);
-    const diffFiles = diffFilePayload.map<DiffFile>(payload => {
+    const diffFilePayloads = await this.activeGitAdapter.getCommitDiff(commitHash);
+
+    if (!this.activeTutorial.localPath) {
+      this.userInteraction.showErrorMessage('Cannot show diff: Tutorial local path is undefined.');
+      return;
+    }
+    const tutorialLocalPath = this.activeTutorial.localPath;
+
+    const diffFiles = diffFilePayloads.map<DiffFile>(payload => {
       return {
         oldContentProvider: async () => {
-          return await this.activeGitAdapter!.getFileContent(commitHash, payload.relativeFilePath);
+          if (!this.activeGitAdapter) throw new Error("Git adapter became unavailable.");
+          return await this.activeGitAdapter.getFileContent(payload.commitHash, payload.relativeFilePath);
         },
-        currentPath: payload.absoluteFilePath,
+        currentPath: path.join(tutorialLocalPath, payload.relativeFilePath),
         relativePath: payload.relativeFilePath,
         commitHashForTitle: commitHash.substring(0, 7),
         commitHash: commitHash
@@ -270,12 +327,24 @@ export class TutorialController {
     //TODO: What is this for?
     vscode.commands.executeCommand('setContext', 'gitorial.tutorialActive', true);
 
-    const stepIdToSelect = initialStepId || tutorial.currentStepId;
+    let stepIdToSelect = initialStepId || tutorial.currentStepId;
+
+    if (!tutorial.steps.find(s => s.id === stepIdToSelect) && tutorial.steps.length > 0) {
+      stepIdToSelect = tutorial.steps[0].id;
+    } else if (tutorial.steps.length === 0) {
+      console.warn("TutorialController: activateTutorialMode called for a tutorial with no steps.");
+      await this._updateTutorialPanel();
+      return;
+    }
+
     await this.selectStep(stepIdToSelect);
-    await this._updateTutorialPanel();
+    //TODO: why dont we update here the view?
   }
 
   private clearActiveTutorialState(): void {
+    if (this.activeTutorial) {
+      this.tutorialService.closeTutorial();
+    }
     this.activeTutorial = null;
     this.activeGitAdapter = null;
     vscode.commands.executeCommand('setContext', 'gitorial.tutorialActive', false);
@@ -284,49 +353,59 @@ export class TutorialController {
   }
 
   private async updateUIAfterTutorialLoad(tutorial: Tutorial, initialStepId?: string): Promise<void> {
-    const stepToSelect = initialStepId ||
-      tutorial.currentStepId ||
-      (tutorial.steps.length > 0 ? tutorial.steps[0].id : undefined);
-    if (stepToSelect) {
-      // Before calling selectStep, ensure activeTutorial is set
-      if (this.activeTutorial) { // Or rely on selectStep's internal check
-        //TODO: After the step is selected, is the UI being updated?
-        await this.selectStep(stepToSelect);
-      } else {
-        console.warn("updateUIAfterTutorialLoad: activeTutorial is null, cannot select step.");
-        await this._updateTutorialPanel();
-      }
-    } else {
+    console.log("TutorialController: updateUIAfterTutorialLoad called. Relying on activateTutorialMode or selectStep to update panel.");
+    if (this.activeTutorial && this.activeTutorial.id === tutorial.id) {
       await this._updateTutorialPanel();
     }
   }
 
-  // Methods to be called by UI (e.g., TreeDataProvider, WebviewPanel)
-  public async requestNextStep(): Promise<void> { /* ... */ }
-  public async requestPreviousStep(): Promise<void> { /* ... */ }
+  public async requestNextStep(): Promise<void> {
+    if (!this.activeTutorial) return;
+    const success = await this.tutorialService.navigateToNextStep();
+    if (success) {
+      this.activeTutorial.currentStepId = this.tutorialService.getActiveTutorial()!.currentStepId;
+      await this.stepProgressService.setCurrentStep(this.activeTutorial.id, this.activeTutorial.currentStepId);
+      await this._updateTutorialPanel();
+    } else {
+      this.userInteraction.showInformationMessage("You are already on the last step.");
+    }
+  }
+  public async requestPreviousStep(): Promise<void> {
+    if (!this.activeTutorial) return;
+    const success = await this.tutorialService.navigateToPreviousStep();
+    if (success) {
+      this.activeTutorial.currentStepId = this.tutorialService.getActiveTutorial()!.currentStepId;
+      await this.stepProgressService.setCurrentStep(this.activeTutorial.id, this.activeTutorial.currentStepId);
+      await this._updateTutorialPanel();
+    } else {
+      this.userInteraction.showInformationMessage("You are already on the first step.");
+    }
+  }
   public async requestGoToStep(stepId: string): Promise<void> {
-    this.selectStep(stepId);
+    await this.selectStep(stepId);
   }
 
   get tutorialViewModel(): TutorialViewModel | null {
     if (this.activeTutorial) {
       const tutorial = this.activeTutorial;
+      const currentStepIdInService = this.tutorialService.getActiveTutorial()?.currentStepId;
+      const actualCurrentStepId = currentStepIdInService || tutorial.currentStepId;
+
       const stepsViewModel: TutorialStepViewModel[] = tutorial.steps.map(step => ({
         id: step.id,
         title: step.title,
         description: step.description,
         commitHash: step.commitHash,
         state: step.state,
-        isActive: step.id === tutorial.currentStepId
+        isActive: step.id === actualCurrentStepId
       }));
-  
-      const tutorialViewModel: TutorialViewModel = {
+
+      return {
         id: tutorial.id,
         title: tutorial.title,
         steps: stepsViewModel,
-        currentStepId: tutorial.currentStepId
-      }; 
-      return tutorialViewModel;
+        currentStepId: actualCurrentStepId
+      };
     }
     return null;
   }

@@ -12,7 +12,7 @@ export interface PathSelectionOptions {
 }
 
 
-type OpenDialogOptions = {
+export type OpenDialogOptions = {
   canSelectFolders?: boolean;
   canSelectFiles?: boolean;
   canSelectMany?: boolean;

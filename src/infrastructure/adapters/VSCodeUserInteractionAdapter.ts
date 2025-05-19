@@ -1,9 +1,17 @@
 import * as vscode from 'vscode';
-import { IUserInteraction, PathSelectionOptions } from '../../domain/ports/IUserInteraction';
+import { IUserInteraction, PathSelectionOptions, OpenDialogOptions } from '../../domain/ports/IUserInteraction';
 
 export class VSCodeUserInteractionAdapter implements IUserInteraction {
-  public async showOpenDialog(options: vscode.OpenDialogOptions): Promise<vscode.Uri[] | undefined> {
-    return await vscode.window.showOpenDialog(options);
+  public async showInputBox(options: { prompt: string; placeHolder?: string; defaultValue?: string; }): Promise<undefined | string> {
+    return await vscode.window.showInputBox({
+      prompt: options.prompt,
+      placeHolder: options.placeHolder,
+      value: options.defaultValue,
+    });
+  }
+  public async showOpenDialog(options: OpenDialogOptions): Promise<string | undefined> {
+    const uris = await vscode.window.showOpenDialog(options);
+    return uris?.at(0)?.fsPath;
   }
   public async showSaveDialog(options: vscode.SaveDialogOptions): Promise<vscode.Uri | undefined> {
     return await vscode.window.showSaveDialog(options);
@@ -49,26 +57,27 @@ export class VSCodeUserInteractionAdapter implements IUserInteraction {
     });
   }
 
-  public async askConfirmation(
-    message: string, 
-    detail?: string, 
-    confirmActionTitle: string = 'Yes', 
-    cancelActionTitle: string = 'Cancel'
+  public async askConfirmation(opt: {
+    message: string,
+    detail?: string,
+    confirmActionTitle?: string,
+    cancelActionTitle?: string
+  }
   ): Promise<boolean> {
     const options: vscode.MessageItem[] = [
-      { title: confirmActionTitle, isCloseAffordance: false },
-      { title: cancelActionTitle, isCloseAffordance: true },
+      { title: opt.confirmActionTitle || 'Yes', isCloseAffordance: false },
+      { title: opt.cancelActionTitle || 'Cancel', isCloseAffordance: true },
     ];
 
     const choice = await vscode.window.showWarningMessage(
-      message,
-      { modal: true, detail: detail },
+      opt.message,
+      { modal: true, detail: opt.detail },
       ...options
     );
 
-    return choice?.title === confirmActionTitle;
+    return choice?.title === opt.confirmActionTitle;
   }
-} 
+}
 
 
 export function createUserInteractionAdapter(): IUserInteraction {

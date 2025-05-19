@@ -2,38 +2,41 @@
 // to trigger actions like cloning and opening a tutorial. Delegates to TutorialController.
 import * as vscode from 'vscode';
 import { TutorialController } from '../controllers/TutorialController';
+import { UriParser, UriCommand, ParseResult } from '../../libs/uri-parser/UriParser'; // Adjusted path
 
 export class TutorialUriHandler implements vscode.UriHandler {
-  constructor(private tutorialController: TutorialController) {}
-
+  constructor(private tutorialController: TutorialController) { }
 
   public async register(context: vscode.ExtensionContext): Promise<void> {
     context.subscriptions.push(
       vscode.window.registerUriHandler(this)
     );
+    console.log('TutorialUriHandler registered.');
   }
 
   public async handleUri(uri: vscode.Uri): Promise<void> {
     console.log(`TutorialUriHandler received URI: ${uri.toString()}`);
-    const queryParams = new URLSearchParams(uri.query);
-    const command = uri.path.substring(1); // Remove leading '/'
+    const { scheme, authority, path: uriPath, query } = uri;
 
-    switch (command) {
-      case 'open':
-        const repoUrl = queryParams.get('repoUrl');
-        if (repoUrl) {
-          console.log(`Attempting to clone and open tutorial from URL: ${repoUrl}`);
-          // TutorialController needs a method like initiateCloneFromUri
-          // For now, directly calling a simplified version of clone logic
-          // This assumes initiateCloneTutorial can be adapted or a new method is made
-          await this.tutorialController.initiateCloneTutorial(); // This would need to get repoUrl from URI
-        } else {
-          vscode.window.showErrorMessage('repoUrl parameter is missing in the URI.');
-        }
+    const pathPrefix = uriPath.startsWith('/') || uriPath === '' ? '' : '/';
+    const authorityString = authority ? `//${authority}` : '';
+    const uriStringToParse = `${scheme}:${authorityString}${pathPrefix}${uriPath}${query ? `?${query}` : ''}`;
+
+    const parseResult: ParseResult = UriParser.parse(uriStringToParse);
+
+    if (parseResult instanceof Error) {
+      vscode.window.showErrorMessage(`Gitorial: Invalid URI - ${parseResult.message}`);
+      return;
+    }
+
+    switch (parseResult.command) {
+      case UriCommand.Sync:
+        const { repoUrl, commitHash } = parseResult.payload;
+        console.log(`TutorialUriHandler: Processing '${parseResult.command}' command. RepoURL: ${repoUrl}, Commit: ${commitHash}`);
+        await this.tutorialController.handleExternalTutorialRequest({ repoUrl, commitHash });
         break;
-      // Add other URI commands if needed
       default:
-        vscode.window.showErrorMessage(`Unknown Gitorial command in URI: ${command}`);
+        vscode.window.showErrorMessage(`Gitorial: Unhandled URI command: ${parseResult.command}`);
     }
   }
 } 

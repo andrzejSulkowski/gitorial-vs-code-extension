@@ -20,6 +20,17 @@ export interface IFileSystem {
    */
   isDirectory(path: string): Promise<boolean>;
 
+  /**
+   * Checks if a given path is a directory and contains a specific subdirectory as a direct child.
+   * @param parentDirectoryPath The absolute path of the potential parent directory.
+   * @param subdirectoryName The name of the subdirectory to look for.
+   * @returns A promise that resolves to true if `parentDirectoryPath` is an existing directory
+   *          and it contains a direct child directory named `subdirectoryName`.
+   *          Resolves to false otherwise (e.g., if `parentDirectoryPath` doesn't exist,
+   *          is not a directory, or if the specified subdirectory doesn't exist or isn't a directory).
+   */
+  hasSubdirectory(parentDirectoryPath: string, subdirectoryName: string): Promise<boolean>;
+
 
   /**
    * Ensures that a directory exists.
@@ -44,4 +55,12 @@ export interface IFileSystem {
    * @throws Error if the file does not exist or if reading fails.
    */
   readFile(path: string): Promise<string>;
+
+  /**
+   * Joins two paths.
+   * @param path1 The first path.
+   * @param path2 The second path.
+   * @returns The joined path.
+   */
+  join(path1: string, path2: string): string;
 } 

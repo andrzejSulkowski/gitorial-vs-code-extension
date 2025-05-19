@@ -45,7 +45,4 @@ export class Tutorial {
         this.workspaceFolder = data.workspaceFolder;
         this.currentStepId = data.currentStepId || data.steps[0].id;
     }
-
-    // Static factory method if needed for complex construction, though TutorialBuilder service handles this.
-    // static create(data: any): Tutorial { /* ... */ }
 }

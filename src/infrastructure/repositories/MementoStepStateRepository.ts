@@ -14,6 +14,15 @@ export class MementoStepStateRepository implements IStepStateRepository {
     this.db = globalState.getDB('stepStates'); // Get a namespaced DB for step states
   }
 
+  async getCurrentStepId(tutorialId: TutorialId): Promise<string | undefined> {
+    const key = this.getKey(tutorialId, 'current');
+    return this.db.get<string>(key);
+  }
+  async setCurrentStepId(tutorialId: TutorialId, stepId: string): Promise<void> {
+    const key = this.getKey(tutorialId, 'current');
+    await this.db.update(key, stepId);
+  }
+
   private getKey(tutorialId: TutorialId, stepId: string): string {
     return `${STEP_STATE_PREFIX}${tutorialId}:${stepId}`;
   }

@@ -5,7 +5,7 @@
 */
 
 import { Tutorial } from '../models/Tutorial';
-import { TutorialRepository } from '../repositories/TutorialRepository';
+import { TutorialRepository } from '../repositories/ITutorialRepository';
 import { EventBus, EventPayload } from '../events/EventBus';
 import { EventType } from '../events/EventTypes';
 import { IGitOperations } from '../../infrastructure/adapters/GitAdapter';

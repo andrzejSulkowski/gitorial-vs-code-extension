@@ -11,7 +11,18 @@ export interface PathSelectionOptions {
   defaultUri?: string; // Should be a string representation of a URI
 }
 
+
+type OpenDialogOptions = {
+  canSelectFolders?: boolean;
+  canSelectFiles?: boolean;
+  canSelectMany?: boolean;
+  openLabel?: string;
+  title?: string;
+}
+
 export interface IUserInteraction {
+  showOpenDialog(options: OpenDialogOptions): Promise<undefined | string>;
+  showInputBox(options: {prompt: string, placeHolder?: string, defaultValue?: string}): Promise<undefined | string>;
   showInformationMessage(message: string): Promise<void>;
   showWarningMessage(message: string): Promise<void>;
   showErrorMessage(message: string): Promise<void>;
@@ -40,5 +51,5 @@ export interface IUserInteraction {
    * @param cancelActionTitle Optional text for the cancel button (e.g., "No", "Cancel").
    * @returns A promise that resolves to true if the user confirmed, false otherwise.
    */
-  askConfirmation(message: string, detail?: string, confirmActionTitle?: string, cancelActionTitle?: string): Promise<boolean>;
+  askConfirmation(opt: {message: string, detail?: string, confirmActionTitle?: string, cancelActionTitle?: string}): Promise<boolean>;
 } 

@@ -3,11 +3,10 @@
 - Provides Git operations (clone, checkout, etc.)
 */
 
-import simpleGit, { SimpleGit, BranchSummary, RemoteWithRefs, CommitResult, CheckRepoActions } from 'simple-git';
+import simpleGit, { SimpleGit, BranchSummary, RemoteWithRefs, CommitResult, CheckRepoActions, TaskOptions } from 'simple-git';
 import * as path from 'path';
 import { IGitOperations, DefaultLogFields, ListLogLine } from '../../domain/ports/IGitOperations';
 import { DiffFilePayload } from 'src/domain/ports/IDiffDisplayer';
-import { DiffFile } from 'src/domain/ports/IDiffDisplayer';
 
 /**
  * Adapter for Git operations using simple-git
@@ -24,6 +23,15 @@ export class GitAdapter implements IGitOperations {
   constructor(repoPath: string) {
     this.repoPath = repoPath;
     this.git = simpleGit({ baseDir: repoPath, binary: 'git', maxConcurrentProcesses: 6 });
+  }
+  public async clone(): Promise<void> {
+    await this.git.clone(this.repoPath);
+  }
+  public async checkout(commitHash: string): Promise<void> {
+    await this.git.checkout(commitHash);
+  }
+  public async listRemote(args: TaskOptions): Promise<string> {
+    return await this.git.listRemote(args);
   }
   
   /**

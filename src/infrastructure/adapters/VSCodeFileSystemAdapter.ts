@@ -40,3 +40,7 @@ export class VSCodeFileSystemAdapter implements IFileSystem {
     }
   }
 } 
+
+export function createFileSystemAdapter(): IFileSystem {
+  return new VSCodeFileSystemAdapter();
+}

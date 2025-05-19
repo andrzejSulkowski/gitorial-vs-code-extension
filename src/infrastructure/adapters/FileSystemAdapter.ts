@@ -4,13 +4,22 @@
 */
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import { IFileSystem } from 'src/domain/ports/IFileSystem';
 
 // It's good practice to define an interface in the Domain layer
 // and implement it here. For example:
 // import { IFileSystem } from '../domain/ports/IFileSystem';
 
-// export class FileSystemAdapter implements IFileSystem {
-export class FileSystemAdapter {
+export class FileSystemAdapter implements IFileSystem {
+  async isDirectory(path: string): Promise<boolean> {
+    const stats = await fs.stat(path);
+    return stats.isDirectory();
+  }
+
+  async deleteDirectory(path: string): Promise<void> {
+    await fs.rmdir(path, { recursive: true });
+  }
+
   async readFile(filePath: string): Promise<string> {
     try {
       const absolutePath = path.resolve(filePath);
@@ -20,17 +29,6 @@ export class FileSystemAdapter {
       // Log the error or handle it as per application's error handling strategy
       console.error(`Error reading file ${filePath}:`, error);
       throw new Error(`Could not read file: ${filePath}`);
-    }
-  }
-
-  async writeFile(filePath: string, content: string): Promise<void> {
-    try {
-      const absolutePath = path.resolve(filePath);
-      await fs.writeFile(absolutePath, content, 'utf-8');
-    } catch (error) {
-      // Log the error or handle it as per application's error handling strategy
-      console.error(`Error writing file ${filePath}:`, error);
-      throw new Error(`Could not write file: ${filePath}`);
     }
   }
 

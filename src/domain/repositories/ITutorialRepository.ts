@@ -14,7 +14,7 @@ import * as T from 'shared/types';
  * - Creating new tutorials from cloned repositories
  * - Working with the TutorialBuilder to construct Tutorial instances
  */
-export interface TutorialRepository {
+export interface ITutorialRepository {
   /**
    * Find a tutorial by its local path
    * @param localPath The local filesystem path

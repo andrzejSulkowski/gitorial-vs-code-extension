@@ -12,6 +12,7 @@ import {
 } from "./tutorialOrchestrator";
 import * as T from "@shared/types";
 import { handleExternalUri } from "./uriHandler";
+import { vscDiffDisplayer } from "src/extension_old";
 
 /**
  * The default URL to clone if the user doesn't provide one.

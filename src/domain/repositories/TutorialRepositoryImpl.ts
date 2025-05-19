@@ -1,4 +1,4 @@
-import { TutorialRepository } from './TutorialRepository';
+import { ITutorialRepository } from './ITutorialRepository';
 import { Tutorial } from '../models/Tutorial';
 import { TutorialBuilder } from '../services/TutorialBuilder';
 import { GitService } from '../services/GitService';
@@ -21,7 +21,7 @@ export type GitCloneAdapterFactory = (repoUrl: string, targetPath: string) => Pr
 /**
  * Implementation of the TutorialRepository
  */
-export class TutorialRepositoryImpl implements TutorialRepository {
+export class TutorialRepositoryImpl implements ITutorialRepository {
   private stateStorage: IStateStorage;
   private gitAdapterFactory: GitAdapterFactory;
   private gitCloneAdapterFactory: GitCloneAdapterFactory;
@@ -52,7 +52,6 @@ export class TutorialRepositoryImpl implements TutorialRepository {
     this.fileSystem = fileSystem;
     this.userInteraction = userInteraction;
   }
-  
   /**
    * Find a tutorial by its local path
    * @param localPath The local filesystem path
@@ -101,12 +100,11 @@ export class TutorialRepositoryImpl implements TutorialRepository {
       // Check if targetPath exists and prompt for overwrite if necessary
       if (await this.fileSystem.pathExists(targetPath)) {
         if (await this.fileSystem.isDirectory(targetPath)) {
-          const confirmed = await this.userInteraction.askConfirmation(
-            'Directory Exists',
-            `The directory '${targetPath}' already exists. Do you want to delete its contents and proceed with the clone?`,
-            'Delete and Clone',
-            'Cancel'
-          );
+          const confirmed = await this.userInteraction.askConfirmation({
+            message: `The directory '${targetPath}' already exists. Do you want to delete its contents and proceed with the clone?`,
+            confirmActionTitle: 'Delete and Clone',
+            cancelActionTitle: 'Cancel'
+          });
           if (!confirmed) {
             throw new Error(`Clone operation cancelled by user: Directory '${targetPath}' not overwritten.`);
           }

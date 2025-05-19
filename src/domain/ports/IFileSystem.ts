@@ -20,6 +20,15 @@ export interface IFileSystem {
    */
   isDirectory(path: string): Promise<boolean>;
 
+
+  /**
+   * Ensures that a directory exists.
+   * @param path The absolute path to the directory to ensure.
+   * @returns A promise that resolves when the directory has been ensured.
+   * @throws Error if the ensuring fails.
+   */
+  ensureDir(path: string): Promise<void>;
+
   /**
    * Deletes a directory and its contents recursively.
    * @param path The absolute path to the directory to delete.
@@ -27,4 +36,12 @@ export interface IFileSystem {
    * @throws Error if the path does not exist or if deletion fails.
    */
   deleteDirectory(path: string): Promise<void>;
+
+  /**
+   * Reads the contents of a file.
+   * @param path The absolute path to the file to read.
+   * @returns A promise that resolves to the file's contents.
+   * @throws Error if the file does not exist or if reading fails.
+   */
+  readFile(path: string): Promise<string>;
 } 

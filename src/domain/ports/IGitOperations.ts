@@ -175,6 +175,21 @@ export interface DiffResult {
   deletions: number;
 }
 
+
+/**
+ * Most tasks accept custom options as an array of strings as well as the
+ * options object. Unless the task is explicitly documented as such, the
+ * tasks will not accept both formats at the same time, preferring whichever
+ * appears last in the arguments.
+ */
+export declare type TaskOptions<O extends Options = Options> = string[] | O;
+/**
+ * Options supplied in most tasks as an optional trailing object
+ */
+export declare type OptionsValues = null | string | number;
+export declare type Options = Record<string, OptionsValues>;
+export declare type OptionFlags<FLAGS extends string, VALUE = null> = Partial<Record<FLAGS, VALUE>>;
+
 /**
  * Core interface defining Git operations required by the Domain layer.
  * Implementations (Infrastructure) will provide concrete behavior via commands like `git clone`,
@@ -260,7 +275,7 @@ export interface IGitOperations {
    * Lists all remote heads in the form:
    *    COMMIT_SHA<TAB>refs/heads/BRANCH_NAME
    */
-  listRemote(args: Array<unknown>): Promise<string>;
+  listRemote(args: TaskOptions): Promise<string>;
 
   /**
    * Clean untracked files and reset changes in the working directory.

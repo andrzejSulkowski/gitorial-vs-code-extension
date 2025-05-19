@@ -14,10 +14,12 @@ import { TutorialId } from './types/TutorialId';
 export interface TutorialData {
     id: TutorialId;
     title: string;
-    repoUrl: string;
+    currentStepId?: string;
+    repoUrl?: string; //Optional: A tutorial might be purely local
     localPath?: string;
     description?: string;
     steps: Step[];
+    workspaceFolder?: string;
 }
 
 /**
@@ -30,7 +32,9 @@ export class Tutorial {
     public readonly repoUrl?: string;
     public readonly localPath?: string;
     public readonly description?: string;
-
+    public readonly workspaceFolder?: string;
+    public currentStepId: string;
+    
     constructor(data: TutorialData) {
         this.id = data.id;
         this.title = data.title;
@@ -38,6 +42,8 @@ export class Tutorial {
         this.repoUrl = data.repoUrl;
         this.localPath = data.localPath;
         this.description = data.description;
+        this.workspaceFolder = data.workspaceFolder;
+        this.currentStepId = data.currentStepId || data.steps[0].id;
     }
 
     // Static factory method if needed for complex construction, though TutorialBuilder service handles this.

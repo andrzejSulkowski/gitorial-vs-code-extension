@@ -2,6 +2,12 @@ import * as vscode from 'vscode';
 import { IUserInteraction, PathSelectionOptions } from '../../domain/ports/IUserInteraction';
 
 export class VSCodeUserInteractionAdapter implements IUserInteraction {
+  public async showOpenDialog(options: vscode.OpenDialogOptions): Promise<vscode.Uri[] | undefined> {
+    return await vscode.window.showOpenDialog(options);
+  }
+  public async showSaveDialog(options: vscode.SaveDialogOptions): Promise<vscode.Uri | undefined> {
+    return await vscode.window.showSaveDialog(options);
+  }
   public async showInformationMessage(message: string): Promise<void> {
     await vscode.window.showInformationMessage(message);
   }
@@ -63,3 +69,8 @@ export class VSCodeUserInteractionAdapter implements IUserInteraction {
     return choice?.title === confirmActionTitle;
   }
 } 
+
+
+export function createUserInteractionAdapter(): IUserInteraction {
+  return new VSCodeUserInteractionAdapter();
+}

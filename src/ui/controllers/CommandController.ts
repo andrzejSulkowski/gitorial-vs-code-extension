@@ -1,4 +1,1 @@
-/*
-- Registers VS Code commands
-- Routes commands to appropriate services
-*/
+//TODO: Find out what this file is for.

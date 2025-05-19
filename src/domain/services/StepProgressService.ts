@@ -3,34 +3,23 @@
 // It uses the IStepStateRepository port to persist and retrieve step states.
 import { IStepStateRepository } from '../repositories/IStepStateRepository';
 import { TutorialId } from '../models/types/TutorialId';
-import { Step } from '../models/Step'; // Assuming Step model has a 'state' property
+import { Step } from '../models/Step';
 import { StepState } from '../models/StepState';
-import { DomainCommit } from '../ports/IGitOperations'; // If converting from commits
+import { DomainCommit } from '../ports/IGitOperations';
 
 export class StepProgressService {
   constructor(private stepStateRepository: IStepStateRepository) {}
 
-  public async markStepAsActive(tutorialId: TutorialId, stepId: string): Promise<void> {
-    await this.stepStateRepository.saveStepState(tutorialId, stepId, StepState.ACTIVE);
-    // Additional logic: Maybe mark other steps as PENDING if they were ACTIVE?
+  public async setCurrentStep(tutorialId: TutorialId, stepId: string): Promise<void> {
+    await this.stepStateRepository.setCurrentStepId(tutorialId, stepId);
   }
 
-  public async markStepAsInactive(tutorialId: TutorialId, stepId: string): Promise<void> {
-    // Typically, a step becomes inactive by another becoming active.
-    // Or if it was active and is now pending/completed.
-    // For simplicity, we might just ensure it's not ACTIVE.
-    const currentState = await this.stepStateRepository.getStepState(tutorialId, stepId);
-    if (currentState === StepState.ACTIVE) {
-      await this.stepStateRepository.saveStepState(tutorialId, stepId, StepState.PENDING);
-    }
+  public async getCurrentStepId(tutorialId: TutorialId): Promise<string | undefined> {
+    return this.stepStateRepository.getCurrentStepId(tutorialId);
   }
 
-  public async markStepAsCompleted(tutorialId: TutorialId, stepId: string): Promise<void> {
-    await this.stepStateRepository.saveStepState(tutorialId, stepId, StepState.COMPLETED);
-  }
-
-  public async getStepState(tutorialId: TutorialId, stepId: string): Promise<StepState | undefined> {
-    return this.stepStateRepository.getStepState(tutorialId, stepId);
+  public async clearProgress(tutorialId: TutorialId): Promise<void> {
+    await this.stepStateRepository.clearAllStepStatesForTutorial(tutorialId);
   }
 
   /**

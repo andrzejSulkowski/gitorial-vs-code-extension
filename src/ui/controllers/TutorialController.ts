@@ -30,7 +30,8 @@ export class TutorialController {
     private readonly tutorialService: TutorialService // Injected TutorialService
   ) { }
 
-  public async checkWorkspaceForTutorial(): Promise<void> {
+  //TODO: check if autoOpen actually does a difference
+  public async checkWorkspaceForTutorial(autoOpen: boolean): Promise<void> {
     console.log('TutorialController: Checking workspace for existing tutorial...');
     const workspaceFolders = vscode.workspace.workspaceFolders;
     if (workspaceFolders && workspaceFolders.length > 0) {
@@ -47,6 +48,9 @@ export class TutorialController {
 
           this.userInteraction.showInformationMessage(`Tutorial "${tutorial.title}" is active in this workspace.`);
           this.activateTutorialMode(tutorial);
+          if (autoOpen) {
+            this.openTutorialFromPath(workspacePath);
+          }
         } else {
           console.log('TutorialController: No Gitorial tutorial found in the current workspace.');
         }
@@ -112,10 +116,21 @@ export class TutorialController {
       });
 
       if (openNowChoice) {
-        await this.openTutorialFromPath(finalClonePath, { 
-          initialStepId: cloneOptions?.targetStepId, 
-          isNewClone: true 
+        // Prepare data for the new window to pick up
+        const pendingTutorialInfo = {
+          autoOpenTutorialPath: finalClonePath,
+          targetStepId: cloneOptions?.targetStepId,
+        };
+        await this.context.globalState.update('gitorial:pendingAutoOpen', pendingTutorialInfo);
+
+        // Open the cloned tutorial in a new VS Code window
+        const folderUri = vscode.Uri.file(finalClonePath);
+        vscode.commands.executeCommand('vscode.openFolder', folderUri, {
         });
+        // Note: After this command, the context might change. 
+        // The current extension host might be shutting down if the window is replaced, 
+        // or a new one will activate in the new window.
+        // We probably shouldn't call openTutorialFromPath here for the *current* controller instance.
       }
     } catch (error) {
       this.progressReporter.reportEnd();
@@ -352,12 +367,6 @@ export class TutorialController {
     console.log('TutorialController: Active tutorial state cleared.');
   }
 
-  private async updateUIAfterTutorialLoad(tutorial: Tutorial, initialStepId?: string): Promise<void> {
-    console.log("TutorialController: updateUIAfterTutorialLoad called. Relying on activateTutorialMode or selectStep to update panel.");
-    if (this.activeTutorial && this.activeTutorial.id === tutorial.id) {
-      await this._updateTutorialPanel();
-    }
-  }
 
   public async requestNextStep(): Promise<void> {
     if (!this.activeTutorial) return;

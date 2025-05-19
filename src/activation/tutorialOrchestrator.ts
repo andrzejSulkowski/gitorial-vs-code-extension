@@ -4,7 +4,7 @@ import { TutorialBuilder } from "../services/tutorial-builder/TutorialBuilder";
 import { TutorialPanel } from "../panels/TutorialPanel";
 import { TutorialController } from "../controllers/TutorialController";
 import { GlobalState } from "../utilities/GlobalState";
-import { vscDiffDisplayer } from "../extension";
+import { vscDiffDisplayer } from "src/extension_old";
 
 let activeController: TutorialController | undefined;
 

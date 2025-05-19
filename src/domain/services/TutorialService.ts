@@ -70,6 +70,7 @@ export class TutorialService {
       console.warn(`TutorialService: No tutorial found at path ${localPath}`);
       return null;
     }
+    this.gitAdapter = this.gitAdapterFactory.createFromPath(localPath);
     await this.activateTutorial(tutorial, options);
     return tutorial;
   }
@@ -80,6 +81,7 @@ export class TutorialService {
   public async cloneAndLoadTutorial(repoUrl: string, targetPath: string, options: LoadTutorialOptions = {}): Promise<Tutorial | null> {
     try {
       const tutorial = await this.repository.createFromClone(repoUrl, targetPath);
+      this.gitAdapter = this.gitAdapterFactory.createFromPath(targetPath);
       await this.activateTutorial(tutorial, options);
       return tutorial;
     } catch (error) {

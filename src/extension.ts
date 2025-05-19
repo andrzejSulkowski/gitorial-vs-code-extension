@@ -80,8 +80,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<vscode
   uriHandler.register(context);
 
   // Runs async
-  tutorialController.checkWorkspaceForTutorial();
+  const autoOpen: boolean = !!context.globalState.get<{ autoOpenTutorialPath: string, targetStepId: string }>('gitorial:pendingAutoOpen');
+  console.log("📖 Gitorial autoOpen:", autoOpen);
+  tutorialController.checkWorkspaceForTutorial(autoOpen);
   console.log("📖 Gitorial activation complete.");
+  context.globalState.update('gitorial:pendingAutoOpen', undefined);
   return context;
 }
 

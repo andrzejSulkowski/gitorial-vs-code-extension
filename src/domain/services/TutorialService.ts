@@ -5,13 +5,14 @@
 */
 
 import { Tutorial } from '../models/Tutorial';
-import { TutorialRepository } from '../repositories/ITutorialRepository';
+import { ITutorialRepository } from '../repositories/ITutorialRepository';
 import { EventBus, EventPayload } from '../events/EventBus';
 import { EventType } from '../events/EventTypes';
-import { IGitOperations } from '../../infrastructure/adapters/GitAdapter';
-import { IDiffDisplayer, DiffFile } from '../../infrastructure/VSCodeDiffDisplayer';
 import * as path from 'path';
 import * as fs from 'fs';
+import { IGitOperations } from '../ports/IGitOperations';
+import { IDiffDisplayer, DiffFile, DiffFilePayload } from '../ports/IDiffDisplayer';
+import { Step } from '../models/Step';
 
 /**
  * Options for loading a tutorial
@@ -20,7 +21,7 @@ export interface LoadTutorialOptions {
   /**
    * Initial step index to load
    */
-  initialStep?: number;
+  initialStepIndex?: number;
   
   /**
    * Whether to show solution immediately
@@ -32,7 +33,7 @@ export interface LoadTutorialOptions {
  * Core service for tutorial operations
  */
 export class TutorialService {
-  private repository: TutorialRepository;
+  private repository: ITutorialRepository;
   private eventBus: EventBus;
   private activeTutorial: Tutorial | null = null;
   private gitAdapter: IGitOperations | null = null;
@@ -43,11 +44,13 @@ export class TutorialService {
    * Create a new TutorialService
    */
   constructor(
-    repository: TutorialRepository,
-    diffDisplayer: IDiffDisplayer
+    repository: ITutorialRepository,
+    diffDisplayer: IDiffDisplayer,
+    gitAdapter: IGitOperations
   ) {
     this.repository = repository;
     this.diffDisplayer = diffDisplayer;
+    this.gitAdapter = gitAdapter;
     this.eventBus = EventBus.getInstance();
     
     // Subscribe to relevant events
@@ -59,13 +62,10 @@ export class TutorialService {
    * Load a tutorial from its local path
    */
   public async loadTutorialFromPath(localPath: string, options: LoadTutorialOptions = {}): Promise<Tutorial | null> {
-    // Find the tutorial
     const tutorial = await this.repository.findByPath(localPath);
-    
     if (!tutorial) {
       return null;
     }
-    
     await this.activateTutorial(tutorial, options);
     return tutorial;
   }
@@ -75,21 +75,16 @@ export class TutorialService {
    */
   public async cloneAndLoadTutorial(repoUrl: string, targetPath: string, options: LoadTutorialOptions = {}): Promise<Tutorial | null> {
     try {
-      // Create the tutorial by cloning the repository
       const tutorial = await this.repository.createFromClone(repoUrl, targetPath);
-      
       await this.activateTutorial(tutorial, options);
       return tutorial;
     } catch (error) {
       console.error(`Error cloning tutorial from ${repoUrl}:`, error);
-      
-      // Publish error event
       this.eventBus.publish(EventType.ERROR_OCCURRED, {
         error,
         message: `Failed to clone tutorial: ${error instanceof Error ? error.message : String(error)}`,
         source: 'TutorialService.cloneAndLoadTutorial'
       });
-      
       return null;
     }
   }
@@ -105,33 +100,53 @@ export class TutorialService {
    * Navigate to a specific step
    */
   public async navigateToStep(stepIndex: number): Promise<boolean> {
-    if (!this.activeTutorial) {
+    if (!this.activeTutorial || stepIndex < 0 || stepIndex >= this.activeTutorial.steps.length) {
+      console.warn('TutorialService: Invalid step index or no active tutorial for navigateToStep.');
       return false;
     }
-    
-    return await this.activeTutorial.navigateToStep(stepIndex);
+
+    const targetStep = this.activeTutorial.steps[stepIndex];
+    if (this.activeTutorial.currentStepId === targetStep.id) {
+      return true; // Already on the target step
+    }
+
+    this.activeTutorial.currentStepId = targetStep.id;
+    // Persistence of currentStepId is handled by StepProgressService via TutorialController
+
+    // Load content for the new step (checkout)
+    await this.loadStepContent(targetStep.commitHash);
+
+    this.eventBus.publish(EventType.STEP_CHANGED, {
+      tutorialId: this.activeTutorial.id,
+      stepIndex: stepIndex,
+      step: targetStep,
+      totalSteps: this.activeTutorial.steps.length
+    });
+    return true;
   }
   
   /**
    * Navigate to the next step
    */
   public async navigateToNextStep(): Promise<boolean> {
-    if (!this.activeTutorial) {
-      return false;
+    if (!this.activeTutorial) return false;
+    const currentIndex = this.activeTutorial.steps.findIndex(s => s.id === this.activeTutorial!.currentStepId);
+    if (currentIndex === -1 || currentIndex >= this.activeTutorial.steps.length - 1) {
+      return false; // No next step or current step not found
     }
-    
-    return await this.activeTutorial.navigateToNextStep();
+    return this.navigateToStep(currentIndex + 1);
   }
   
   /**
    * Navigate to the previous step
    */
   public async navigateToPreviousStep(): Promise<boolean> {
-    if (!this.activeTutorial) {
-      return false;
+    if (!this.activeTutorial) return false;
+    const currentIndex = this.activeTutorial.steps.findIndex(s => s.id === this.activeTutorial!.currentStepId);
+    if (currentIndex <= 0) {
+      return false; // No previous step or current step not found
     }
-    
-    return await this.activeTutorial.navigateToPreviousStep();
+    return this.navigateToStep(currentIndex - 1);
   }
   
   /**
@@ -139,35 +154,22 @@ export class TutorialService {
    */
   public async toggleSolution(show?: boolean): Promise<void> {
     const newValue = show === undefined ? !this.isShowingSolution : show;
-    
     if (newValue === this.isShowingSolution) {
       return;
     }
-    
     this.isShowingSolution = newValue;
-    
-    // Publish event
-    this.eventBus.publish(EventType.SOLUTION_TOGGLED, {
-      showing: this.isShowingSolution
-    });
+    this.eventBus.publish(EventType.SOLUTION_TOGGLED, { showing: this.isShowingSolution });
   }
   
   /**
    * Close the active tutorial
    */
   public async closeTutorial(): Promise<void> {
-    if (!this.activeTutorial) {
-      return;
-    }
-    
+    if (!this.activeTutorial) return;
     const tutorial = this.activeTutorial;
     this.activeTutorial = null;
-    this.gitAdapter = null;
-    
-    // Publish event
-    this.eventBus.publish(EventType.TUTORIAL_CLOSED, {
-      tutorialId: tutorial.id
-    });
+    this.gitAdapter = null; 
+    this.eventBus.publish(EventType.TUTORIAL_CLOSED, { tutorialId: tutorial.id });
   }
   
   /**
@@ -175,37 +177,47 @@ export class TutorialService {
    */
   private async activateTutorial(tutorial: Tutorial, options: LoadTutorialOptions = {}): Promise<void> {
     const oldTutorial = this.activeTutorial;
-    
-    // Set the active tutorial
     this.activeTutorial = tutorial;
-    
-    // Create a GitAdapter for the tutorial
-    this.gitAdapter = this.createGitAdapter(tutorial.localPath);
-    
-    // Reset solution state
-    this.isShowingSolution = options.showSolution || false;
-    
-    // If there's a specified initial step, navigate to it
-    if (options.initialStep !== undefined) {
-      await tutorial.navigateToStep(options.initialStep);
+
+    if (!tutorial.localPath) {
+      console.error('TutorialService: Cannot activate tutorial without a localPath.');
+      this.eventBus.publish(EventType.ERROR_OCCURRED, {
+        message: 'Tutorial activation failed: localPath is missing.',
+        source: 'TutorialService.activateTutorial'
+      });
+      this.activeTutorial = oldTutorial; // Revert
+      return;
     }
     
-    // Load the content for the current step
-    await this.loadStepContent(tutorial.currentStep.commitHash);
+    this.isShowingSolution = options.showSolution || false;
     
-    // Publish event that a new tutorial is loaded
+    let targetStepIndex = options.initialStepIndex;
+    if (targetStepIndex === undefined) {
+        const currentStepId = tutorial.currentStepId;
+        const foundIndex = tutorial.steps.findIndex(s => s.id === currentStepId);
+        targetStepIndex = foundIndex !== -1 ? foundIndex : 0; 
+    }
+    
+    if (tutorial.steps.length > 0) {
+        const stepToActivate = tutorial.steps[Math.max(0, Math.min(targetStepIndex, tutorial.steps.length - 1))];
+        tutorial.currentStepId = stepToActivate.id; // Set initial currentStepId
+        await this.loadStepContent(stepToActivate.commitHash); // Checkout initial step
+    } else {
+        // Handle tutorial with no steps - perhaps log or set a specific state
+        console.warn(`TutorialService: Tutorial "${tutorial.title}" has no steps.`);
+    }
+    
+    const currentActiveStepIndex = tutorial.steps.findIndex(s => s.id === tutorial.currentStepId);
+
     this.eventBus.publish(EventType.TUTORIAL_LOADED, {
       tutorialId: tutorial.id,
       title: tutorial.title,
-      currentStep: tutorial.currentStepIndex,
-      totalSteps: tutorial.totalSteps
+      currentStepIndex: currentActiveStepIndex !== -1 ? currentActiveStepIndex : undefined,
+      totalSteps: tutorial.steps.length
     });
     
-    // If we replaced another tutorial, close it
     if (oldTutorial && oldTutorial.id !== tutorial.id) {
-      this.eventBus.publish(EventType.TUTORIAL_CLOSED, {
-        tutorialId: oldTutorial.id
-      });
+      this.eventBus.publish(EventType.TUTORIAL_CLOSED, { tutorialId: oldTutorial.id });
     }
   }
   
@@ -213,16 +225,13 @@ export class TutorialService {
    * Handle step changed event
    */
   private async handleStepChanged(payload: EventPayload): Promise<void> {
-    if (!this.activeTutorial || !this.gitAdapter) {
+    // This is called AFTER navigateToStep successfully changes the step and checkouts.
+    // The primary role here is to show solution if needed.
+    if (!this.activeTutorial || !this.gitAdapter || !payload.step) {
       return;
     }
-    
-    const { stepIndex, step } = payload;
-    
-    // Load content for the new step
-    await this.loadStepContent(step.commitHash);
-    
-    // If showing solution, display diffs
+    // const { stepIndex, step } = payload; // step is already the current step from navigateToStep
+    // loadStepContent was already called in navigateToStep
     if (this.isShowingSolution) {
       await this.showStepSolution();
     }
@@ -233,7 +242,6 @@ export class TutorialService {
    */
   private async handleSolutionToggled(payload: EventPayload): Promise<void> {
     const { showing } = payload;
-    
     if (showing) {
       await this.showStepSolution();
     }
@@ -243,38 +251,26 @@ export class TutorialService {
    * Load content for a step
    */
   private async loadStepContent(commitHash: string): Promise<void> {
-    if (!this.activeTutorial || !this.gitAdapter) {
+    if (!this.activeTutorial || !this.gitAdapter || !this.activeTutorial.localPath) {
+      console.warn('TutorialService: Cannot load step content. Missing active tutorial, git adapter, or local path.');
       return;
     }
-    
+    const tutorialLocalPath = this.activeTutorial.localPath; // Guaranteed to be string here
+
     try {
-      // Checkout the commit
-      await this.gitAdapter.checkoutCommit(commitHash);
+      await this.gitAdapter.checkout(commitHash); // Use checkout
       
-      // Read README.md or another markdown file
-      const readmePath = path.join(this.activeTutorial.localPath, 'README.md');
-      let content = '';
-      
-      if (fs.existsSync(readmePath)) {
-        content = fs.readFileSync(readmePath, 'utf8');
-      } else {
-        // Try to find any markdown file
-        const files = fs.readdirSync(this.activeTutorial.localPath)
-          .filter(file => file.endsWith('.md'));
-        
-        if (files.length > 0) {
-          const mdFilePath = path.join(this.activeTutorial.localPath, files[0]);
-          content = fs.readFileSync(mdFilePath, 'utf8');
-        }
-      }
-      
-      // Update the step content
-      await this.activeTutorial.updateCurrentStepContent(content);
+      // The responsibility of what content to show (README, etc.) for a step
+      // is more aligned with the UI/ViewModel layer after checkout.
+      // This service ensures the correct commit is checked out.
+      // We remove the direct file reading here.
+      // const readmePath = path.join(tutorialLocalPath, 'README.md');
+      // let content = '';
+      // if (fs.existsSync(readmePath)) { ... }
+      // await this.activeTutorial.updateCurrentStepContent(content); // Step model does not have this
       
     } catch (error) {
       console.error(`Error loading step content for commit ${commitHash}:`, error);
-      
-      // Publish error event
       this.eventBus.publish(EventType.ERROR_OCCURRED, {
         error,
         message: `Failed to load step content: ${error instanceof Error ? error.message : String(error)}`,
@@ -287,65 +283,52 @@ export class TutorialService {
    * Show the solution for the current step
    */
   private async showStepSolution(): Promise<void> {
-    if (!this.activeTutorial || !this.gitAdapter) {
+    if (!this.activeTutorial || !this.gitAdapter || !this.activeTutorial.localPath) {
+      console.warn('TutorialService: Cannot show solution. Missing active tutorial, git adapter, or local path.');
       return;
     }
-    
+    const currentStep = this.activeTutorial.steps.find(s => s.id === this.activeTutorial!.currentStepId);
+    if (!currentStep) {
+        console.warn('TutorialService: Current step not found for showing solution.');
+        return;
+    }
+    const tutorialLocalPath = this.activeTutorial.localPath; // Guaranteed to be string
+
     try {
-      // Get changed files
-      const changedFiles = await this.gitAdapter.getChangedFiles();
+      const commitDiffPayloads: DiffFilePayload[] = await this.gitAdapter.getCommitDiff(currentStep.commitHash);
       
-      if (changedFiles.length === 0) {
+      if (commitDiffPayloads.length === 0) {
         return;
       }
       
-      // Prepare files for diff
-      const filesToDisplay: DiffFile[] = [];
+      const filesToDisplay: DiffFile[] = commitDiffPayloads.map(payload => ({
+        oldContentProvider: async () => {
+          // Ensure gitAdapter is not null, though it should be if activeTutorial is set
+          if (!this.gitAdapter) throw new Error("Git adapter not available");
+          return this.gitAdapter.getFileContent(payload.commitHash, payload.relativeFilePath);
+        },
+        currentPath: path.join(tutorialLocalPath, payload.relativeFilePath),
+        relativePath: payload.relativeFilePath,
+        commitHashForTitle: currentStep.commitHash.slice(0, 7),
+        commitHash: currentStep.commitHash // Using currentStep.commitHash as originalCommitHash
+      }));
       
-      for (const relativePath of changedFiles) {
-        const currentPath = path.join(this.activeTutorial.localPath, relativePath);
-        
-        filesToDisplay.push({
-          oldContentProvider: async () => {
-            return await this.gitAdapter!.getFileContent(
-              this.activeTutorial!.currentStep.commitHash,
-              relativePath
-            );
-          },
-          currentPath,
-          relativePath,
-          commitHashForTitle: this.activeTutorial.currentStep.commitHash.slice(0, 7),
-          originalCommitHash: this.activeTutorial.currentStep.commitHash
-        });
-      }
+      await this.diffDisplayer.displayDiff(filesToDisplay); // Use displayDiff
       
-      // Display diffs
-      await this.diffDisplayer.displayMultipleDiffs(filesToDisplay);
-      
-      // Publish event
+      const currentStepIndex = this.activeTutorial.steps.findIndex(s => s.id === currentStep.id);
       this.eventBus.publish(EventType.GIT_DIFF_DISPLAYED, {
         tutorialId: this.activeTutorial.id,
-        stepIndex: this.activeTutorial.currentStepIndex,
+        stepIndex: currentStepIndex !== -1 ? currentStepIndex : undefined,
         fileCount: filesToDisplay.length
       });
       
     } catch (error) {
       console.error('Error showing step solution:', error);
-      
-      // Publish error event
       this.eventBus.publish(EventType.ERROR_OCCURRED, {
         error,
         message: `Failed to show solution: ${error instanceof Error ? error.message : String(error)}`,
         source: 'TutorialService.showStepSolution'
       });
     }
-  }
-  
-  /**
-   * Create a GitAdapter for a path
-   */
-  private createGitAdapter(repoPath: string): IGitOperations {
-    // This would be injected in a real implementation
-    throw new Error('createGitAdapter should be injected');
   }
 }

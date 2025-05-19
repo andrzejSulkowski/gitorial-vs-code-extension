@@ -6,6 +6,13 @@ import { TutorialController } from '../controllers/TutorialController';
 export class TutorialUriHandler implements vscode.UriHandler {
   constructor(private tutorialController: TutorialController) {}
 
+
+  public async register(context: vscode.ExtensionContext): Promise<void> {
+    context.subscriptions.push(
+      vscode.window.registerUriHandler(this)
+    );
+  }
+
   public async handleUri(uri: vscode.Uri): Promise<void> {
     console.log(`TutorialUriHandler received URI: ${uri.toString()}`);
     const queryParams = new URLSearchParams(uri.query);

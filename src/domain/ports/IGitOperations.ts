@@ -175,7 +175,6 @@ export interface DiffResult {
   deletions: number;
 }
 
-
 /**
  * Most tasks accept custom options as an array of strings as well as the
  * options object. Unless the task is explicitly documented as such, the

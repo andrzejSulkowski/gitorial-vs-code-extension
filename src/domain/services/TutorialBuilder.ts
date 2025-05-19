@@ -33,7 +33,7 @@ export class TutorialBuilder {
       const id = this.generateTutorialId(repoUrl);
       const title = path.basename(repoPath);
       
-      const commits = await gitService.getTutorialCommits();
+      const commits = await gitService.getCommitHistory();
       if (commits.length === 0) {
         console.log(`No commits found in repository: ${repoPath}`);
         return null;

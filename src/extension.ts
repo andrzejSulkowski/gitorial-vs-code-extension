@@ -3,7 +3,7 @@ import { createDiffDisplayerAdapter } from "./infrastructure/adapters/DiffDispla
 import { createMementoAdapter } from "./infrastructure/adapters/MementoAdapter";
 import { createProgressReportAdapter } from "./infrastructure/adapters/ProgressReportAdapter";
 import { GitAdapterFactory } from "./infrastructure/factories/GitAdapterFactory";
-import { TutorialUriHandler } from "./ui/handlers/TutorialUriHandler";
+import { TutorialUriHandler } from "./ui/handlers/UriHandler";
 import { TutorialController } from "./ui/controllers/TutorialController";
 import { CommandHandler } from "./ui/handlers/CommandHandler";
 import { TutorialRepositoryImpl } from "./domain/repositories/TutorialRepositoryImpl";
@@ -67,33 +67,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<vscode
     fileSystemAdapter
   );
 
-  const tutorialViewModel = tutorialController.tutorialViewModel;
-  if(!tutorialViewModel) {
-    throw new Error("TutorialViewModel is null, cannot create TutorialPanelManager");
-  }
-  const tutorialPanelManager = TutorialPanelManager.createOrShow(context.extensionUri, tutorialViewModel, tutorialController);
-
   const commandHandler = new CommandHandler(tutorialController);
-  const tutorialUriHandler = new TutorialUriHandler(tutorialController);
+  const uriHandler = new TutorialUriHandler(tutorialController);
 
   // --- VS Code Specific Registrations (Infrastructure concern, performed here) ---
-  context.subscriptions.push(
-    vscode.commands.registerCommand('gitorial.openTutorial', () => {
-      console.log("Debugging cloneTutorial of new extension.ts!");
-      commandHandler.handleOpenLocalTutorial();
-    })
-  );
-
-  context.subscriptions.push(
-    vscode.commands.registerCommand('gitorial.cloneTutorial', () => {
-      console.log("Debugging cloneTutorial of new extension.ts!");
-      commandHandler.handleCloneTutorial();
-    })
-  );
-
-  context.subscriptions.push(
-    vscode.window.registerUriHandler(tutorialUriHandler) // The UriHandler itself implements vscode.UriHandler
-  );
+  commandHandler.register(context);
+  uriHandler.register(context);
 
   // Runs async
   tutorialController.checkWorkspaceForTutorial();

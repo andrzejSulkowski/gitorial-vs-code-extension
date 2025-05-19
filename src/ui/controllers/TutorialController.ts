@@ -9,7 +9,7 @@ import { GitAdapterFactory } from 'src/infrastructure/factories/GitAdapterFactor
 import { Tutorial } from '../../domain/models/Tutorial'; // Assuming this model exists
 import { Step } from 'src/domain/models/Step';
 import { TutorialPanelManager } from '../panels/TutorialPanelManager';
-import * as path from 'path'; 
+import * as path from 'path';  //TODO: This need to be refactored to use our IFileSystem Abstraction
 import { IFileSystem } from 'src/domain/ports/IFileSystem';
 import { TutorialStepViewModel, TutorialViewModel } from '../viewmodels/TutorialViewModel';
 import { UriParser } from 'src/libs/uri-parser/UriParser';
@@ -17,7 +17,6 @@ import { UriParser } from 'src/libs/uri-parser/UriParser';
 export class TutorialController {
   private activeTutorial: Tutorial | null = null;
   private activeGitAdapter: IGitOperations | null = null;
-  private tutorialPanelManager: TutorialPanelManager | null = null;
 
   constructor(
     private readonly context: vscode.ExtensionContext,
@@ -107,6 +106,7 @@ export class TutorialController {
         cancelActionTitle: 'Open Later'
       });
       if (openNowChoice) {
+        //TODO: we need to open VSCode with the path to the tutorial
         this.openTutorialFromUri(vscode.Uri.file(finalClonePath));
       }
     }
@@ -199,6 +199,16 @@ export class TutorialController {
     }
   }
 
+  public async openTutorialFromPath(path: string): Promise<void> {
+    const tutorial = await this.tutorialRepository.findByPath(path);
+    if (!tutorial) {
+      throw new Error(`Could not load tutorial from local path: ${path}`);
+    }
+    this.activeTutorial = tutorial;
+    this.activeGitAdapter = this.gitAdapterFactory.createFromPath(path);
+    await this.updateUIAfterTutorialLoad(tutorial);
+  }
+
   public async selectStep(step: Step | string): Promise<void> {
     if (!this.activeTutorial || !this.activeGitAdapter) {
       this.userInteraction.showWarningMessage('No active tutorial to select a step from.');
@@ -269,9 +279,7 @@ export class TutorialController {
     this.activeTutorial = null;
     this.activeGitAdapter = null;
     vscode.commands.executeCommand('setContext', 'gitorial.tutorialActive', false);
-    if (this.tutorialPanelManager) {
-      this.tutorialPanelManager.dispose();
-    }
+    TutorialPanelManager.disposeCurrentPanel();
     console.log('TutorialController: Active tutorial state cleared.');
   }
 
@@ -282,15 +290,14 @@ export class TutorialController {
     if (stepToSelect) {
       // Before calling selectStep, ensure activeTutorial is set
       if (this.activeTutorial) { // Or rely on selectStep's internal check
+        //TODO: After the step is selected, is the UI being updated?
         await this.selectStep(stepToSelect);
-        this._updateTutorialPanel();
       } else {
         console.warn("updateUIAfterTutorialLoad: activeTutorial is null, cannot select step.");
+        await this._updateTutorialPanel();
       }
     } else {
-      if (this.tutorialPanelManager && tutorial.steps.length === 0) {
-        this.tutorialPanelManager.displayError("This tutorial has no steps defined yet.");
-      }
+      await this._updateTutorialPanel();
     }
   }
 
@@ -326,8 +333,10 @@ export class TutorialController {
 
   private async _updateTutorialPanel(): Promise<void> {
     const tutorialViewModel = this.tutorialViewModel;
-    if (this.tutorialPanelManager && tutorialViewModel) {
-      this.tutorialPanelManager.updateTutorial(tutorialViewModel);
+    if (tutorialViewModel) {
+      TutorialPanelManager.createOrShow(this.context.extensionUri, tutorialViewModel, this);
+    } else {
+      TutorialPanelManager.disposeCurrentPanel();
     }
   }
 }

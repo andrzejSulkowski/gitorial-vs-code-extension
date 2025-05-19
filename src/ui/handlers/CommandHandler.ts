@@ -31,7 +31,7 @@ export class CommandHandler {
    * This method should be called during extension activation.
    * @param context The extension context to push disposables to.
    */
-  public registerCommands(context: vscode.ExtensionContext): void {
+  public register(context: vscode.ExtensionContext): void {
     context.subscriptions.push(
       vscode.commands.registerCommand('gitorial.openTutorial', () => {
         this.handleOpenLocalTutorial();

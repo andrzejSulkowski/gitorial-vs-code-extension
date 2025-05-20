@@ -183,12 +183,14 @@ export class TutorialService {
       await this.gitAdapter.checkout(targetStep.commitHash);
       this.activeTutorial.currentStepId = targetStep.id;
       await this.loadAndPrepareDisplayContentForStep(targetStep);
+      const changedFilePaths = await this.gitAdapter.getChangesInCommit(targetStep.commitHash);
 
       this.eventBus.publish(EventType.STEP_CHANGED, {
         tutorialId: this.activeTutorial.id,
         stepIndex: stepIndex,
         step: targetStep,
-        totalSteps: this.activeTutorial.steps.length
+        totalSteps: this.activeTutorial.steps.length,
+        changedFilePaths: changedFilePaths
       });
       return true;
     } catch (error) {
@@ -322,7 +324,7 @@ export class TutorialService {
     if (!this.activeTutorial || !this.gitAdapter || !payload.step) {
       return;
     }
-    // const { stepIndex, step } = payload; // step is already the current step from navigateToStep
+    // const { step, changedFilePaths } = payload; // changedFilePaths is now available if needed here
     // loadStepContent was already called in navigateToStep
     if (this.isShowingSolution) {
       await this.showStepSolution();

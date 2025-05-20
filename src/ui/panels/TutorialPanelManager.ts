@@ -12,12 +12,8 @@ export class TutorialPanelManager {
   private static currentPanelManagerDisposables: vscode.Disposable[] = [];
 
   public static createOrShow(extensionUri: vscode.Uri, tutorial: TutorialViewModel, tutorialController: TutorialController): void {
-    const column = vscode.window.activeTextEditor
-      ? vscode.window.activeTextEditor.viewColumn
-      : undefined;
-
     if (TutorialPanelManager.currentPanelInstance) {
-      TutorialPanelManager.currentPanelInstance.reveal(column);
+      TutorialPanelManager.currentPanelInstance.reveal(vscode.ViewColumn.One);
       TutorialPanelManager.currentPanelInstance.updateTutorial(tutorial);
       return;
     }
@@ -28,7 +24,7 @@ export class TutorialPanelManager {
     const vscodePanel = vscode.window.createWebviewPanel(
       'tutorialPanel', // Identifies the type of the webview. Used internally
       tutorial.title || 'Gitorial Tutorial', // Title of the panel displayed to the user
-      column || vscode.ViewColumn.One, // Editor column to show the new webview panel in.
+      vscode.ViewColumn.One, // Editor column to show the new webview panel in.
       {
         enableScripts: true,
         localResourceRoots: [
@@ -55,6 +51,9 @@ export class TutorialPanelManager {
 
     //Show the tutorial
     TutorialPanelManager.currentPanelInstance.updateTutorial(tutorial);
+
+    // Ensure the new panel is also revealed in the first column
+    TutorialPanelManager.currentPanelInstance.panel.reveal(vscode.ViewColumn.One);
   }
 
   /**

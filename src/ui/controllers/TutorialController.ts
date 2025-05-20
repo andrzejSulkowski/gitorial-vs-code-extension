@@ -11,6 +11,8 @@ import * as path from 'path';  //TODO: This need to be refactored to use our IFi
 import { IFileSystem } from 'src/domain/ports/IFileSystem';
 import { TutorialStepViewModel, TutorialViewModel } from 'shared/types/viewmodels';
 import { TutorialService } from '../../domain/services/TutorialService'; // Added import
+import { EventBus, EventPayload } from '../../domain/events/EventBus'; // Corrected import for EventBus and EventPayload
+import { EventType } from '../../domain/events/EventTypes'; // Corrected import for EventType
 
 export class TutorialController {
   private activeTutorial: Tutorial | null = null;
@@ -24,7 +26,128 @@ export class TutorialController {
     private readonly stepProgressService: StepProgressService,
     private readonly fs: IFileSystem,
     private readonly tutorialService: TutorialService // Injected TutorialService
-  ) { }
+  ) {
+    EventBus.getInstance().subscribe(EventType.STEP_CHANGED, this.handleStepChangedEvent.bind(this));
+  }
+
+  private async handleStepChangedEvent(payload: EventPayload): Promise<void> {
+    if (!this.activeTutorial || !payload.step || !payload.changedFilePaths) {
+      console.warn('TutorialController: Received STEP_CHANGED event with missing data.', payload);
+      return;
+    }
+
+    const step = payload.step as Step; // Assuming Step type is correctly defined and matches
+    const changedFilePaths = payload.changedFilePaths as string[];
+
+    console.log(`TutorialController: Handling STEP_CHANGED event for step '${step.title}'. Changed files:`, changedFilePaths);
+    await this._updateSidePanelFiles(step, changedFilePaths);
+  }
+
+  private async _updateSidePanelFiles(step: Step, changedFilePaths: string[]): Promise<void> {
+    if (!this.activeTutorial || !this.activeTutorial.localPath) {
+      console.warn("TutorialController: Cannot update side panel files, active tutorial or localPath missing.");
+      return;
+    }
+    const localPath = this.activeTutorial.localPath;
+
+    // Define excluded file extensions and names
+    const excludedExtensions = ['.md', '.toml', '.lock'];
+    const excludedFileNames = ['.gitignore'];
+
+    // Close all tabs in group two if it's a section step
+    if (step.type === 'section') {
+      const groupTwoTabs = this._getTabsInGroup(vscode.ViewColumn.Two);
+      if (groupTwoTabs.length > 0) {
+        await vscode.window.tabGroups.close(groupTwoTabs, false); 
+        console.log("TutorialController: Closed all tabs in group two for section step.");
+      }
+      return;
+    }
+
+    const targetUris: vscode.Uri[] = [];
+    for (const relativePath of changedFilePaths) {
+      const fileName = path.basename(relativePath);
+      const fileExtension = path.extname(relativePath).toLowerCase();
+
+      if (excludedFileNames.includes(fileName) || excludedExtensions.includes(fileExtension)) {
+        console.log(`TutorialController: Skipping excluded file: ${relativePath}`);
+        continue;
+      }
+
+      const absolutePath = this.fs.join(localPath, relativePath);
+      if (await this.fs.pathExists(absolutePath)) {
+        targetUris.push(vscode.Uri.file(absolutePath));
+      } else {
+        console.warn(`TutorialController: File path from changed files does not exist: ${absolutePath}`);
+      }
+    }
+    
+    // 1. Get current tabs in editor group two.
+    const currentTabsInGroupTwo = this._getTabsInGroup(vscode.ViewColumn.Two);
+    const targetUriStrings = targetUris.map(u => u.toString());
+
+    // 2. Determine tabs to close.
+    //    - Tabs showing diffs (input has original & modified).
+    //    - Tabs for files that no longer exist.
+    //    - Tabs for files not in the current targetUris list for this step.
+    const tabsToClose: vscode.Tab[] = [];
+    for (const tab of currentTabsInGroupTwo) {
+      const input = tab.input as any; // Type assertion to access properties
+      if (input && input.original && input.modified) { // It's a diff view
+        tabsToClose.push(tab);
+        continue;
+      }
+      const tabUri = (input?.uri as vscode.Uri);
+      if (tabUri) {
+        if (!(await this.fs.pathExists(tabUri.fsPath))) {
+          tabsToClose.push(tab);
+          continue;
+        }
+        if (!targetUriStrings.includes(tabUri.toString())) {
+          tabsToClose.push(tab);
+          continue;
+        }
+      }
+    }
+    
+    // 3. Open new files in group two.
+    for (const uri of targetUris) {
+      // Avoid re-opening already open and correct tabs
+      if (!currentTabsInGroupTwo.find(tab => (tab.input as any)?.uri?.toString() === uri.toString())) {
+        try {
+          await vscode.window.showTextDocument(uri, { viewColumn: vscode.ViewColumn.Two, preview: false, preserveFocus: true });
+        } catch (error) {
+          console.error(`TutorialController: Error opening file ${uri.fsPath} in group two:`, error);
+        }
+      }
+    }
+
+    // 4. Close identified tabs.
+    if (tabsToClose.length > 0) {
+      try {
+        await vscode.window.tabGroups.close(tabsToClose, false); // false to not close group if empty
+      } catch (error) {
+        console.error("TutorialController: Error closing tabs in group two:", error);
+      }
+    }
+
+    // 5. Adjust focus if needed (e.g., focus group one if group two was active for a diff).
+    // This part can be refined based on desired UX.
+    if (targetUris.length > 0 && vscode.window.tabGroups.activeTabGroup?.viewColumn === vscode.ViewColumn.Two) {
+      // If we opened files and group two is active, maybe focus group one?
+      // Or let user manage focus unless it was a diff view previously.
+    } else if (targetUris.length === 0 && currentTabsInGroupTwo.length > 0 && tabsToClose.length === currentTabsInGroupTwo.length) {
+      // If we closed everything in group two, focus group one.
+      await vscode.commands.executeCommand('workbench.action.focusFirstEditorGroup');
+    }
+
+    console.log("TutorialController: Side panel files updated for step:", step.title);
+  }
+
+  private _getTabsInGroup(viewColumn: vscode.ViewColumn): vscode.Tab[] {
+    const group = vscode.window.tabGroups.all.find(tg => tg.viewColumn === viewColumn);
+    return group ? [...group.tabs] : [];
+  }
 
   //TODO: check if autoOpen actually does a difference
   public async checkWorkspaceForTutorial(autoOpen: boolean): Promise<void> {
@@ -360,7 +483,9 @@ export class TutorialController {
    * Note: this method displays the webview panel
    */
   private async activateTutorialMode(tutorial: Tutorial, initialStepId?: string): Promise<void> {
-    //TODO: What is this for?
+    // Clear all currently open editor tabs
+    await vscode.commands.executeCommand('workbench.action.closeAllEditors');
+
     vscode.commands.executeCommand('setContext', 'gitorial.tutorialActive', true);
 
     let stepIdToSelect = initialStepId || tutorial.currentStepId;

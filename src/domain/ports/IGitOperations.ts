@@ -288,5 +288,12 @@ export interface IGitOperations {
    * @throws Error if a 'gitorial' branch cannot be set up.
    */
   ensureGitorialBranch(): Promise<void>;
+
+  /**
+   * Gets the names of files changed (added, modified) in the current commit compared to the provided commit.
+   * @param commitHash The hash of the commit to compare against.
+   * @returns A promise that resolves to an array of relative file paths.
+   */
+  getChangesInCommit(commitHash: string): Promise<string[]>;
 }
 

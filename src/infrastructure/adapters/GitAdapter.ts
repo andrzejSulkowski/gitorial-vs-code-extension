@@ -261,6 +261,38 @@ export class GitAdapter implements IGitOperations {
   async isGitRepository(): Promise<boolean> {
     return this.git.checkIsRepo(CheckRepoActions.IS_REPO_ROOT);
   }
+
+  async getChangesInCommit(commitHash: string): Promise<string[]> {
+    if (!commitHash) {
+      console.warn("GitAdapter: getChangesInCommit called with no commitHash.");
+      return [];
+    }
+    try {
+      // Diff against the parent. If it's the initial commit, it has no parent.
+      // simple-git might throw an error for `HEAD^` on initial commit, or an empty diff might result.
+      // Using `git.show` with `--name-only --pretty=format:` is also an option for listing files in a commit,
+      // but `diff` is more direct for changes *introduced* by the commit.
+      const diffOutput = await this.git.diff([`${commitHash}^`, commitHash, '--name-only', '--diff-filter=AM']); // Filter for Added or Modified files only
+      if (diffOutput) {
+        return diffOutput.split('\n').filter(line => line.trim().length > 0);
+      }
+      return [];
+    } catch (error: any) {
+      // A common error here is if the commitHash is the very first commit (no parent ^).
+      // In such cases, all files in that commit are effectively "changes".
+      if (error.message && (error.message.includes('unknown revision or path not in the working tree') || error.message.includes('bad revision ')) && error.message.includes(`${commitHash}^`)){
+        console.log(`GitAdapter: Likely initial commit (${commitHash}). Listing all files in the commit instead of diffing against parent.`);
+        const showOutput = await this.git.show([commitHash, '--name-only', '--pretty=format:', '--no-abbrev']);
+        if (showOutput) {
+          // The output of show --name-only --pretty=format: is just a list of files, one per line, often with an extra newline at the end.
+          return showOutput.split('\n').filter(line => line.trim().length > 0);
+        }
+        return [];
+      }
+      console.error(`GitAdapter: Error getting changes in commit ${commitHash}:`, error);
+      throw error;
+    }
+  }
 }
 
 /**

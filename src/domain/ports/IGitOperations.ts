@@ -280,5 +280,13 @@ export interface IGitOperations {
    * Clean untracked files and reset changes in the working directory.
    */
   cleanWorkingDirectory(): Promise<void>;
+
+  /**
+   * Ensures that the Git repository is on the 'gitorial' branch.
+   * If not, it attempts to check out an existing local 'gitorial' branch,
+   * or create and track it from a remote 'gitorial' branch.
+   * @throws Error if a 'gitorial' branch cannot be set up.
+   */
+  ensureGitorialBranch(): Promise<void>;
 }
 

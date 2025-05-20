@@ -37,25 +37,35 @@ export class TutorialController {
     if (workspaceFolders && workspaceFolders.length > 0) {
       const workspacePath = workspaceFolders[0].uri.fsPath;
       try {
-        this.progressReporter.reportStart('Checking workspace for tutorial...');
-        const tutorial = await this.tutorialService.loadTutorialFromPath(workspacePath);
-        this.progressReporter.reportEnd();
+        const isTutorial = await this.tutorialService.isTutorialInPath(workspacePath);
 
-        if (tutorial) {
-          this.activeTutorial = tutorial;
-          this.activeGitAdapter = this.tutorialService.getActiveGitAdapter();
-          console.log(`TutorialController: Found and loaded tutorial '${tutorial.title}' from workspace via TutorialService.`);
+        if (isTutorial) {
+          const openTutorialChoice = autoOpen ? true : await this.userInteraction.askConfirmation({
+            message: `Gitorial tutorial found in the current workspace. Do you want to open it?`,
+            confirmActionTitle: 'Open Now',
+            cancelActionTitle: 'No Thanks'
+          });
+          if (openTutorialChoice) {
+            const tutorial = await this.tutorialService.loadTutorialFromPath(workspacePath);
+            if (!tutorial) {
+              this.userInteraction.showErrorMessage('Failed to load tutorial from path.');
+              console.error('TutorialController: Failed to load tutorial from path, despite previous check.');
+              return;
+            }
+            this.activeTutorial = tutorial;
+            this.activeGitAdapter = this.tutorialService.getActiveGitAdapter();
+            console.log(`TutorialController: Found and loaded tutorial '${tutorial.title}' from workspace via TutorialService.`);
 
-          this.userInteraction.showInformationMessage(`Tutorial "${tutorial.title}" is active in this workspace.`);
-          this.activateTutorialMode(tutorial);
-          if (autoOpen) {
-            this.openTutorialFromPath(workspacePath);
+            this.userInteraction.showInformationMessage(`Tutorial "${tutorial.title}" is active in this workspace.`);
+            this.activateTutorialMode(tutorial);
+            if (autoOpen) {
+              this.openTutorialFromPath(workspacePath);
+            }
           }
         } else {
           console.log('TutorialController: No Gitorial tutorial found in the current workspace.');
         }
       } catch (error) {
-        this.progressReporter.reportEnd();
         console.error('TutorialController: Error checking workspace for tutorial:', error);
         this.userInteraction.showErrorMessage(`Error checking for tutorial: ${error instanceof Error ? error.message : String(error)}`);
         this.clearActiveTutorialState();
@@ -214,29 +224,29 @@ export class TutorialController {
       } else {
         // User chose to Open Local (or cancelled the first dialog and implicitly wants to use local or cancel entirely)
         const openLocalConfirmation = await this.userInteraction.askConfirmation({
-            message: `Open a local version of the Gitorial from "${repoUrl}"?`,
-            confirmActionTitle: 'Select Local Folder and Sync',
-            cancelActionTitle: 'Cancel'
+          message: `Open a local version of the Gitorial from "${repoUrl}"?`,
+          confirmActionTitle: 'Select Local Folder and Sync',
+          cancelActionTitle: 'Cancel'
         });
 
         if (openLocalConfirmation) {
-            const dirAbsPathResult = await this.userInteraction.showOpenDialog({
-              canSelectFolders: true,
-              canSelectFiles: false,
-              canSelectMany: false,
-              openLabel: 'Select Local Tutorial Folder to Sync',
-              title: 'Open Local Gitorial for Syncing'
-            });
-    
-            if (dirAbsPathResult && dirAbsPathResult.length > 0) {
-              const localPath = dirAbsPathResult; 
-              console.log(`TutorialController: User selected local path "${localPath}" for repo "${repoUrl}". Attempting to open and sync.`);
-              await this.openTutorialFromPath(localPath, { initialStepId: commitHash });
-            } else {
-              this.userInteraction.showInformationMessage('Open local operation cancelled: No folder selected.');
-            }
+          const dirAbsPathResult = await this.userInteraction.showOpenDialog({
+            canSelectFolders: true,
+            canSelectFiles: false,
+            canSelectMany: false,
+            openLabel: 'Select Local Tutorial Folder to Sync',
+            title: 'Open Local Gitorial for Syncing'
+          });
+
+          if (dirAbsPathResult && dirAbsPathResult.length > 0) {
+            const localPath = dirAbsPathResult;
+            console.log(`TutorialController: User selected local path "${localPath}" for repo "${repoUrl}". Attempting to open and sync.`);
+            await this.openTutorialFromPath(localPath, { initialStepId: commitHash });
+          } else {
+            this.userInteraction.showInformationMessage('Open local operation cancelled: No folder selected.');
+          }
         } else {
-             this.userInteraction.showInformationMessage('Tutorial request cancelled.');
+          this.userInteraction.showInformationMessage('Tutorial request cancelled.');
         }
       }
     } catch (error) {
@@ -248,6 +258,13 @@ export class TutorialController {
     }
   }
 
+  /**
+   * 
+   * @param step 
+   * @returns 
+   * 
+   * Note: this method does display the webview panel
+   */
   public async selectStep(step: Step | string): Promise<void> {
     if (!this.activeTutorial || !this.activeGitAdapter) {
       this.userInteraction.showWarningMessage('No active tutorial or Git adapter to select a step from.');
@@ -338,6 +355,14 @@ export class TutorialController {
     await this.diffDisplayer.displayDiff(diffFiles);
   }
 
+  /**
+   * 
+   * @param tutorial 
+   * @param initialStepId 
+   * @returns 
+   * 
+   * Note: this method displays the webview panel
+   */
   private async activateTutorialMode(tutorial: Tutorial, initialStepId?: string): Promise<void> {
     //TODO: What is this for?
     vscode.commands.executeCommand('setContext', 'gitorial.tutorialActive', true);
@@ -353,7 +378,6 @@ export class TutorialController {
     }
 
     await this.selectStep(stepIdToSelect);
-    //TODO: why dont we update here the view?
   }
 
   private clearActiveTutorialState(): void {
@@ -400,16 +424,23 @@ export class TutorialController {
       const currentStepIdInService = this.tutorialService.getActiveTutorial()?.currentStepId;
       const actualCurrentStepId = currentStepIdInService || tutorial.currentStepId;
 
-      const stepsViewModel: TutorialStepViewModel[] = tutorial.steps.map(step => ({
-        id: step.id,
-        title: step.title,
-        description: step.description,
-        commitHash: step.commitHash,
-        state: step.state,
-        type: step.type,
-        isActive: step.id === actualCurrentStepId,
-        htmlContent: "" //FIXME: send the rendered html content
-      }));
+      const stepsViewModel: TutorialStepViewModel[] = tutorial.steps.map(step => {
+        let stepHtmlContent: string | undefined = undefined;
+        if (step.id === actualCurrentStepId) {
+          stepHtmlContent = this.tutorialService.getCurrentStepHtmlContent() || undefined; // Get content only for the active step
+        }
+
+        return {
+          id: step.id,
+          title: step.title,
+          description: step.description,
+          commitHash: step.commitHash,
+          state: step.state,
+          type: step.type,
+          isActive: step.id === actualCurrentStepId,
+          htmlContent: stepHtmlContent
+        };
+      });
 
       return {
         id: tutorial.id,

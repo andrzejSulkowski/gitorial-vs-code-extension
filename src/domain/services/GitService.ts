@@ -6,8 +6,7 @@
 import { DiffModel, DiffChangeType } from '../models/DiffModel';
 import { EventBus } from '../events/EventBus';
 import { EventType } from '../events/EventTypes';
-import { DefaultLogFields, ListLogLine } from 'simple-git';
-import { IGitOperations } from '../ports/IGitOperations';
+import { IGitOperations, DomainCommit, DefaultLogFields, ListLogLine } from '../ports/IGitOperations';
 import { IDiffDisplayer, DiffFile, DiffFilePayload } from '../ports/IDiffDisplayer';
 
 // Provides domain-specific Git operations relevant to tutorials. It uses the
@@ -158,15 +157,23 @@ export class GitService {
   }
 
   /**
-   * Get the commit history for the tutorial.
-   * Filters for commits on the 'gitorial' branch.
+   * Get the commit history of the currenlty checked out branch.
    */
-  public async getCommitHistory(): Promise<readonly (DefaultLogFields & ListLogLine)[]> {
+  public async getCommitHistory(): Promise<DomainCommit[]> {
     try {
-      // This assumes getCommitHistory on the adapter is already filtered
-      // or that filtering happens here if needed.
-      // Based on GitAdapter, it's already filtered for 'gitorial' branch.
-      return await this.gitAdapter.getCommits();
+      const rawCommits: Array<DefaultLogFields & ListLogLine> = await this.gitAdapter.getCommits();
+      
+      const domainCommits: DomainCommit[] = rawCommits.map(commit => {
+        return {
+          hash: commit.hash,
+          message: commit.message,
+          authorName: commit.author_name,
+          authorEmail: commit.author_email,
+          date: commit.date,
+        };
+      });
+      return domainCommits;
+
     } catch (error) {
       console.error(`Error getting commit history:`, error);
       this.eventBus.publish(EventType.ERROR_OCCURRED, {
@@ -174,7 +181,7 @@ export class GitService {
         message: `Failed to get commit history: ${error instanceof Error ? error.message : String(error)}`,
         source: 'GitService.getCommitHistory'
       });
-      throw error; // Or return [] depending on desired error handling
+      throw error;
     }
   }
 

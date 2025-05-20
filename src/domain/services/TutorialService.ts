@@ -58,16 +58,54 @@ export class TutorialService {
   
   /**
    * Load a tutorial from its local path
+   * @param localPath - The local path to the tutorial
+   * @param options - Options for loading the tutorial
+   * @returns The loaded tutorial or null if no tutorial is found
+   * 
+   * Note: This method only loads the tutorial data and does not handle displaying
+   * the tutorial UI. The UI must be updated separately.
    */
   public async loadTutorialFromPath(localPath: string, options: LoadTutorialOptions = {}): Promise<Tutorial | null> {
+    const isTutorial = await this.isTutorialInPath(localPath);
+    if(!isTutorial) {
+      console.warn(`TutorialService: No tutorial found at path ${localPath}`);
+      this.eventBus.publish(EventType.ERROR_OCCURRED, {
+        error: new Error(`No tutorial found at path ${localPath}`),
+        message: `No tutorial found at path ${localPath}`,
+        source: 'TutorialService.loadTutorialFromPath'
+      });
+      return null;
+    }
+
+    this.gitAdapter = this.gitAdapterFactory.createFromPath(localPath);
+    try {
+      await this.gitAdapter.ensureGitorialBranch();
+    } catch (error) {
+      console.error(`TutorialService: Failed to ensure gitorial branch for ${localPath}:`, error);
+      this.eventBus.publish(EventType.ERROR_OCCURRED, {
+        error,
+        message: `Failed to set up gitorial branch: ${error instanceof Error ? error.message : String(error)}`,
+        source: 'TutorialService.loadTutorialFromPath'
+      });
+      this.gitAdapter = null; // Prevent further operations with a misconfigured adapter
+      return null; // Or handle differently, e.g., return tutorial but indicate a warning state
+    }
+
     const tutorial = await this.repository.findByPath(localPath);
     if (!tutorial) {
       console.warn(`TutorialService: No tutorial found at path ${localPath}`);
       return null;
     }
-    this.gitAdapter = this.gitAdapterFactory.createFromPath(localPath);
+
     await this.activateTutorial(tutorial, options);
     return tutorial;
+  }
+
+  /**
+   * Check if a tutorial exists in a given local path
+   */
+  public async isTutorialInPath(localPath: string): Promise<boolean> {
+    return this.repository.findByPath(localPath) !== null;
   }
   
   /**
@@ -77,6 +115,19 @@ export class TutorialService {
     try {
       const tutorial = await this.repository.createFromClone(repoUrl, targetPath);
       this.gitAdapter = this.gitAdapterFactory.createFromPath(targetPath);
+      try {
+        await this.gitAdapter.ensureGitorialBranch();
+      } catch (error) {
+        console.error(`TutorialService: Failed to ensure gitorial branch for cloned repo ${targetPath}:`, error);
+        this.eventBus.publish(EventType.ERROR_OCCURRED, {
+          error,
+          message: `Failed to set up gitorial branch after clone: ${error instanceof Error ? error.message : String(error)}`,
+          source: 'TutorialService.cloneAndLoadTutorial'
+        });
+        // Decide if we should nullify adapter and/or return null for the tutorial
+        this.gitAdapter = null; 
+        return null; // Cloning succeeded but branch setup failed, treat as critical
+      }
       await this.activateTutorial(tutorial, options);
       return tutorial;
     } catch (error) {

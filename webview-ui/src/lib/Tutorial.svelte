@@ -13,6 +13,7 @@
 
   onMount(() => {
     const handleMessage = (event: MessageEvent) => {
+      console.log("Tutorial.svelte: handleMessage", event);
       const message = event.data;
       if (message.command === 'updateTutorial') {
         const data = message.data as TutorialViewModel;

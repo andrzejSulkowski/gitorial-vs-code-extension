@@ -52,6 +52,9 @@ export class TutorialPanelManager {
       null,
       TutorialPanelManager.currentPanelManagerDisposables // Store this subscription here
     );
+
+    //Show the tutorial
+    TutorialPanelManager.currentPanelInstance.updateTutorial(tutorial);
   }
 
   /**

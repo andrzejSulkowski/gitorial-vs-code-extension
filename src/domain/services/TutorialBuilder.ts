@@ -6,10 +6,10 @@
 import * as path from 'path';
 import * as crypto from 'crypto';
 import { Tutorial, TutorialData } from '../models/Tutorial';
-import { Step, StepData } from '../models/Step';
-import { StepState } from 'shared/types/domain-primitives/StepState';
 import { GitService } from './GitService';
 import { TutorialId } from 'shared/types/domain-primitives/TutorialId';
+import { StepProgressService } from './StepProgressService';
+import { DomainCommit } from '../ports/IGitOperations';
 
 /**
  * Constructs Tutorial domain objects from raw data (e.g., repository information,
@@ -33,25 +33,12 @@ export class TutorialBuilder {
       const id = this.generateTutorialId(repoUrl);
       const title = path.basename(repoPath);
       
-      const commits = await gitService.getCommitHistory();
-      if (commits.length === 0) {
+      const domainCommits = await gitService.getCommitHistory();
+      if (domainCommits.length === 0) {
         console.log(`No commits found in repository: ${repoPath}`);
         return null;
       }
-      
-      const steps: Step[] = commits.map((commit, index) => {
-        const stepId = `${id}-step-${index + 1}-${commit.hash.substring(0,7)}`;
-        const stepTitle = this.extractStepTitle(commit.message, index);
-        
-        const stepData: StepData = {
-          id: stepId,
-          title: stepTitle,
-          commitHash: commit.hash,
-          description: commit.message.substring(commit.message.indexOf('\n') + 1).trim() || undefined,
-        };
-        return new Step(stepData, StepState.PENDING);
-      });
-      
+      const steps = StepProgressService.extractStepsFromCommits(domainCommits, id);
       const tutorialData: TutorialData = {
         id,
         title,
@@ -146,6 +133,7 @@ export class TutorialBuilder {
       return null;
     }
     
+    //FIX: This is currently a wrong deep link format
     return `gitorial://sync?platform=${repoDetails.platform}&owner=${repoDetails.owner}&repo=${repoDetails.repo}&commitHash=${step.commitHash}`;
   }
 }

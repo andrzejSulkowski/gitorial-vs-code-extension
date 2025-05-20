@@ -18,7 +18,7 @@ export interface TutorialStepViewModel {
   state: StepState;
   type: StepType;
   isActive: boolean; // UI specific state
-  htmlContent: string; //TODO: send only the markdown and let the webview hanlde the conversion to HTML
+  htmlContent?: string; // Made optional for lazy loading. TODO: send only the markdown and let the webview hanlde the conversion to HTML
 }
 
 export interface TutorialViewModel {

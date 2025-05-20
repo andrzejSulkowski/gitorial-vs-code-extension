@@ -9,7 +9,7 @@
 // Business logic related to a tutorial (e.g., progression) should be in domain services.
 
 import { Step } from './Step';
-import { TutorialId } from './types/TutorialId';
+import { TutorialId } from '../../../shared/types/domain-primitives/TutorialId';
 
 export interface TutorialData {
     id: TutorialId;

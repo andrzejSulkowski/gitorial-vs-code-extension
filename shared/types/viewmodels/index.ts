@@ -6,8 +6,8 @@
 // Represents the data structure specifically tailored for displaying a tutorial
 // in the UI (e.g., in the Svelte panel). It's derived from the Tutorial domain model
 // but might include additional UI-specific properties or formatting.
-import { TutorialId } from '../../domain/models/types/TutorialId';
-import { StepState } from '../../domain/models/StepState';
+import { TutorialId } from '../domain-primitives/TutorialId';
+import { StepState } from '../domain-primitives/StepState';
 
 export interface TutorialStepViewModel {
   id: string;
@@ -16,6 +16,7 @@ export interface TutorialStepViewModel {
   commitHash: string;
   state: StepState;
   isActive: boolean; // UI specific state
+  htmlContent: string; //TODO: send only the markdown and let the webview hanlde the conversion to HTML
 }
 
 export interface TutorialViewModel {

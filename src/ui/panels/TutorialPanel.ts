@@ -4,9 +4,11 @@
 */
 
 import * as vscode from 'vscode';
-import { TutorialViewModel } from '../viewmodels/TutorialViewModel';
-import { TutorialController } from '../controllers/TutorialController';
 import { WebviewMessageHandler } from './WebviewMessageHandler';
+import { Uri } from 'vscode';
+import path from 'path';
+import fs from 'fs';
+import { TutorialViewModel } from '@shared/types/viewmodels';
 
 function getNonce() {
   let text = '';
@@ -54,32 +56,70 @@ export class TutorialPanel {
     this.panel.webview.postMessage({ command: 'error', data: error });
   }
 
-  private updateWebviewContent(tutorial: TutorialViewModel): void {
-    const webview = this.panel.webview;
-    const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(this.extensionUri, 'webview-ui', 'build', 'bundle.js'));
-    const stylesUri = webview.asWebviewUri(vscode.Uri.joinPath(this.extensionUri, 'webview-ui', 'build', 'bundle.css'));
-    const nonce = getNonce();
+  private async updateWebviewContent(tutorial: TutorialViewModel): Promise<void> {
+    this.panel.webview.html = await this.getWebviewHTML();
+  }
 
-    this.panel.webview.html = `
-      <!DOCTYPE html>
-      <html lang="en">
-      <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}'; img-src ${webview.cspSource} data:;">
-        <link href="${stylesUri}" rel="stylesheet">
-        <title>${tutorial.title || 'Gitorial'}</title>
-      </head>
-      <body>
-        <div id="app"></div> <!-- Svelte app mounts here -->
-        <script nonce="${nonce}" src="${scriptUri}"></script>
-        <script nonce="${nonce}">
-          // Send initial data to the Svelte app
-          const vscodeApi = acquireVsCodeApi();
-          vscodeApi.postMessage({ command: 'initialize', data: ${JSON.stringify(tutorial)} });
-        </script>
-      </body>
-      </html>`;
+  private async getWebviewHTML(): Promise<string> {
+    const svelteAppBuildPath = Uri.joinPath(this.extensionUri, "webview-ui", "dist");
+    const svelteAppDiskPath = svelteAppBuildPath.fsPath;
+    const indexHtmlPath = path.join(svelteAppDiskPath, "index.html");
+
+    let htmlContent: string;
+    try {
+      htmlContent = fs.readFileSync(indexHtmlPath, 'utf8');
+    } catch (e) {
+      console.error(`Error reading index.html from ${indexHtmlPath}: ${e}`);
+      return `<html><body>Error loading webview content. Details: ${e}</body></html>`;
+    }
+
+    // Find asset paths using regex (more robust than fixed strings)
+    const cssRegex = /<link[^>]*?href="([^"\>]*?\.css)"/;
+    const cssMatch = htmlContent.match(cssRegex);
+    const relativeCssPath = cssMatch ? cssMatch[1] : null;
+
+    const jsRegex = /<script[^>]*?src="([^"\>]*?\.js)"/;
+    const jsMatch = htmlContent.match(jsRegex);
+    const relativeJsPath = jsMatch ? jsMatch[1] : null;
+
+    if (!relativeCssPath || !relativeJsPath) {
+      console.error("Could not extract CSS or JS paths from index.html content:", htmlContent);
+      return `<html><body>Error parsing index.html to find asset paths.</body></html>`;
+    }
+
+    // Find vite icon path (relative path usually in index.html)
+    const viteIconRegex = /<link rel="icon" type="image\/svg\+xml" href="([^"\>]*?\.svg)"/;
+    const viteIconMatch = htmlContent.match(viteIconRegex);
+    const relativeViteIconPath = viteIconMatch ? viteIconMatch[1] : '/vite.svg'; // Default if not found
+
+    // Create webview URIs for assets
+    const cssUri = this.panel.webview.asWebviewUri(Uri.joinPath(svelteAppBuildPath, relativeCssPath));
+    const jsUri = this.panel.webview.asWebviewUri(Uri.joinPath(svelteAppBuildPath, relativeJsPath));
+    const viteIconUri = this.panel.webview.asWebviewUri(Uri.joinPath(svelteAppBuildPath, relativeViteIconPath));
+
+    const nonce = getNonce();
+    const csp = `default-src 'none'; style-src ${this.panel.webview.cspSource}; script-src 'nonce-${nonce}'; img-src ${this.panel.webview.cspSource} data:; font-src ${this.panel.webview.cspSource}; connect-src 'self';`;
+
+    // Remove the original script and link tags from the template body
+    htmlContent = htmlContent.replace(/<script.*?src=".*?"[^>]*><\/script>/g, '');
+    htmlContent = htmlContent.replace(/<link rel="stylesheet".*?href=".*?"[^>]*>/g, '');
+    htmlContent = htmlContent.replace(/<link rel="icon".*?href=".*?"[^>]*>/g, ''); // Remove original icon link
+
+    // Inject the correct tags with webview URIs and nonce
+    htmlContent = htmlContent.replace(
+      '</head>',
+      `  <meta http-equiv="Content-Security-Policy" content="${csp}">\n` +
+      `  <link rel="icon" type="image/svg+xml" href="${viteIconUri}" />\n` +
+      `  <link rel="stylesheet" type="text/css" href="${cssUri}">\n` +
+      `</head>`
+    );
+    htmlContent = htmlContent.replace(
+      '</body>',
+      `  <script defer type="module" nonce="${nonce}" src="${jsUri}"></script>\n` +
+      `</body>`
+    );
+
+    return htmlContent;
   }
 
   public reveal(column?: vscode.ViewColumn): void {

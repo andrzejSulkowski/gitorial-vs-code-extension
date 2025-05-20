@@ -1,8 +1,8 @@
 // Implements the IStepStateRepository interface using GlobalState (which in turn uses
 // vscode.Memento) to store and retrieve step states.
 import { IStepStateRepository } from '../../domain/repositories/IStepStateRepository';
-import { TutorialId } from '../../domain/models/types/TutorialId';
-import { StepState } from '../../domain/models/StepState'; // Assuming StepState is an enum or type
+import { TutorialId } from 'shared/types/domain-primitives/TutorialId';
+import { StepState } from 'shared/types/domain-primitives/StepState'; // Assuming StepState is an enum or type
 import { GlobalState, StateDB } from '../state/GlobalState'; // Corrected path
 
 const STEP_STATE_PREFIX = 'stepState:';

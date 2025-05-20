@@ -1,7 +1,8 @@
 // Represents a single step within a Tutorial. Contains data like step ID, title,
 // description, associated commit hash, and its current StepState
 // (e.g., pending, active, completed).
-import { StepState } from './StepState'; // Assuming StepState is in the same directory
+
+import { StepState } from "@shared/types/domain-primitives/StepState";
 
 export interface StepData {
     id: string;

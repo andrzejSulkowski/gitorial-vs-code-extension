@@ -2,10 +2,10 @@
 // handling its messages to/from the webview content, and displaying tutorial data.
 // It interacts with the TutorialController.
 import * as vscode from 'vscode';
-import { TutorialViewModel } from '../viewmodels/TutorialViewModel'; // Assuming ViewModel exists
 import { TutorialController } from '../controllers/TutorialController'; // To send actions back
 import { TutorialPanel } from './TutorialPanel'; // Import the new TutorialPanel
 import { WebviewMessageHandler } from './WebviewMessageHandler'; // Added import
+import { TutorialViewModel } from '@shared/types/viewmodels';
 
 export class TutorialPanelManager {
   private static currentPanelInstance: TutorialPanel | undefined;
@@ -32,9 +32,10 @@ export class TutorialPanelManager {
       {
         enableScripts: true,
         localResourceRoots: [
-          vscode.Uri.joinPath(extensionUri, 'webview-ui', 'public'), 
-          vscode.Uri.joinPath(extensionUri, 'webview-ui', 'build')
-        ]
+          vscode.Uri.joinPath(extensionUri, "out"),
+          vscode.Uri.joinPath(extensionUri, "webview-ui", "dist")
+        ],
+        retainContextWhenHidden: true,
       }
     );
 

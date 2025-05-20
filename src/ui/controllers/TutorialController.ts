@@ -11,7 +11,7 @@ import { Step } from 'src/domain/models/Step';
 import { TutorialPanelManager } from '../panels/TutorialPanelManager';
 import * as path from 'path';  //TODO: This need to be refactored to use our IFileSystem Abstraction
 import { IFileSystem } from 'src/domain/ports/IFileSystem';
-import { TutorialStepViewModel, TutorialViewModel } from '../viewmodels/TutorialViewModel';
+import { TutorialStepViewModel, TutorialViewModel } from 'shared/types/viewmodels';
 import { TutorialService } from '../../domain/services/TutorialService'; // Added import
 
 export class TutorialController {
@@ -406,7 +406,8 @@ export class TutorialController {
         description: step.description,
         commitHash: step.commitHash,
         state: step.state,
-        isActive: step.id === actualCurrentStepId
+        isActive: step.id === actualCurrentStepId,
+        htmlContent: "" //FIXME: send the rendered html content
       }));
 
       return {

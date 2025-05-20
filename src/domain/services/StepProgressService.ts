@@ -2,9 +2,9 @@
 // For example, determining the next step, marking a step as complete.
 // It uses the IStepStateRepository port to persist and retrieve step states.
 import { IStepStateRepository } from '../repositories/IStepStateRepository';
-import { TutorialId } from '../models/types/TutorialId';
+import { TutorialId } from 'shared/types/domain-primitives/TutorialId';
 import { Step } from '../models/Step';
-import { StepState } from '../models/StepState';
+import { StepState } from 'shared/types/domain-primitives/StepState';
 import { DomainCommit } from '../ports/IGitOperations';
 
 export class StepProgressService {

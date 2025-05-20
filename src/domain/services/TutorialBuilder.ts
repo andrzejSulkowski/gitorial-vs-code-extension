@@ -7,9 +7,9 @@ import * as path from 'path';
 import * as crypto from 'crypto';
 import { Tutorial, TutorialData } from '../models/Tutorial';
 import { Step, StepData } from '../models/Step';
-import { StepState } from '../models/StepState';
+import { StepState } from 'shared/types/domain-primitives/StepState';
 import { GitService } from './GitService';
-import { TutorialId } from '../models/types/TutorialId';
+import { TutorialId } from 'shared/types/domain-primitives/TutorialId';
 
 /**
  * Constructs Tutorial domain objects from raw data (e.g., repository information,

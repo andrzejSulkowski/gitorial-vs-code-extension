@@ -12,7 +12,7 @@ interface StoredTutorialState {
 export class MementoActiveTutorialStateRepository implements IActiveTutorialStateRepository {
   constructor(private readonly workspaceState: IStateStorage) {}
 
-  async saveActiveTutorial(workspaceId: string, tutorialId: TutorialId, currentStepId: string): Promise<void> {
+  async saveActiveTutorial(_workspaceId: string, tutorialId: TutorialId, currentStepId: string): Promise<void> {
     // The IStateStorage (MementoAdapter) is already scoped to a workspace or global.
     // The workspaceId parameter here is more for semantic correctness at the port level,
     // but with Memento, the scoping is implicit in how IStateStorage is instantiated.
@@ -22,7 +22,7 @@ export class MementoActiveTutorialStateRepository implements IActiveTutorialStat
     console.log(`MementoActiveTutorialStateRepository: Saved active tutorial ${tutorialId}, step ${currentStepId} for workspace.`);
   }
 
-  async getActiveTutorial(workspaceId: string): Promise<{ tutorialId: TutorialId; currentStepId: string; } | undefined> {
+  async getActiveTutorial(_workspaceId: string): Promise<{ tutorialId: TutorialId; currentStepId: string; } | undefined> {
     // Again, workspaceId is for semantic consistency; IStateStorage instance dictates scope.
     const state = this.workspaceState.get<StoredTutorialState>(ACTIVE_TUTORIAL_STATE_KEY);
     if (state) {
@@ -31,7 +31,7 @@ export class MementoActiveTutorialStateRepository implements IActiveTutorialStat
     return state;
   }
 
-  async clearActiveTutorial(workspaceId: string): Promise<void> {
+  async clearActiveTutorial(_workspaceId: string): Promise<void> {
     // workspaceId for consistency.
     await this.workspaceState.clear(ACTIVE_TUTORIAL_STATE_KEY);
     console.log(`MementoActiveTutorialStateRepository: Cleared active tutorial state for workspace.`);

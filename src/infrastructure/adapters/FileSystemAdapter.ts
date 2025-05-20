@@ -10,7 +10,8 @@ import { IFileSystem } from 'src/domain/ports/IFileSystem';
 // and implement it here. For example:
 // import { IFileSystem } from '../domain/ports/IFileSystem';
 
-export class FileSystemAdapter implements IFileSystem {
+//once implements IFileSystem, now its not being used
+export class FileSystemAdapter {
   join(path1: string, path2: string): string {
     return path.join(path1, path2);
   }

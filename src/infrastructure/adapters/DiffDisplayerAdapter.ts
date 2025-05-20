@@ -15,7 +15,7 @@ export class DiffDisplayerAdapter implements IDiffDisplayer {
       try {
         // Create a content provider for the left (original) version of the file
         leftProviderDisposable = vscode.workspace.registerTextDocumentContentProvider(leftScheme, {
-          provideTextDocumentContent: async (uri: vscode.Uri): Promise<string> => {
+          provideTextDocumentContent: async (_uri: vscode.Uri): Promise<string> => {
             // const filePath = uri.path.startsWith('/') ? uri.path.slice(1) : uri.path; // Not needed if provider knows its file
             try {
               return await file.leftContentProvider();
@@ -28,7 +28,7 @@ export class DiffDisplayerAdapter implements IDiffDisplayer {
         
         // Create a content provider for the right (modified/solution) version of the file
         rightProviderDisposable = vscode.workspace.registerTextDocumentContentProvider(rightScheme, {
-          provideTextDocumentContent: async (uri: vscode.Uri): Promise<string> => {
+          provideTextDocumentContent: async (_uri: vscode.Uri): Promise<string> => {
             try {
               return await file.rightContentProvider();
             } catch (error) {

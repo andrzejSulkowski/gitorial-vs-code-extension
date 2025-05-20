@@ -62,7 +62,7 @@ export class TutorialRepositoryImpl implements ITutorialRepository {
   public async findByPath(localPath: string): Promise<Tutorial | null> {
     try {
       const gitAdapter = this.gitAdapterFactory(localPath);
-      const gitService = new GitService(gitAdapter, localPath, this.diffDisplayer);
+      const gitService = new GitService(gitAdapter, localPath);
       const tutorial = await TutorialBuilder.buildFromLocalPath(localPath, gitService);
       if (tutorial) {
         // Save the mapping from tutorial.id to localPath
@@ -121,7 +121,7 @@ export class TutorialRepositoryImpl implements ITutorialRepository {
 
       // Clone the repository
       const gitAdapter = await this.gitCloneAdapterFactory(repoUrl, targetPath);
-      const gitService = new GitService(gitAdapter, targetPath, this.diffDisplayer);
+      const gitService = new GitService(gitAdapter, targetPath);
       await gitService.clone();
       
       // Use the builder to create the tutorial

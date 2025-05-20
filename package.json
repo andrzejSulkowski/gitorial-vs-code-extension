@@ -15,6 +15,21 @@
   "engines": {
     "vscode": "^1.87.0"
   },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "vscode:prepublish": "npm run compile",
+    "compile": "npm run typecheck && npm run compile:webview && npm run compile:extension && npm run post-build",
+    "compile:webview": "cd webview-ui && npm run build && cd ..",
+    "compile:extension": "node ./esbuild.config.mjs",
+    "post-build": "node scripts/post-build.js",
+    "watch:extension": "node ./esbuild.config.mjs --watch",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src",
+    "test": "vscode-test",
+    "vscode:package": "vsce package",
+    "test:unit:js": "mocha dist/test/unit",
+    "test:unit": "mocha --require ts-node/register \"src/**/*.test.ts\" --exclude \"src/test/**/*.test.ts\""
+  },
   "categories": [
     "Education",
     "Other"
@@ -59,21 +74,6 @@
         "label": "Gitorial URI Handler"
       }
     ]
-  },
-
-  "scripts": {
-    "vscode:prepublish": "npm run compile",
-    "compile": "npm run compile:webview && npm run compile:extension && npm run post-build",
-    "compile:webview": "cd webview-ui && npm run build && cd ..",
-    "compile:extension": "node ./esbuild.config.mjs",
-    "post-build": "node scripts/post-build.js",
-    "watch:extension": "node ./esbuild.config.mjs --watch",
-    "pretest": "npm run compile && npm run lint",
-    "lint": "eslint src",
-    "test": "vscode-test",
-    "vscode:package": "vsce package",
-    "test:unit:js": "mocha dist/test/unit",
-    "test:unit": "mocha --require ts-node/register \"src/**/*.test.ts\" --exclude \"src/test/**/*.test.ts\""
   },
   "devDependencies": {
     "@types/chai": "^5.2.2",

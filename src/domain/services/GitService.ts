@@ -7,11 +7,9 @@ import { DiffModel, DiffChangeType } from '../models/DiffModel';
 import { EventBus } from '../events/EventBus';
 import { EventType } from '../events/EventTypes';
 import { IGitOperations, DomainCommit, DefaultLogFields, ListLogLine } from '../ports/IGitOperations';
-import { IDiffDisplayer, DiffFile, DiffFilePayload } from '../ports/IDiffDisplayer';
 
 // Provides domain-specific Git operations relevant to tutorials. It uses the
 // IGitOperations port to interact with an actual Git implementation and the
-// IDiffDisplayer port to request diff visualization. Examples: "get commits relevant
 // for tutorial steps," "get changes for a specific step (commit)."
 
 /**
@@ -22,23 +20,19 @@ export class GitService {
   private gitAdapter: IGitOperations;
   private repoPath: string;
   private eventBus: EventBus;
-  private diffDisplayer: IDiffDisplayer;
 
   /**
    * Create a new GitService
    * @param gitAdapter The Git adapter to use
    * @param repoPath The path to the repository
-   * @param diffDisplayer The diff displayer to use
    */
   constructor(
     gitAdapter: IGitOperations,
     repoPath: string,
-    diffDisplayer: IDiffDisplayer
   ) {
     this.gitAdapter = gitAdapter;
     this.repoPath = repoPath;
     this.eventBus = EventBus.getInstance();
-    this.diffDisplayer = diffDisplayer;
   }
 
 
@@ -276,85 +270,6 @@ export class GitService {
 
   async getRepoName(): Promise<string> {
     return this.gitAdapter.getRepoName();
-  }
-
-  /**
-   * Displays the changes introduced by the given commitHash compared to its parent.
-   * @param commitHash The commit hash whose changes are to be displayed.
-   */
-  public async showParentChanges(commitHash: string): Promise<void> {
-    try {
-      // 1. Find the parent of the given commitHash
-      const commitHistory = await this.getCommitHistory(); // Assumes history is in reverse chronological order
-      const currentCommitIndex = commitHistory.findIndex(c => c.hash === commitHash);
-
-      if (currentCommitIndex === -1) {
-        const errorMessage = `Commit ${commitHash} not found in history.`;
-        console.error(errorMessage);
-        this.eventBus.publish(EventType.ERROR_OCCURRED, {
-            error: new Error(errorMessage),
-            message: errorMessage,
-            source: 'GitService.showParentChanges'
-        });
-        return;
-      }
-
-      // The parent is the next commit in the reverse-chronological list from getCommitHistory()
-      const parentCommit = commitHistory.at(currentCommitIndex + 1);
-
-      if (!parentCommit) {
-        const infoMessage = `Commit ${commitHash.substring(0, 7)} is likely the initial commit. No parent changes to display.`;
-        console.log(infoMessage);
-        this.eventBus.publish(EventType.INFO_MESSAGE_LOGGED, { message: infoMessage });
-        return;
-      }
-      const parentCommitHash = parentCommit.hash;
-
-      // 2. Get diff payloads. this.gitAdapter.getCommitDiff(commitHash)
-      //    should return changes IN commitHash compared to ITS parent (parentCommitHash).
-      const changedFilePayloads: DiffFilePayload[] = await this.gitAdapter.getCommitDiff(commitHash);
-
-      if (changedFilePayloads.length === 0) {
-        const infoMessage = `No file changes detected in commit ${commitHash.substring(0,7)} compared to its parent ${parentCommitHash.substring(0,7)}.`;
-        console.log(infoMessage);
-        this.eventBus.publish(EventType.INFO_MESSAGE_LOGGED, { message: infoMessage });
-        return;
-      }
-
-      // 3. Transform DiffFilePayload[] to DiffFile[]
-      const diffFiles: DiffFile[] = changedFilePayloads.map(payload => {
-        return {
-          currentPath: payload.absoluteFilePath, // Path in the 'commitHash' state
-          relativePath: payload.relativeFilePath,
-          oldContentProvider: async () => {
-            if (payload.isNew) {
-              // A file marked as new in this commit had no prior existence (in the parent)
-              return ""; 
-            }
-            try {
-              // Fetch content from the parent commit
-              return await this.gitAdapter.getFileContent(parentCommitHash, payload.relativeFilePath);
-            } catch (e) {
-              console.warn(`Could not get old content for ${payload.relativeFilePath} from parent commit ${parentCommitHash.substring(0,7)}: ${e instanceof Error ? e.message : String(e)}`);
-              // Fallback for errors or if file genuinely didn't exist (though isNew should cover new files)
-              return ""; 
-            }
-          },
-          commitHashForTitle: commitHash.substring(0, 7), // Displaying changes IN this commit
-          commitHash: commitHash, // Full hash for reference to this commit
-        };
-      });
-
-      await this.diffDisplayer.displayDiff(diffFiles);
-
-    } catch (error) {
-      console.error(`Error displaying changes for commit ${commitHash}:`, error);
-      this.eventBus.publish(EventType.ERROR_OCCURRED, {
-          error,
-          message: `Failed to display changes for commit ${commitHash.substring(0,7)}: ${error instanceof Error ? error.message : String(error)}`,
-          source: 'GitService.showParentChanges'
-      });
-    }
   }
 
   async isGitRepository(): Promise<boolean> {

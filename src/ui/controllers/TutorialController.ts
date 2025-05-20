@@ -13,6 +13,7 @@ import { TutorialStepViewModel, TutorialViewModel } from 'shared/types/viewmodel
 import { TutorialService } from '../../domain/services/TutorialService'; // Added import
 import { EventBus, EventPayload } from '../../domain/events/EventBus'; // Corrected import for EventBus and EventPayload
 import { EventType } from '../../domain/events/EventTypes'; // Corrected import for EventType
+import { TutorialViewService } from '../services/TutorialViewService';
 
 export class TutorialController {
   private activeTutorial: Tutorial | null = null;
@@ -25,7 +26,8 @@ export class TutorialController {
     private readonly userInteraction: IUserInteraction,
     private readonly stepProgressService: StepProgressService,
     private readonly fs: IFileSystem,
-    private readonly tutorialService: TutorialService // Injected TutorialService
+    private readonly tutorialService: TutorialService, // Injected TutorialService
+    private readonly tutorialViewService: TutorialViewService // Added TutorialViewService
   ) {
     EventBus.getInstance().subscribe(EventType.STEP_CHANGED, this.handleStepChangedEvent.bind(this));
     EventBus.getInstance().subscribe(EventType.SOLUTION_TOGGLED, this.handleSolutionToggledEvent.bind(this)); // Added listener
@@ -56,69 +58,38 @@ export class TutorialController {
 
   private async handleSolutionToggledEvent(payload: EventPayload): Promise<void> {
     if (payload.showing === true) {
-      // Solution is being shown, clear regular files from group two
-      const groupTwoTabs = this._getTabsInGroup(vscode.ViewColumn.Two);
-      const regularFileTabsToClose: vscode.Tab[] = [];
-      for (const tab of groupTwoTabs) {
-        const input = tab.input as any;
-        // Only close non-diff tabs. Diff tabs have 'original' and 'modified' URIs.
-        if (!(input && input.original && input.modified)) {
-          regularFileTabsToClose.push(tab);
-        }
-      }
-      if (regularFileTabsToClose.length > 0) {
-        try {
-          await vscode.window.tabGroups.close(regularFileTabsToClose, false);
-          console.log("TutorialController: Closed regular files in group two as solution is being shown.");
-        } catch (error) {
-          console.error("TutorialController: Error closing regular files for solution view:", error);
-        }
-      }
-      await vscode.commands.executeCommand('workbench.action.focusSecondEditorGroup');
+      await this.tutorialViewService.handleSolutionToggleUI(true);
     } else {
       // Solution is being hidden.
-      // 1. Explicitly close all diff tabs in group two.
-      const groupTwoTabs = this._getTabsInGroup(vscode.ViewColumn.Two);
-      const diffTabsToClose: vscode.Tab[] = [];
-      for (const tab of groupTwoTabs) {
-        const input = tab.input as any;
-        if (input && input.original && input.modified) { // It's a diff view
-          diffTabsToClose.push(tab);
-        }
-      }
-      if (diffTabsToClose.length > 0) {
-        try {
-          await vscode.window.tabGroups.close(diffTabsToClose, false);
-          console.log("TutorialController: Closed diff tabs in group two as solution is being hidden.");
-        } catch (error) {
-          console.error("TutorialController: Error closing diff tabs for hiding solution:", error);
-        }
-      }
+      let currentStep: Step | undefined;
+      let changedFilePaths: string[] = [];
+      let tutorialLocalPath: string | undefined;
 
-      // 2. Re-evaluate side panel files for the current step.
       if (this.activeTutorial && this.activeTutorial.currentStepId) {
-        const currentStep = this.activeTutorial.steps.find(s => s.id === this.activeTutorial!.currentStepId);
-        if (currentStep && this.activeGitAdapter) {
-          const changedFilePaths = await this.activeGitAdapter.getChangesInCommit(currentStep.commitHash);
-          await this._updateSidePanelFiles(currentStep, changedFilePaths);
+        currentStep = this.activeTutorial.steps.find(s => s.id === this.activeTutorial!.currentStepId);
+        if (currentStep && this.activeGitAdapter && this.activeTutorial.localPath) {
+          changedFilePaths = await this.activeGitAdapter.getChangesInCommit(currentStep.commitHash);
+          tutorialLocalPath = this.activeTutorial.localPath;
         }
       }
+      await this.tutorialViewService.handleSolutionToggleUI(false, currentStep, changedFilePaths, tutorialLocalPath);
     }
     // Refresh the webview as its state (e.g., show/hide solution button) might have changed
     await this._updateTutorialPanel();
   }
 
   private async handleStepChangedEvent(payload: EventPayload): Promise<void> {
-    if (!this.activeTutorial || !payload.step || !payload.changedFilePaths) {
-      console.warn('TutorialController: Received STEP_CHANGED event with missing data.', payload);
+    if (!this.activeTutorial || !payload.step || !payload.changedFilePaths || !this.activeTutorial.localPath) {
+      console.warn('TutorialController: Received STEP_CHANGED event with missing data for TutorialViewService.', payload);
       return;
     }
 
-    const step = payload.step as Step; // Assuming Step type is correctly defined and matches
+    const step = payload.step as Step; 
     const changedFilePaths = payload.changedFilePaths as string[];
+    const tutorialLocalPath = this.activeTutorial.localPath;
 
-    console.log(`TutorialController: Handling STEP_CHANGED event for step '${step.title}'. Changed files:`, changedFilePaths);
-    await this._updateSidePanelFiles(step, changedFilePaths);
+    console.log(`TutorialController: Handling STEP_CHANGED event for step '${step.title}'. Delegating to TutorialViewService.`);
+    await this.tutorialViewService.updateSidePanelFiles(step, changedFilePaths, tutorialLocalPath);
   }
 
   private async _updateSidePanelFiles(step: Step, changedFilePaths: string[]): Promise<void> {
@@ -297,10 +268,10 @@ export class TutorialController {
         cancelActionTitle: 'Cancel'
       });
       if (!overwriteChoice) return;
-      await this.fs.deleteDirectory(cloneTargetFsPath);
+      await this.fs.deleteDirectory(this.fs.join(cloneTargetFsPath, repoName));
     }
 
-    const finalClonePath = path.join(cloneTargetFsPath, repoName);
+    const finalClonePath = this.fs.join(cloneTargetFsPath, repoName);
 
 
     try {
@@ -532,7 +503,7 @@ export class TutorialController {
    */
   private async activateTutorialMode(tutorial: Tutorial, initialStepId?: string): Promise<void> {
     // Clear all currently open editor tabs
-    await vscode.commands.executeCommand('workbench.action.closeAllEditors');
+    await this.tutorialViewService.resetEditorLayout();
 
     vscode.commands.executeCommand('setContext', 'gitorial.tutorialActive', true);
 

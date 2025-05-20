@@ -17,6 +17,7 @@ import { TutorialService } from "./domain/services/TutorialService";
 import { createMarkdownConverterAdapter } from "./infrastructure/adapters/MarkdownConverter";
 import { StepContentRepository } from "./infrastructure/repositories/StepContentRepository";
 import { MementoActiveTutorialStateRepository } from "./infrastructure/repositories/MementoActiveTutorialStateRepository";
+import { TutorialViewService } from "./ui/services/TutorialViewService";
 
 // Create a singleton instance of the VS Code diff displayer to be used throughout the application
 export const diffDisplayer = createDiffDisplayerAdapter();
@@ -82,6 +83,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<vscode
     workspaceId
   );
   const stepProgressService = new StepProgressService(stepStateRepository);
+  const tutorialViewService = new TutorialViewService(fileSystemAdapter);
 
   // --- UI Layer Controllers/Handlers (still no direct vscode registration logic inside them) ---
   const tutorialController = new TutorialController(
@@ -91,7 +93,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<vscode
     userInteractionAdapter,
     stepProgressService,
     fileSystemAdapter,
-    tutorialService
+    tutorialService,
+    tutorialViewService
   );
 
   const commandHandler = new CommandHandler(tutorialController);

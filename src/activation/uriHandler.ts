@@ -8,7 +8,7 @@ import {
   cloneTutorialCommand,
   openTutorialSelectorCommand,
 } from "./commandHandler";
-import { createVSCodeDiffDisplayer } from "../extension";
+import { createVSCodeDiffDisplayer } from "src/extension_old";
 
 // Use a single instance of diffDisplayer
 const diffDisplayer = createVSCodeDiffDisplayer();

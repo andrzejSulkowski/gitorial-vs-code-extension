@@ -36,7 +36,7 @@ export class TutorialPanelManager {
     );
 
     const messageHandler = new WebviewMessageHandler(tutorialController); // Create message handler
-    const newTutorialPanel = new TutorialPanel(vscodePanel, extensionUri, tutorial, messageHandler); // Pass handler to panel
+    const newTutorialPanel = new TutorialPanel(vscodePanel, extensionUri, messageHandler); // Pass handler to panel
     TutorialPanelManager.currentPanelInstance = newTutorialPanel;
 
     vscodePanel.onDidDispose(

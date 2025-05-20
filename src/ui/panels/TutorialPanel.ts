@@ -27,13 +27,12 @@ export class TutorialPanel {
   constructor(
     vscodePanel: vscode.WebviewPanel,
     private readonly extensionUri: vscode.Uri,
-    initialTutorial: TutorialViewModel,
     messageHandler: WebviewMessageHandler
   ) {
     this.panel = vscodePanel;
     this.messageHandler = messageHandler;
 
-    this.updateWebviewContent(initialTutorial);
+    this.updateWebviewContent();
 
     this.panel.webview.onDidReceiveMessage(
       message => {
@@ -56,7 +55,7 @@ export class TutorialPanel {
     this.panel.webview.postMessage({ command: 'error', data: error });
   }
 
-  private async updateWebviewContent(tutorial: TutorialViewModel): Promise<void> {
+  private async updateWebviewContent(): Promise<void> {
     this.panel.webview.html = await this.getWebviewHTML();
   }
 

@@ -64,12 +64,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<vscode
   // --- UI Layer Controllers/Handlers (still no direct vscode registration logic inside them) ---
   const tutorialController = new TutorialController(
     context, // context can be passed for things like extensionUri, but avoid direct vscode API calls //TODO: refactor to not pass context
-    tutorialRepository,
     diffDisplayer,
     progressReportAdapter,
     userInteractionAdapter,
     stepProgressService,
-    gitAdapterFactory,
     fileSystemAdapter,
     tutorialService
   );

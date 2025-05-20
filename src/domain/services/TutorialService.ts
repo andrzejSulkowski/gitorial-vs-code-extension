@@ -113,8 +113,7 @@ export class TutorialService {
    */
   public async cloneAndLoadTutorial(repoUrl: string, targetPath: string, options: LoadTutorialOptions = {}): Promise<Tutorial | null> {
     try {
-      const tutorial = await this.repository.createFromClone(repoUrl, targetPath);
-      this.gitAdapter = this.gitAdapterFactory.createFromPath(targetPath);
+      this.gitAdapter = await this.gitAdapterFactory.createFromClone(repoUrl, targetPath);
       try {
         await this.gitAdapter.ensureGitorialBranch();
       } catch (error) {
@@ -127,6 +126,10 @@ export class TutorialService {
         // Decide if we should nullify adapter and/or return null for the tutorial
         this.gitAdapter = null; 
         return null; // Cloning succeeded but branch setup failed, treat as critical
+      }
+      const tutorial = await this.repository.findByPath(targetPath);
+      if (!tutorial) {
+        throw new Error(`TutorialService: Failed to find tutorial at path ${targetPath} despite successful clone and branch setup`);
       }
       await this.activateTutorial(tutorial, options);
       return tutorial;

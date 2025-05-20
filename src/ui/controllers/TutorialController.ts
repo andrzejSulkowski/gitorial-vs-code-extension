@@ -1,11 +1,9 @@
 import * as vscode from 'vscode';
-import { ITutorialRepository } from '../../domain/repositories/ITutorialRepository'; // Assuming this port exists
 import { DiffFile, IDiffDisplayer } from '../../domain/ports/IDiffDisplayer';
 import { IProgressReporter } from '../../domain/ports/IProgressReporter';
 import { IUserInteraction } from '../../domain/ports/IUserInteraction';
 import { StepProgressService } from '../../domain/services/StepProgressService'; // Assuming this port exists
 import { IGitOperations } from '../../domain/ports/IGitOperations';
-import { GitAdapterFactory } from 'src/infrastructure/factories/GitAdapterFactory';
 import { Tutorial } from '../../domain/models/Tutorial'; // Assuming this model exists
 import { Step } from 'src/domain/models/Step';
 import { TutorialPanelManager } from '../panels/TutorialPanelManager';
@@ -20,12 +18,10 @@ export class TutorialController {
 
   constructor(
     private readonly context: vscode.ExtensionContext,
-    private readonly tutorialRepository: ITutorialRepository,
     private readonly diffDisplayer: IDiffDisplayer,
     private readonly progressReporter: IProgressReporter,
     private readonly userInteraction: IUserInteraction,
     private readonly stepProgressService: StepProgressService,
-    private readonly gitAdapterFactory: GitAdapterFactory,
     private readonly fs: IFileSystem,
     private readonly tutorialService: TutorialService // Injected TutorialService
   ) { }
@@ -109,15 +105,15 @@ export class TutorialController {
     try {
       this.progressReporter.reportStart(`Cloning ${repoUrl}...`);
       //I dont like that we interact with the repository here. I guess it would make more sense to let the TutorialService handle this
-      const clonedTutorialMetadata = await this.tutorialRepository.createFromClone(repoUrl, finalClonePath);
+      const tutorial = await this.tutorialService.cloneAndLoadTutorial(repoUrl, finalClonePath);
       this.progressReporter.reportEnd();
 
-      if (!clonedTutorialMetadata) {
+      if (!tutorial) {
         this.userInteraction.showErrorMessage('Failed to clone tutorial repository.');
         return;
       }
 
-      this.userInteraction.showInformationMessage(`Tutorial "${clonedTutorialMetadata.title || repoName}" cloned to ${finalClonePath}.`);
+      this.userInteraction.showInformationMessage(`Tutorial "${tutorial.title}" cloned to ${finalClonePath}.`);
 
       const openNowChoice = initialRepoUrl ? true : await this.userInteraction.askConfirmation({
         message: `Do you want to open the tutorial now?`,

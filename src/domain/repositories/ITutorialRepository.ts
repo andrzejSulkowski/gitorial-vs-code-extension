@@ -43,5 +43,6 @@ export interface ITutorialRepository {
    * @returns The created tutorial
    * @throws Error if cloning or building the tutorial fails
    */
-  createFromClone(repoUrl: string, targetPath: string): Promise<Tutorial>;
+  //This is now being handled by the GitAdapterFactory
+  //createFromClone(repoUrl: string, targetPath: string): Promise<Tutorial>;
 }

@@ -28,6 +28,56 @@ export class TutorialController {
     private readonly tutorialService: TutorialService // Injected TutorialService
   ) {
     EventBus.getInstance().subscribe(EventType.STEP_CHANGED, this.handleStepChangedEvent.bind(this));
+    EventBus.getInstance().subscribe(EventType.SOLUTION_TOGGLED, this.handleSolutionToggledEvent.bind(this)); // Added listener
+  }
+
+  public async requestShowSolution(): Promise<void> {
+    if (!this.activeTutorial) {
+      this.userInteraction.showWarningMessage("No active tutorial to show solution for.");
+      return;
+    }
+    // Delegate to TutorialService to handle showing the solution
+    // TutorialService will manage its internal state (isShowingSolution) 
+    // and call the diffDisplayer.
+    await this.tutorialService.toggleSolution(true);
+    // We might want to ensure the webview panel is visible
+    await this._updateTutorialPanel(); 
+  }
+
+  private async handleSolutionToggledEvent(payload: EventPayload): Promise<void> {
+    if (payload.showing === true) {
+      // Solution is being shown, clear regular files from group two
+      const groupTwoTabs = this._getTabsInGroup(vscode.ViewColumn.Two);
+      const regularFileTabsToClose: vscode.Tab[] = [];
+      for (const tab of groupTwoTabs) {
+        const input = tab.input as any;
+        // Only close non-diff tabs. Diff tabs have 'original' and 'modified' URIs.
+        if (!(input && input.original && input.modified)) {
+          regularFileTabsToClose.push(tab);
+        }
+      }
+      if (regularFileTabsToClose.length > 0) {
+        try {
+          await vscode.window.tabGroups.close(regularFileTabsToClose, false);
+          console.log("TutorialController: Closed regular files in group two as solution is being shown.");
+        } catch (error) {
+          console.error("TutorialController: Error closing regular files for solution view:", error);
+        }
+      }
+      // Optionally, focus the second editor group where the diff is shown
+      // await vscode.commands.executeCommand('workbench.action.focusSecondEditorGroup');
+    } else {
+      // Solution is being hidden. Re-evaluate side panel files for the current step.
+      if (this.activeTutorial && this.activeTutorial.currentStepId) {
+        const currentStep = this.activeTutorial.steps.find(s => s.id === this.activeTutorial!.currentStepId);
+        if (currentStep && this.activeGitAdapter) {
+          const changedFilePaths = await this.activeGitAdapter.getChangesInCommit(currentStep.commitHash);
+          await this._updateSidePanelFiles(currentStep, changedFilePaths);
+        }
+      }
+    }
+    // Refresh the webview as its state (e.g., show/hide solution button) might have changed
+    await this._updateTutorialPanel();
   }
 
   private async handleStepChangedEvent(payload: EventPayload): Promise<void> {
@@ -450,6 +500,9 @@ export class TutorialController {
       return;
     }
 
+    await this.tutorialService.toggleSolution(true);
+
+    /*
     const commitHash = typeof step === 'string' ? step : step.commitHash;
     const diffFilePayloads = await this.activeGitAdapter.getCommitDiff(commitHash);
 
@@ -472,6 +525,7 @@ export class TutorialController {
       };
     });
     await this.diffDisplayer.displayDiff(diffFiles);
+    */
   }
 
   /**

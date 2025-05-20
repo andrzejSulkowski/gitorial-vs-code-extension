@@ -28,7 +28,9 @@ export class WebviewMessageHandler {
       case 'prevStep':
         this.tutorialController.requestPreviousStep();
         return;
-      // Add other command handlers here as needed
+      case 'showSolution':
+        this.tutorialController.requestShowSolution();
+        return;
       default:
         console.warn('Received unknown command from webview:', message.command);
         return;

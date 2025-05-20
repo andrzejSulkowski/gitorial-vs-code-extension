@@ -4,37 +4,51 @@ Defines how diffs are shown to the user (e.g., displayDiff(files: DiffFilePaylo
 
 */
 
+/**
+ * Port interface definitions for displaying differences (diffs).
+ * 
+ * This module declares the contracts (interfaces, types) that the Domain layer
+ * uses for requesting diff displays. Implementations of these interfaces live in the
+ * Infrastructure layer (e.g., using VS Code APIs).
+ */
+
 // Defines the interface (port) for displaying differences (diffs) to the user.
 // The domain requests a diff to be shown through this port.
 
 /**
- * Represents a file to be displayed in a diff view
+ * Represents a file to be displayed in a diff view.
+ * Both sides of the diff are provided by content providers.
  */
 export interface DiffFile {
   /**
-   * Function to get the content of the file from the reference commit
+   * Function to get the content of the file for the left side of the diff (e.g., current step).
    */
-  oldContentProvider: () => Promise<string>;
+  leftContentProvider: () => Promise<string>;
+
+  /**
+   * Function to get the content of the file for the right side of the diff (e.g., next step/solution).
+   */
+  rightContentProvider: () => Promise<string>;
   
   /**
-   * Absolute path to the current version of the file
-   */
-  currentPath: string;
-  
-  /**
-   * Relative path within the repository
+   * Relative path within the repository, used for display and URI construction.
    */
   relativePath: string;
   
   /**
-   * Short version of the commit hash for display
+   * Identifier (e.g., commit hash) for the left side content, used for unique URI scheme generation.
    */
-  commitHashForTitle: string;
-  
+  leftCommitId: string;
+
   /**
-   * Full commit hash for reference
+   * Identifier (e.g., commit hash) for the right side content, used for unique URI scheme generation.
    */
-  commitHash: string;
+  rightCommitId: string;
+
+  /**
+   * Short version of an identifier (e.g., commit hash) for display in the diff tab title.
+   */
+  titleCommitId: string;
 }
 
 /**
@@ -49,11 +63,11 @@ export interface DiffFile {
  * `DiffFile` objects before being passed to `IDiffDisplayer.displayDiff()`.
  */
 export interface DiffFilePayload {
-  absoluteFilePath: string;
+  absoluteFilePath: string; // This might still be useful for context, even if not directly used for diff content URIs
   relativeFilePath: string;
-  commitHash: string;
-  originalContent?: string; // Content before changes, could be undefined for new files
-  modifiedContent?: string; // Content after changes, could be undefined for deleted files
+  commitHash: string; // The commit where the change *culminated* (e.g. nextStep.commitHash)
+  originalContent?: string; // Content before changes (e.g. currentStep content)
+  modifiedContent?: string; // Content after changes (e.g. nextStep content)
   isNew?: boolean;
   isDeleted?: boolean;
   isModified?: boolean;
@@ -67,7 +81,7 @@ export interface DiffFilePayload {
 export interface IDiffDisplayer {
   /**
    * Display diffs for a set of file changes.
-   * @param diffs An array of file payloads representing the changes.
+   * @param diffs An array of file descriptions, where each file has providers for left and right content.
    */
   displayDiff(diffs: DiffFile[]): Promise<void>;
 }

@@ -382,37 +382,91 @@ export class TutorialService {
       console.warn('TutorialService: Cannot show solution. Missing active tutorial, git adapter, or local path.');
       return;
     }
-    const currentStep = this.activeTutorial.steps.find(s => s.id === this.activeTutorial!.currentStepId);
-    if (!currentStep) {
-        console.warn('TutorialService: Current step not found for showing solution.');
+
+    const currentStepIdx = this.activeTutorial.steps.findIndex(s => s.id === this.activeTutorial!.currentStepId);
+    if (currentStepIdx === -1) {
+        console.warn('TutorialService: Current step not found by ID for showing solution.');
         return;
     }
-    const tutorialLocalPath = this.activeTutorial.localPath;
+    const currentStep = this.activeTutorial.steps[currentStepIdx];
+    
+    // The "solution" for the current step is represented by the state of the next step's commit.
+    const nextStep = this.activeTutorial.steps[currentStepIdx + 1]; // .at() might not be available in all TS/JS versions
+
+    if (!nextStep) {
+      console.warn('TutorialService: At the last step, no next step to show solution from.');
+      // Optionally, inform the user they are on the last step and no solution diff is applicable in this way.
+      this.eventBus.publish(EventType.GIT_DIFF_DISPLAYED, { 
+        tutorialId: this.activeTutorial.id, 
+        stepIndex: currentStepIdx,
+        fileCount: 0 
+      });
+      return;
+    }
 
     try {
-      const commitDiffPayloads: DiffFilePayload[] = await this.gitAdapter.getCommitDiff(currentStep.commitHash);
+      // Get diff between nextStep.commitHash and currentStep.commitHash (its parent)
+      const commitDiffPayloads: DiffFilePayload[] = await this.gitAdapter.getCommitDiff(nextStep.commitHash);
       
       if (commitDiffPayloads.length === 0) {
+        this.eventBus.publish(EventType.GIT_DIFF_DISPLAYED, {
+            tutorialId: this.activeTutorial.id,
+            stepIndex: currentStepIdx,
+            fileCount: 0
+        });
+        return;
+      }
+
+      const excludedFileNames = ['readme.md', '.gitignore'];
+
+      const filteredDiffPayloads = commitDiffPayloads.filter(payload => {
+        const baseName = payload.relativeFilePath.substring(payload.relativeFilePath.lastIndexOf('/') + 1).toLowerCase();
+        if (excludedFileNames.includes(baseName)) {
+            return false; 
+        }
+
+        // Check if the file in the *current step's state* (originalContent) had a "TODO:".
+        // payload.originalContent is from currentStep.commitHash because we called getCommitDiff(nextStep.commitHash).
+        if (payload.originalContent && payload.originalContent.includes("TODO:")) {
+            // This includes files Modified or Deleted in nextStep that had a TODO in currentStep.
+            return true;
+        }
+        
+        // Files new in nextStep (payload.isNew = true) didn't exist in currentStep, so no prior TODO.
+        // Files modified/deleted whose originalContent (currentStep state) didn't have TODO are also excluded.
+        return false;
+      });
+
+      if (filteredDiffPayloads.length === 0) {
+        console.log(`TutorialService: No files with 'TODO:' in current step (after filtering) found in solution diff for step '${currentStep.title}'.`);
+        this.eventBus.publish(EventType.GIT_DIFF_DISPLAYED, { 
+            tutorialId: this.activeTutorial.id, 
+            stepIndex: currentStepIdx,
+            fileCount: 0 
+        });
         return;
       }
       
-      const filesToDisplay: DiffFile[] = commitDiffPayloads.map(payload => ({
-        oldContentProvider: async () => {
-          if (!this.gitAdapter) throw new Error("Git adapter not available");
-          return this.gitAdapter.getFileContent(payload.commitHash, payload.relativeFilePath);
+      const filesToDisplay: DiffFile[] = filteredDiffPayloads.map(payload => ({
+        leftContentProvider: async () => {
+          // payload.originalContent is from currentStep.commitHash
+          return payload.originalContent || ""; 
         },
-        currentPath: this.fs.join(tutorialLocalPath, payload.relativeFilePath),
+        rightContentProvider: async () => {
+          // payload.modifiedContent is from nextStep.commitHash
+          return payload.modifiedContent || "";
+        },
         relativePath: payload.relativeFilePath,
-        commitHashForTitle: currentStep.commitHash.slice(0, 7),
-        commitHash: currentStep.commitHash
+        leftCommitId: currentStep.commitHash, // Full hash for scheme uniqueness
+        rightCommitId: nextStep.commitHash,  // Full hash for scheme uniqueness
+        titleCommitId: nextStep.commitHash.slice(0, 7) // Short hash for display
       }));
       
       await this.diffDisplayer.displayDiff(filesToDisplay);
       
-      const currentStepIndex = this.activeTutorial.steps.findIndex(s => s.id === currentStep.id);
       this.eventBus.publish(EventType.GIT_DIFF_DISPLAYED, {
         tutorialId: this.activeTutorial.id,
-        stepIndex: currentStepIndex !== -1 ? currentStepIndex : undefined,
+        stepIndex: currentStepIdx, // Still refers to the current step for which solution is shown
         fileCount: filesToDisplay.length
       });
       

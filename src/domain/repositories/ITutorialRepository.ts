@@ -4,7 +4,6 @@
 */
 
 import { Tutorial } from '../models/Tutorial';
-import * as T from 'shared/types';
 
 /**
  * Repository interface for accessing and persisting Tutorial data

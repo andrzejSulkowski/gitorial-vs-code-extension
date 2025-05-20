@@ -290,8 +290,9 @@ export interface IGitOperations {
   ensureGitorialBranch(): Promise<void>;
 
   /**
-   * Gets the names of files changed (added, modified) in the current commit compared to the provided commit.
-   * @param commitHash The hash of the commit to compare against.
+   * Gets the names of files added or modified *by the specified commit* compared to its direct parent.
+   * If it's the initial commit, lists all files tracked in that commit.
+   * @param commitHash The hash of the commit to inspect.
    * @returns A promise that resolves to an array of relative file paths.
    */
   getChangesInCommit(commitHash: string): Promise<string[]>;

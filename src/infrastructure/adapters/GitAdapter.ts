@@ -25,6 +25,37 @@ export class GitAdapter implements IGitOperations {
     this.git = simpleGit({ baseDir: repoPath, binary: 'git', maxConcurrentProcesses: 6 });
   }
 
+  // Helper to parse git diff --name-status output
+  private parseNameStatus(diffOutput: string): Array<{ status: string, path: string, oldPath?: string }> {
+    const files: Array<{ status: string, path: string, oldPath?: string }> = [];
+    if (!diffOutput) return files;
+
+    const lines = diffOutput.trim().split('\n');
+    for (const line of lines) {
+      if (line.trim() === '') continue;
+      // Lines are typically "S\tpath" or "SXXX\tpath" for A, M, D, T
+      // or "SXXX\told_path\tnew_path" for R, C (where S is the status char like R or C)
+      const parts = line.split('\t');
+      const rawStatus = parts[0].trim(); // e.g., "A", "M", "D", "R100", "C075"
+      const statusChar = rawStatus[0]; // "A", "M", "D", "R", "C"
+
+      if (statusChar === 'R' || statusChar === 'C') {
+        if (parts.length === 3) { // R_old_new or C_old_new
+          files.push({ status: statusChar, oldPath: parts[1].trim(), path: parts[2].trim() });
+        } else {
+          console.warn(`GitAdapter.parseNameStatus: Unexpected format for Renamed/Copied line: '${line}'`);
+        }
+      } else { // A, M, D, T
+        if (parts.length === 2) {
+          files.push({ status: statusChar, path: parts[1].trim() });
+        } else {
+          console.warn(`GitAdapter.parseNameStatus: Unexpected format for line: '${line}'`);
+        }
+      }
+    }
+    return files;
+  }
+
   /**
    * Centralized helper to check if a branch name matches gitorial patterns.
    */
@@ -248,14 +279,76 @@ export class GitAdapter implements IGitOperations {
     return log.all as Array<DefaultLogFields & ListLogLine>; // Type assertion, ensure compatibility
   }
 
-  async getCommitDiff(commitHash: string): Promise<DiffFilePayload[]> {
-    // This requires careful implementation with simple-git's diff parsing.
-    // The `diffSummary` and `diff` methods provide different levels of detail.
-    // For content, `git.show` is needed for each file in the diff.
-    console.warn(`GitAdapter.getCommitDiff for ${commitHash} is schematic and needs full implementation.`);
-    // Example: const diffResult = await this.git.diff([`${commitHash}^!S`]);
-    // Parse diffResult to create DiffFilePayload[]
-    return []; // Placeholder
+  async getCommitDiff(targetCommitHash: string): Promise<DiffFilePayload[]> {
+    const payloads: DiffFilePayload[] = [];
+    let parentCommitHash: string | null = null;
+    let isInitialCommit = false;
+
+    try {
+      parentCommitHash = await this.git.revparse([`${targetCommitHash}^`]);
+    } catch (e) {
+      isInitialCommit = true;
+      console.log(`GitAdapter.getCommitDiff: Could not find parent for ${targetCommitHash}. Assuming initial commit.`);
+    }
+
+    let changedFilesRawOutput: string;
+    if (isInitialCommit) {
+      // For initial commit, list all files as "Added".
+      // `git show --pretty="format:" --name-status <commit>` gives "A\tfile"
+      changedFilesRawOutput = await this.git.raw(['show', targetCommitHash, '--pretty=format:', '--name-status', '--no-abbrev']);
+    } else {
+      // For non-initial commits, use git diff --name-status against the parent.
+      if (!parentCommitHash) {
+          console.error(`GitAdapter.getCommitDiff: parentCommitHash is null for non-initial commit ${targetCommitHash}. This should not happen.`);
+          return []; 
+      }
+      changedFilesRawOutput = await this.git.raw(['diff', '--name-status', parentCommitHash, targetCommitHash]);
+    }
+    
+    const changedFiles = this.parseNameStatus(changedFilesRawOutput);
+
+    for (const { status, path: relativeFilePath, oldPath } of changedFiles) {
+      const absoluteFilePath = path.join(this.repoPath, relativeFilePath);
+      let originalContent: string | undefined = undefined;
+      let modifiedContent: string | undefined = undefined;
+
+      const effectiveOldPath = oldPath || relativeFilePath;
+
+      if (status === 'A') { // Added
+        modifiedContent = await this.getFileContent(targetCommitHash, relativeFilePath);
+      } else if (status === 'D') { // Deleted
+        if (parentCommitHash) {
+          originalContent = await this.getFileContent(parentCommitHash, effectiveOldPath);
+        }
+      } else if (status === 'M' || status === 'T') { // Modified or Type Changed
+        if (parentCommitHash) {
+          originalContent = await this.getFileContent(parentCommitHash, effectiveOldPath);
+        }
+        modifiedContent = await this.getFileContent(targetCommitHash, relativeFilePath);
+      } else if (status === 'R') { // Renamed
+          if (parentCommitHash && oldPath) { 
+               originalContent = await this.getFileContent(parentCommitHash, oldPath);
+          }
+          modifiedContent = await this.getFileContent(targetCommitHash, relativeFilePath);
+      } else if (status === 'C') { // Copied
+          if (parentCommitHash && oldPath) { 
+               originalContent = await this.getFileContent(parentCommitHash, oldPath); 
+          }
+          modifiedContent = await this.getFileContent(targetCommitHash, relativeFilePath);
+      }
+
+      payloads.push({
+        absoluteFilePath,
+        relativeFilePath,
+        commitHash: targetCommitHash,
+        originalContent,
+        modifiedContent,
+        isNew: status === 'A' || status === 'C',
+        isDeleted: status === 'D',
+        isModified: status === 'M' || status === 'R' || status === 'T',
+      });
+    }
+    return payloads;
   }
 
   async isGitRepository(): Promise<boolean> {

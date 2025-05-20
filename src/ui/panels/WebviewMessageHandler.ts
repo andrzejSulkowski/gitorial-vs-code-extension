@@ -31,6 +31,9 @@ export class WebviewMessageHandler {
       case 'showSolution':
         this.tutorialController.requestShowSolution();
         return;
+      case 'hideSolution':
+        this.tutorialController.requestHideSolution();
+        return;
       default:
         console.warn('Received unknown command from webview:', message.command);
         return;

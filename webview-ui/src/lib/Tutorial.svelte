@@ -22,12 +22,13 @@
         const mabyeCurrentStepIndex = data.steps.findIndex(step => step.id === data.currentStepId);
         if (mabyeCurrentStepIndex === -1) {
           console.warn("Tutorial.svelte: Current step not found in steps array");
+          // Potentially set step to null or a default state if currentStepId is invalid
         } else {
           currentStepIndex = mabyeCurrentStepIndex;
           step = data.steps[currentStepIndex];
         }
         totalSteps = data.steps.length;
-        //isShowingSolution = data.isShowingSolution;
+        isShowingSolution = data.isShowingSolution; // Use the flag from the view model
       } else {
         console.warn("Webview received unhandled command:", message.command);
       }

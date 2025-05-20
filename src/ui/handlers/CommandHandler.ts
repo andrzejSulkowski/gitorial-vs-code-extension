@@ -56,7 +56,6 @@ export class CommandHandler {
     // Add other command registrations here, e.g.:
     // vscode.commands.registerCommand('gitorial.nextStep', () => this.tutorialController.requestNextStep());
     // vscode.commands.registerCommand('gitorial.previousStep', () => this.tutorialController.requestPreviousStep());
-    // vscode.commands.registerCommand('gitorial.showDiff', (stepId: string) => this.tutorialController.showDiffForStep(stepId));
 
     console.log('Gitorial commands registered.');
   }

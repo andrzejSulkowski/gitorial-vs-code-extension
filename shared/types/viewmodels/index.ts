@@ -27,4 +27,5 @@ export interface TutorialViewModel {
   description?: string; // Optional description for UI
   steps: TutorialStepViewModel[];
   currentStepId: string | null; // To highlight the active step in the UI
+  isShowingSolution: boolean; // Added flag
 }

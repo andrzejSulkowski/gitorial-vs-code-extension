@@ -172,6 +172,10 @@ export class TutorialService {
     return this.gitAdapter;
   }
   
+  public getIsShowingSolution(): boolean {
+    return this.isShowingSolution;
+  }
+  
   public getCurrentStepHtmlContent(): string | null {
     return this.currentStepHtmlContent;
   }

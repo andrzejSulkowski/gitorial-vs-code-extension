@@ -44,6 +44,16 @@ export class TutorialController {
     await this._updateTutorialPanel(); 
   }
 
+  public async requestHideSolution(): Promise<void> {
+    if (!this.activeTutorial) {
+      // No active tutorial, so nothing to hide solution for, but also not an error.
+      // Or, if solution can only be hidden if it was shown, check tutorialService state.
+      return;
+    }
+    await this.tutorialService.toggleSolution(false);
+    await this._updateTutorialPanel();
+  }
+
   private async handleSolutionToggledEvent(payload: EventPayload): Promise<void> {
     if (payload.showing === true) {
       // Solution is being shown, clear regular files from group two
@@ -64,10 +74,28 @@ export class TutorialController {
           console.error("TutorialController: Error closing regular files for solution view:", error);
         }
       }
-      // Optionally, focus the second editor group where the diff is shown
-      // await vscode.commands.executeCommand('workbench.action.focusSecondEditorGroup');
+      await vscode.commands.executeCommand('workbench.action.focusSecondEditorGroup');
     } else {
-      // Solution is being hidden. Re-evaluate side panel files for the current step.
+      // Solution is being hidden.
+      // 1. Explicitly close all diff tabs in group two.
+      const groupTwoTabs = this._getTabsInGroup(vscode.ViewColumn.Two);
+      const diffTabsToClose: vscode.Tab[] = [];
+      for (const tab of groupTwoTabs) {
+        const input = tab.input as any;
+        if (input && input.original && input.modified) { // It's a diff view
+          diffTabsToClose.push(tab);
+        }
+      }
+      if (diffTabsToClose.length > 0) {
+        try {
+          await vscode.window.tabGroups.close(diffTabsToClose, false);
+          console.log("TutorialController: Closed diff tabs in group two as solution is being hidden.");
+        } catch (error) {
+          console.error("TutorialController: Error closing diff tabs for hiding solution:", error);
+        }
+      }
+
+      // 2. Re-evaluate side panel files for the current step.
       if (this.activeTutorial && this.activeTutorial.currentStepId) {
         const currentStep = this.activeTutorial.steps.find(s => s.id === this.activeTutorial!.currentStepId);
         if (currentStep && this.activeGitAdapter) {
@@ -494,40 +522,6 @@ export class TutorialController {
     }
   }
 
-  public async showDiffForStep(step: Step | string): Promise<void> {
-    if (!this.activeTutorial || !this.activeGitAdapter) {
-      this.userInteraction.showWarningMessage('No active tutorial or Git adapter for diffing.');
-      return;
-    }
-
-    await this.tutorialService.toggleSolution(true);
-
-    /*
-    const commitHash = typeof step === 'string' ? step : step.commitHash;
-    const diffFilePayloads = await this.activeGitAdapter.getCommitDiff(commitHash);
-
-    if (!this.activeTutorial.localPath) {
-      this.userInteraction.showErrorMessage('Cannot show diff: Tutorial local path is undefined.');
-      return;
-    }
-    const tutorialLocalPath = this.activeTutorial.localPath;
-
-    const diffFiles = diffFilePayloads.map<DiffFile>(payload => {
-      return {
-        oldContentProvider: async () => {
-          if (!this.activeGitAdapter) throw new Error("Git adapter became unavailable.");
-          return await this.activeGitAdapter.getFileContent(payload.commitHash, payload.relativeFilePath);
-        },
-        currentPath: path.join(tutorialLocalPath, payload.relativeFilePath),
-        relativePath: payload.relativeFilePath,
-        commitHashForTitle: commitHash.substring(0, 7),
-        commitHash: commitHash
-      };
-    });
-    await this.diffDisplayer.displayDiff(diffFiles);
-    */
-  }
-
   /**
    * 
    * @param tutorial 
@@ -621,7 +615,8 @@ export class TutorialController {
         id: tutorial.id,
         title: tutorial.title,
         steps: stepsViewModel,
-        currentStepId: actualCurrentStepId
+        currentStepId: actualCurrentStepId,
+        isShowingSolution: this.tutorialService.getIsShowingSolution()
       };
     }
     return null;

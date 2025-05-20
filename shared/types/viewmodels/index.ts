@@ -8,6 +8,7 @@
 // but might include additional UI-specific properties or formatting.
 import { TutorialId } from '../domain-primitives/TutorialId';
 import { StepState } from '../domain-primitives/StepState';
+import { StepType } from '../domain-primitives/StepType';
 
 export interface TutorialStepViewModel {
   id: string;
@@ -15,6 +16,7 @@ export interface TutorialStepViewModel {
   description?: string; // Optional description for UI
   commitHash: string;
   state: StepState;
+  type: StepType;
   isActive: boolean; // UI specific state
   htmlContent: string; //TODO: send only the markdown and let the webview hanlde the conversion to HTML
 }

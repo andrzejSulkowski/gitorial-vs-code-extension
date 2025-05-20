@@ -16,6 +16,8 @@ import { createFileSystemAdapter } from "./infrastructure/adapters/VSCodeFileSys
 import { ITutorialRepository } from "./domain/repositories/ITutorialRepository";
 import { TutorialPanelManager } from "./ui/panels/TutorialPanelManager";
 import { TutorialService } from "./domain/services/TutorialService";
+import { createMarkdownConverterAdapter } from "./infrastructure/adapters/MarkdownConverter";
+import { StepContentRepository } from "./infrastructure/repositories/StepContentRepository";
 
 // Create a singleton instance of the VS Code diff displayer to be used throughout the application
 export const diffDisplayer = createDiffDisplayerAdapter();
@@ -35,19 +37,16 @@ export async function activate(context: vscode.ExtensionContext): Promise<vscode
   const progressReportAdapter = createProgressReportAdapter();
   const userInteractionAdapter = createUserInteractionAdapter();
   const fileSystemAdapter = createFileSystemAdapter();
+  const markdownConverter = createMarkdownConverterAdapter();
 
   // --- State ---
   const globalState = new GlobalState(stateStorage);
 
   // --- Factories ---
   const gitAdapterFactory = new GitAdapterFactory();
-  const stepStateRepository = new MementoStepStateRepository(globalState);
-
-  // --- Domain Services ---
-  const stepProgressService = new StepProgressService(stepStateRepository);
 
   // --- Infrastructure Repositories ---
-  const tutorialRepository: ITutorialRepository = new TutorialRepositoryImpl(
+  const tutorialRepository = new TutorialRepositoryImpl(
     stateStorage,
     gitAdapterFactory.createFromPath,
     gitAdapterFactory.createFromClone,
@@ -55,9 +54,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<vscode
     fileSystemAdapter,
     userInteractionAdapter
   );
+  const stepContentRepository = new StepContentRepository(fileSystemAdapter);
+  const stepStateRepository = new MementoStepStateRepository(globalState);
 
-
-  const tutorialService = new TutorialService(tutorialRepository, diffDisplayerAdapter, gitAdapterFactory, fileSystemAdapter);
+  // --- Domain Services ---
+  const tutorialService = new TutorialService(tutorialRepository, diffDisplayerAdapter, gitAdapterFactory, fileSystemAdapter, stepContentRepository, markdownConverter);
+  const stepProgressService = new StepProgressService(stepStateRepository);
 
   // --- UI Layer Controllers/Handlers (still no direct vscode registration logic inside them) ---
   const tutorialController = new TutorialController(

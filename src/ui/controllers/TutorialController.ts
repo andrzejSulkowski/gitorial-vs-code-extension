@@ -406,6 +406,7 @@ export class TutorialController {
         description: step.description,
         commitHash: step.commitHash,
         state: step.state,
+        type: step.type,
         isActive: step.id === actualCurrentStepId,
         htmlContent: "" //FIXME: send the rendered html content
       }));

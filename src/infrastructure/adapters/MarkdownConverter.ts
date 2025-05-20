@@ -12,3 +12,7 @@ export class MarkdownItConverter implements IMarkdownConverter {
     return this.md.render(markdown);
   }
 }
+
+export const createMarkdownConverterAdapter = (): IMarkdownConverter => {
+  return new MarkdownItConverter();
+};

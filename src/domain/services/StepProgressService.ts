@@ -3,9 +3,10 @@
 // It uses the IStepStateRepository port to persist and retrieve step states.
 import { IStepStateRepository } from '../repositories/IStepStateRepository';
 import { TutorialId } from 'shared/types/domain-primitives/TutorialId';
-import { Step } from '../models/Step';
+import { Step, StepData } from '../models/Step';
 import { StepState } from 'shared/types/domain-primitives/StepState';
 import { DomainCommit } from '../ports/IGitOperations';
+import { StepType } from '@shared/types/domain-primitives/StepType';
 
 export class StepProgressService {
   constructor(private stepStateRepository: IStepStateRepository) {}
@@ -27,16 +28,50 @@ export class StepProgressService {
    * This can be a static utility if it doesn't rely on instance state of StepProgressService.
    */
   public static extractStepsFromCommits(commits: DomainCommit[], tutorialId: TutorialId): Step[] {
-    return commits.map((commit, index) => {
-      // Basic transformation. Title/description might need more sophisticated parsing from commit message.
-      const stepData = {
-        id: `${tutorialId}-step-${index + 1}-${commit.hash.substring(0, 7)}`, // More stable ID
-        title: commit.message.split('\n')[0] || 'Unnamed Step',
+    // Assuming commits are typically newest-first from git log, reverse for chronological tutorial steps
+    const chronologicalCommits = [...commits].reverse(); 
+
+    const steps: Step[] = [];
+    const validTypes: ReadonlyArray<StepType> = ["section", "template", "solution", "action"];
+
+    // Filter out a potential initial "readme:" commit if it exists as the very first commit
+    // This is a common convention for a base state, not an actual step.
+    let relevantCommits = chronologicalCommits;
+    if (relevantCommits.length > 0 && relevantCommits[0].message.toLowerCase().startsWith("readme:")) {
+      relevantCommits = relevantCommits.slice(1); // Skip the first commit
+    }
+
+    relevantCommits.forEach((commit, index) => {
+      const message = commit.message.trim();
+      const colonIndex = message.indexOf(":");
+
+      let stepType: StepType;
+      let stepTitle = message;
+
+      if (colonIndex > 0) {
+        const parsedType = message.substring(0, colonIndex).toLowerCase();
+        if (validTypes.includes(parsedType as StepType)) {
+          stepType = parsedType as StepType;
+          stepTitle = message.substring(colonIndex + 1).trim();
+        } else {
+          console.warn(`StepProgressService: Invalid step type "${parsedType}" in commit message: "${message}". Defaulting to type 'section'.`);
+          // Keep original message as title if type parsing failed but colon was present
+          stepTitle = message.substring(colonIndex + 1).trim() || message; 
+        }
+      } else {
+        throw new Error(`StepProgressService: Commit message "${message}" missing type prefix.`);
+      }
+      
+      const stepData: StepData = {
+        id: `${tutorialId}-step-${index + 1}-${commit.hash.substring(0, 7)}`, // Index is now chronological
+        title: stepTitle || 'Unnamed Step',
         commitHash: commit.hash,
+        type: stepType!, // We throw in the above code an error if no type has been found Q.E.D.
         description: commit.message.substring(commit.message.indexOf('\n') + 1).trim() || undefined,
       };
-      // Initial state is PENDING. Actual state will be loaded/updated via repository.
-      return new Step(stepData, StepState.PENDING);
+      steps.push(new Step(stepData, StepState.PENDING));
     });
+
+    return steps;
   }
 } 

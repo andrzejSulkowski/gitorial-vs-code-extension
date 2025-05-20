@@ -13,11 +13,10 @@ import { GlobalState } from "./infrastructure/state/GlobalState";
 import { IStateStorage } from "./domain/ports/IStateStorage";
 import { createUserInteractionAdapter } from "./infrastructure/adapters/VSCodeUserInteractionAdapter";
 import { createFileSystemAdapter } from "./infrastructure/adapters/VSCodeFileSystemAdapter";
-import { ITutorialRepository } from "./domain/repositories/ITutorialRepository";
-import { TutorialPanelManager } from "./ui/panels/TutorialPanelManager";
 import { TutorialService } from "./domain/services/TutorialService";
 import { createMarkdownConverterAdapter } from "./infrastructure/adapters/MarkdownConverter";
 import { StepContentRepository } from "./infrastructure/repositories/StepContentRepository";
+import { MementoActiveTutorialStateRepository } from "./infrastructure/repositories/MementoActiveTutorialStateRepository";
 
 // Create a singleton instance of the VS Code diff displayer to be used throughout the application
 export const diffDisplayer = createDiffDisplayerAdapter();
@@ -32,6 +31,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<vscode
   console.log("📖 Gitorial extension active");
 
   // --- Adapters ---
+  // For global state that might be shared across workspaces or is not workspace-specific
+  const globalStateMementoAdapter = createMementoAdapter(context, false); // explicitly global
+  // For workspace-specific state
+  const workspaceStateMementoAdapter = createMementoAdapter(context, true); // explicitly workspace
+
   const stateStorage = createMementoAdapter(context);
   const diffDisplayerAdapter = createDiffDisplayerAdapter();
   const progressReportAdapter = createProgressReportAdapter();
@@ -40,7 +44,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<vscode
   const markdownConverter = createMarkdownConverterAdapter();
 
   // --- State ---
-  const globalState = new GlobalState(stateStorage);
+  const globalState = new GlobalState(globalStateMementoAdapter); // GlobalState uses the global memento adapter
 
   // --- Factories ---
   const gitAdapterFactory = new GitAdapterFactory();
@@ -55,10 +59,28 @@ export async function activate(context: vscode.ExtensionContext): Promise<vscode
     userInteractionAdapter
   );
   const stepContentRepository = new StepContentRepository(fileSystemAdapter);
-  const stepStateRepository = new MementoStepStateRepository(globalState);
+  const stepStateRepository = new MementoStepStateRepository(globalState); // Uses globalState (MementoAdapter with global Memento)
+  const activeTutorialStateRepository = new MementoActiveTutorialStateRepository(workspaceStateMementoAdapter); // Use workspace-specific MementoAdapter
+
+  // --- Determine Workspace ID ---
+  let workspaceId: string | undefined;
+  if (vscode.workspace.workspaceFolders && vscode.workspace.workspaceFolders.length > 0) {
+    workspaceId = vscode.workspace.workspaceFolders[0].uri.fsPath;
+  } else {
+    console.warn("Gitorial: No workspace folder open. Workspace-specific tutorial state persistence will be limited.");
+  }
 
   // --- Domain Services ---
-  const tutorialService = new TutorialService(tutorialRepository, diffDisplayerAdapter, gitAdapterFactory, fileSystemAdapter, stepContentRepository, markdownConverter);
+  const tutorialService = new TutorialService(
+    tutorialRepository, 
+    diffDisplayerAdapter, 
+    gitAdapterFactory, 
+    fileSystemAdapter, 
+    stepContentRepository, 
+    markdownConverter, 
+    activeTutorialStateRepository,
+    workspaceId
+  );
   const stepProgressService = new StepProgressService(stepStateRepository);
 
   // --- UI Layer Controllers/Handlers (still no direct vscode registration logic inside them) ---
@@ -79,12 +101,51 @@ export async function activate(context: vscode.ExtensionContext): Promise<vscode
   commandHandler.register(context);
   uriHandler.register(context);
 
-  // Runs async
-  const autoOpen: boolean = !!context.globalState.get<{ autoOpenTutorialPath: string, targetStepId: string }>('gitorial:pendingAutoOpen');
-  console.log("📖 Gitorial autoOpen:", autoOpen);
-  tutorialController.checkWorkspaceForTutorial(autoOpen);
-  console.log("📖 Gitorial activation complete.");
+  // --- Auto-open cloned tutorial (if any) ---
+  const pendingAutoOpen = context.globalState.get<{ autoOpenTutorialPath: string, targetStepId?: string }>('gitorial:pendingAutoOpen');
+  if (pendingAutoOpen && pendingAutoOpen.autoOpenTutorialPath) {
+    console.log("Gitorial: Pending auto-open found:", pendingAutoOpen);
+    // This command typically opens a new window, so state restoration might happen in that new window's activation.
+    // However, if it reuses the current window or for robustness:
+    // We might defer the checkWorkspaceForTutorial or ensure it doesn't conflict.
+    // For now, the `initiateCloneTutorial` handles opening the new window and setting this state.
+    // The primary session restoration will happen after this block.
+  } else {
+    // --- Restore previous session OR Check workspace for tutorial ---
+    // Only attempt to restore if no pending auto-open is taking precedence for a *new* clone.
+    if (workspaceId) {
+      const activeState = await activeTutorialStateRepository.getActiveTutorial(workspaceId);
+      if (activeState && activeState.tutorialId) {
+        console.log(`Gitorial: Found active tutorial state for workspace ${workspaceId}:`, activeState);
+        // We need the localPath of the tutorial. The tutorialId is a hash of the repoUrl.
+        // We'd need to find the tutorial metadata (which includes localPath) using its ID or repoUrl.
+        // This might require enhancing ITutorialRepository to find by ID or iterating.
+        // For simplicity now, we'll assume we can get the local path. This part needs robust implementation.
+        const tutorialToRestore = await tutorialRepository.findById(activeState.tutorialId);
+        if (tutorialToRestore && tutorialToRestore.localPath) {
+          console.log(`Gitorial: Restoring session for tutorial at ${tutorialToRestore.localPath}, step ${activeState.currentStepId}`);
+          await tutorialController.openTutorialFromPath(tutorialToRestore.localPath, { initialStepId: activeState.currentStepId });
+        } else {
+          console.warn(`Gitorial: Could not find local path for stored active tutorial ID ${activeState.tutorialId}. Clearing state.`);
+          await activeTutorialStateRepository.clearActiveTutorial(workspaceId);
+          await tutorialController.checkWorkspaceForTutorial(false); // Fallback to normal check
+        }
+      } else {
+        console.log(`Gitorial: No active tutorial state found for workspace ${workspaceId}. Checking workspace for new tutorial.`);
+        await tutorialController.checkWorkspaceForTutorial(false);
+      }
+    } else {
+      // No workspaceId, just do a general check (which likely won't find anything path-based)
+      await tutorialController.checkWorkspaceForTutorial(false);
+    }
+  }
+  
+  // Clear pending auto-open state regardless of whether it was used or session restored.
+  // If it was used, the new window's activation will handle its own state.
+  // If not used, we clear it to prevent stale state.
   context.globalState.update('gitorial:pendingAutoOpen', undefined);
+
+  console.log("📖 Gitorial activation complete.");
   return context;
 }
 

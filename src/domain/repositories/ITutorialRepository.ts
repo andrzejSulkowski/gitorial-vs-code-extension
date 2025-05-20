@@ -30,13 +30,6 @@ export interface ITutorialRepository {
   findById(id: string): Promise<Tutorial | null>;
   
   /**
-   * Find a tutorial by its repository URL
-   * @param repoUrl The repository URL
-   * @returns The tutorial if found, null otherwise
-   */
-  findByRepoUrl(repoUrl: string): Promise<Tutorial | null>;
-  
-  /**
    * Create a tutorial from a clone operation
    * @param repoUrl The repository URL to clone
    * @param targetPath The local path to clone to

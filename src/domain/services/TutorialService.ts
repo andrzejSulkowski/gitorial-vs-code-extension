@@ -14,6 +14,7 @@ import { IGitAdapterFactory } from '../ports/IGitOperationsFactory';
 import { IGitOperations } from '../ports/IGitOperations';
 import { IStepContentRepository } from '../ports/IStepContentRepository';
 import { IMarkdownConverter } from '../ports/IMarkdownConverter';
+import { IActiveTutorialStateRepository } from "../repositories/IActiveTutorialStateRepository";
 
 /**
  * Options for loading a tutorial
@@ -39,6 +40,7 @@ export class TutorialService {
   private isShowingSolution: boolean = false;
   private gitAdapter: IGitOperations | null = null;
   private currentStepHtmlContent: string | null = null;
+  private readonly workspaceId: string | undefined;
   
   /**
    * Create a new TutorialService
@@ -49,11 +51,14 @@ export class TutorialService {
     private readonly gitAdapterFactory: IGitAdapterFactory,
     private readonly fs: IFileSystem,
     private readonly stepContentRepository: IStepContentRepository,
-    private readonly markdownConverter: IMarkdownConverter
+    private readonly markdownConverter: IMarkdownConverter,
+    private readonly activeTutorialStateRepository: IActiveTutorialStateRepository,
+    workspaceId?: string
   ) {
     this.eventBus = EventBus.getInstance();
     this.eventBus.subscribe(EventType.STEP_CHANGED, this.handleStepChanged.bind(this));
     this.eventBus.subscribe(EventType.SOLUTION_TOGGLED, this.handleSolutionToggled.bind(this));
+    this.workspaceId = workspaceId;
   }
   
   /**
@@ -74,6 +79,9 @@ export class TutorialService {
         message: `No tutorial found at path ${localPath}`,
         source: 'TutorialService.loadTutorialFromPath'
       });
+      if (this.workspaceId) {
+        await this.activeTutorialStateRepository.clearActiveTutorial(this.workspaceId);
+      }
       return null;
     }
 
@@ -87,6 +95,9 @@ export class TutorialService {
         message: `Failed to set up gitorial branch: ${error instanceof Error ? error.message : String(error)}`,
         source: 'TutorialService.loadTutorialFromPath'
       });
+      if (this.workspaceId) {
+        await this.activeTutorialStateRepository.clearActiveTutorial(this.workspaceId);
+      }
       this.gitAdapter = null; // Prevent further operations with a misconfigured adapter
       return null; // Or handle differently, e.g., return tutorial but indicate a warning state
     }
@@ -123,6 +134,9 @@ export class TutorialService {
           message: `Failed to set up gitorial branch after clone: ${error instanceof Error ? error.message : String(error)}`,
           source: 'TutorialService.cloneAndLoadTutorial'
         });
+        if (this.workspaceId) {
+          await this.activeTutorialStateRepository.clearActiveTutorial(this.workspaceId);
+        }
         // Decide if we should nullify adapter and/or return null for the tutorial
         this.gitAdapter = null; 
         return null; // Cloning succeeded but branch setup failed, treat as critical
@@ -184,6 +198,14 @@ export class TutorialService {
       this.activeTutorial.currentStepId = targetStep.id;
       await this.loadAndPrepareDisplayContentForStep(targetStep);
       const changedFilePaths = await this.gitAdapter.getChangesInCommit(targetStep.commitHash);
+
+      if (this.workspaceId && this.activeTutorial && this.activeTutorial.currentStepId) {
+        await this.activeTutorialStateRepository.saveActiveTutorial(
+          this.workspaceId,
+          this.activeTutorial.id,
+          this.activeTutorial.currentStepId
+        );
+      }
 
       this.eventBus.publish(EventType.STEP_CHANGED, {
         tutorialId: this.activeTutorial.id,
@@ -249,6 +271,9 @@ export class TutorialService {
     this.activeTutorial = null;
     this.gitAdapter = null;
     this.currentStepHtmlContent = null;
+    if (this.workspaceId) {
+      await this.activeTutorialStateRepository.clearActiveTutorial(this.workspaceId);
+    }
     this.eventBus.publish(EventType.TUTORIAL_CLOSED, { tutorialId });
   }
   
@@ -302,6 +327,14 @@ export class TutorialService {
     }
     
     const currentActiveStepIndex = tutorial.steps.findIndex(s => s.id === tutorial.currentStepId);
+
+    if (this.workspaceId && tutorial.currentStepId) {
+      await this.activeTutorialStateRepository.saveActiveTutorial(
+        this.workspaceId,
+        tutorial.id,
+        tutorial.currentStepId
+      );
+    }
 
     this.eventBus.publish(EventType.TUTORIAL_LOADED, {
       tutorialId: tutorial.id,

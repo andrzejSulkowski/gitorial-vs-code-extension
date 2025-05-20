@@ -29,6 +29,8 @@ export class TutorialRepositoryImpl implements ITutorialRepository {
   private fileSystem: IFileSystem;
   private userInteraction: IUserInteraction;
 
+  private readonly TUTORIAL_PATH_MAP_KEY_PREFIX = 'gitorial:tutorialPath:';
+
   /**
    * Create a new TutorialRepositoryImpl
    * @param stateStorage Storage for persisting tutorial data
@@ -61,7 +63,12 @@ export class TutorialRepositoryImpl implements ITutorialRepository {
     try {
       const gitAdapter = this.gitAdapterFactory(localPath);
       const gitService = new GitService(gitAdapter, localPath, this.diffDisplayer);
-      return await TutorialBuilder.buildFromLocalPath(localPath, gitService);
+      const tutorial = await TutorialBuilder.buildFromLocalPath(localPath, gitService);
+      if (tutorial) {
+        // Save the mapping from tutorial.id to localPath
+        await this.stateStorage.update(`${this.TUTORIAL_PATH_MAP_KEY_PREFIX}${tutorial.id}`, localPath);
+      }
+      return tutorial;
     } catch (error) {
       console.error(`Error finding tutorial at path ${localPath}:`, error);
       return null;
@@ -74,19 +81,15 @@ export class TutorialRepositoryImpl implements ITutorialRepository {
    * @returns The tutorial if found, null otherwise
    */
   public async findById(id: string): Promise<Tutorial | null> {
-    // Tutorial IDs are derived from repo URLs, so we don't directly look them up
-    // In a real implementation, you might store a mapping of IDs to paths
-    throw new Error("not implemented")
-  }
-  
-  /**
-   * Find a tutorial by its repository URL
-   * @param repoUrl The repository URL
-   * @returns The tutorial if found, null otherwise
-   */
-  public async findByRepoUrl(repoUrl: string): Promise<Tutorial | null> {
-    // In a real implementation, you would look up the repoUrl in your storage
-    throw new Error("not implemented")
+    const localPath = this.stateStorage.get<string>(`${this.TUTORIAL_PATH_MAP_KEY_PREFIX}${id}`);
+    if (localPath) {
+      console.log(`TutorialRepositoryImpl: Found path '${localPath}' for tutorial ID '${id}'. Attempting to load...`);
+      // Now that we have the path, use the existing findByPath logic
+      return await this.findByPath(localPath);
+    } else {
+      console.warn(`TutorialRepositoryImpl: No local path found mapped to tutorial ID '${id}'.`);
+      return null;
+    }
   }
   
   /**
@@ -127,6 +130,8 @@ export class TutorialRepositoryImpl implements ITutorialRepository {
       if (!tutorial) {
         throw new Error(`Failed to build tutorial from cloned repository at ${targetPath}`);
       }
+      // Save the mapping from tutorial.id to localPath
+      await this.stateStorage.update(`${this.TUTORIAL_PATH_MAP_KEY_PREFIX}${tutorial.id}`, targetPath);
       
       return tutorial;
     } catch (error) {

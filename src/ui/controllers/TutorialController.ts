@@ -1,55 +1,47 @@
 import * as vscode from 'vscode';
-import { DiffFile, IDiffDisplayer } from '../../domain/ports/IDiffDisplayer';
 import { IProgressReporter } from '../../domain/ports/IProgressReporter';
 import { IUserInteraction } from '../../domain/ports/IUserInteraction';
-import { StepProgressService } from '../../domain/services/StepProgressService'; // Assuming this port exists
-import { IGitOperations } from '../../domain/ports/IGitOperations';
-import { Tutorial } from '../../domain/models/Tutorial'; // Assuming this model exists
+import { StepProgressService } from '../../domain/services/StepProgressService';
+import { Tutorial } from '../../domain/models/Tutorial';
 import { Step } from 'src/domain/models/Step';
 import { TutorialPanelManager } from '../panels/TutorialPanelManager';
-import * as path from 'path';  //TODO: This need to be refactored to use our IFileSystem Abstraction
 import { IFileSystem } from 'src/domain/ports/IFileSystem';
 import { TutorialStepViewModel, TutorialViewModel } from 'shared/types/viewmodels';
-import { TutorialService } from '../../domain/services/TutorialService'; // Added import
-import { EventBus, EventPayload } from '../../domain/events/EventBus'; // Corrected import for EventBus and EventPayload
-import { EventType } from '../../domain/events/EventTypes'; // Corrected import for EventType
+import { TutorialService } from '../../domain/services/TutorialService'; 
+import { EventBus, EventPayload } from '../../domain/events/EventBus';
+import { EventType } from '../../domain/events/EventTypes';
 import { TutorialViewService } from '../services/TutorialViewService';
 
 export class TutorialController {
-  private activeTutorial: Tutorial | null = null;
-  private activeGitAdapter: IGitOperations | null = null;
-
   constructor(
     private readonly context: vscode.ExtensionContext,
-    private readonly diffDisplayer: IDiffDisplayer,
     private readonly progressReporter: IProgressReporter,
     private readonly userInteraction: IUserInteraction,
     private readonly stepProgressService: StepProgressService,
     private readonly fs: IFileSystem,
-    private readonly tutorialService: TutorialService, // Injected TutorialService
-    private readonly tutorialViewService: TutorialViewService // Added TutorialViewService
+    private readonly tutorialService: TutorialService,
+    private readonly tutorialViewService: TutorialViewService
   ) {
     EventBus.getInstance().subscribe(EventType.STEP_CHANGED, this.handleStepChangedEvent.bind(this));
-    EventBus.getInstance().subscribe(EventType.SOLUTION_TOGGLED, this.handleSolutionToggledEvent.bind(this)); // Added listener
+    EventBus.getInstance().subscribe(EventType.SOLUTION_TOGGLED, this.handleSolutionToggledEvent.bind(this));
   }
 
+  /**
+   * This is the entry point of the the webview -> extension (see WebviewMessageHandler.ts)
+   */
   public async requestShowSolution(): Promise<void> {
-    if (!this.activeTutorial) {
+    const activeTutorial = this.tutorialService.getActiveTutorial();
+    if (!activeTutorial) {
       this.userInteraction.showWarningMessage("No active tutorial to show solution for.");
       return;
     }
-    // Delegate to TutorialService to handle showing the solution
-    // TutorialService will manage its internal state (isShowingSolution) 
-    // and call the diffDisplayer.
     await this.tutorialService.toggleSolution(true);
-    // We might want to ensure the webview panel is visible
     await this._updateTutorialPanel(); 
   }
 
   public async requestHideSolution(): Promise<void> {
-    if (!this.activeTutorial) {
-      // No active tutorial, so nothing to hide solution for, but also not an error.
-      // Or, if solution can only be hidden if it was shown, check tutorialService state.
+    const activeTutorial = this.tutorialService.getActiveTutorial();
+    if (!activeTutorial) {
       return;
     }
     await this.tutorialService.toggleSolution(false);
@@ -57,145 +49,41 @@ export class TutorialController {
   }
 
   private async handleSolutionToggledEvent(payload: EventPayload): Promise<void> {
+    const activeTutorial = this.tutorialService.getActiveTutorial();
+    const activeGitAdapter = this.tutorialService.getActiveGitAdapter();
+
     if (payload.showing === true) {
       await this.tutorialViewService.handleSolutionToggleUI(true);
     } else {
-      // Solution is being hidden.
       let currentStep: Step | undefined;
       let changedFilePaths: string[] = [];
       let tutorialLocalPath: string | undefined;
 
-      if (this.activeTutorial && this.activeTutorial.currentStepId) {
-        currentStep = this.activeTutorial.steps.find(s => s.id === this.activeTutorial!.currentStepId);
-        if (currentStep && this.activeGitAdapter && this.activeTutorial.localPath) {
-          changedFilePaths = await this.activeGitAdapter.getChangesInCommit(currentStep.commitHash);
-          tutorialLocalPath = this.activeTutorial.localPath;
+      if (activeTutorial && activeTutorial.currentStepId) {
+        currentStep = activeTutorial.steps.find(s => s.id === activeTutorial!.currentStepId);
+        if (currentStep && activeGitAdapter && activeTutorial.localPath) {
+          changedFilePaths = await activeGitAdapter.getChangesInCommit(currentStep.commitHash);
+          tutorialLocalPath = activeTutorial.localPath;
         }
       }
       await this.tutorialViewService.handleSolutionToggleUI(false, currentStep, changedFilePaths, tutorialLocalPath);
     }
-    // Refresh the webview as its state (e.g., show/hide solution button) might have changed
     await this._updateTutorialPanel();
   }
 
   private async handleStepChangedEvent(payload: EventPayload): Promise<void> {
-    if (!this.activeTutorial || !payload.step || !payload.changedFilePaths || !this.activeTutorial.localPath) {
+    const activeTutorial = this.tutorialService.getActiveTutorial();
+    if (!activeTutorial || !payload.step || !payload.changedFilePaths || !activeTutorial.localPath) {
       console.warn('TutorialController: Received STEP_CHANGED event with missing data for TutorialViewService.', payload);
       return;
     }
 
     const step = payload.step as Step; 
     const changedFilePaths = payload.changedFilePaths as string[];
-    const tutorialLocalPath = this.activeTutorial.localPath;
+    const tutorialLocalPath = activeTutorial.localPath;
 
     console.log(`TutorialController: Handling STEP_CHANGED event for step '${step.title}'. Delegating to TutorialViewService.`);
     await this.tutorialViewService.updateSidePanelFiles(step, changedFilePaths, tutorialLocalPath);
-  }
-
-  private async _updateSidePanelFiles(step: Step, changedFilePaths: string[]): Promise<void> {
-    if (!this.activeTutorial || !this.activeTutorial.localPath) {
-      console.warn("TutorialController: Cannot update side panel files, active tutorial or localPath missing.");
-      return;
-    }
-    const localPath = this.activeTutorial.localPath;
-
-    // Define excluded file extensions and names
-    const excludedExtensions = ['.md', '.toml', '.lock'];
-    const excludedFileNames = ['.gitignore'];
-
-    // Close all tabs in group two if it's a section step
-    if (step.type === 'section') {
-      const groupTwoTabs = this._getTabsInGroup(vscode.ViewColumn.Two);
-      if (groupTwoTabs.length > 0) {
-        await vscode.window.tabGroups.close(groupTwoTabs, false); 
-        console.log("TutorialController: Closed all tabs in group two for section step.");
-      }
-      return;
-    }
-
-    const targetUris: vscode.Uri[] = [];
-    for (const relativePath of changedFilePaths) {
-      const fileName = path.basename(relativePath);
-      const fileExtension = path.extname(relativePath).toLowerCase();
-
-      if (excludedFileNames.includes(fileName) || excludedExtensions.includes(fileExtension)) {
-        console.log(`TutorialController: Skipping excluded file: ${relativePath}`);
-        continue;
-      }
-
-      const absolutePath = this.fs.join(localPath, relativePath);
-      if (await this.fs.pathExists(absolutePath)) {
-        targetUris.push(vscode.Uri.file(absolutePath));
-      } else {
-        console.warn(`TutorialController: File path from changed files does not exist: ${absolutePath}`);
-      }
-    }
-    
-    // 1. Get current tabs in editor group two.
-    const currentTabsInGroupTwo = this._getTabsInGroup(vscode.ViewColumn.Two);
-    const targetUriStrings = targetUris.map(u => u.toString());
-
-    // 2. Determine tabs to close.
-    //    - Tabs showing diffs (input has original & modified).
-    //    - Tabs for files that no longer exist.
-    //    - Tabs for files not in the current targetUris list for this step.
-    const tabsToClose: vscode.Tab[] = [];
-    for (const tab of currentTabsInGroupTwo) {
-      const input = tab.input as any; // Type assertion to access properties
-      if (input && input.original && input.modified) { // It's a diff view
-        tabsToClose.push(tab);
-        continue;
-      }
-      const tabUri = (input?.uri as vscode.Uri);
-      if (tabUri) {
-        if (!(await this.fs.pathExists(tabUri.fsPath))) {
-          tabsToClose.push(tab);
-          continue;
-        }
-        if (!targetUriStrings.includes(tabUri.toString())) {
-          tabsToClose.push(tab);
-          continue;
-        }
-      }
-    }
-    
-    // 3. Open new files in group two.
-    for (const uri of targetUris) {
-      // Avoid re-opening already open and correct tabs
-      if (!currentTabsInGroupTwo.find(tab => (tab.input as any)?.uri?.toString() === uri.toString())) {
-        try {
-          await vscode.window.showTextDocument(uri, { viewColumn: vscode.ViewColumn.Two, preview: false, preserveFocus: true });
-        } catch (error) {
-          console.error(`TutorialController: Error opening file ${uri.fsPath} in group two:`, error);
-        }
-      }
-    }
-
-    // 4. Close identified tabs.
-    if (tabsToClose.length > 0) {
-      try {
-        await vscode.window.tabGroups.close(tabsToClose, false); // false to not close group if empty
-      } catch (error) {
-        console.error("TutorialController: Error closing tabs in group two:", error);
-      }
-    }
-
-    // 5. Adjust focus if needed (e.g., focus group one if group two was active for a diff).
-    // This part can be refined based on desired UX.
-    if (targetUris.length > 0 && vscode.window.tabGroups.activeTabGroup?.viewColumn === vscode.ViewColumn.Two) {
-      // If we opened files and group two is active, maybe focus group one?
-      // Or let user manage focus unless it was a diff view previously.
-    } else if (targetUris.length === 0 && currentTabsInGroupTwo.length > 0 && tabsToClose.length === currentTabsInGroupTwo.length) {
-      // If we closed everything in group two, focus group one.
-      await vscode.commands.executeCommand('workbench.action.focusFirstEditorGroup');
-    }
-
-    console.log("TutorialController: Side panel files updated for step:", step.title);
-  }
-
-  private _getTabsInGroup(viewColumn: vscode.ViewColumn): vscode.Tab[] {
-    const group = vscode.window.tabGroups.all.find(tg => tg.viewColumn === viewColumn);
-    return group ? [...group.tabs] : [];
   }
 
   //TODO: check if autoOpen actually does a difference
@@ -220,8 +108,6 @@ export class TutorialController {
               console.error('TutorialController: Failed to load tutorial from path, despite previous check.');
               return;
             }
-            this.activeTutorial = tutorial;
-            this.activeGitAdapter = this.tutorialService.getActiveGitAdapter();
             console.log(`TutorialController: Found and loaded tutorial '${tutorial.title}' from workspace via TutorialService.`);
 
             this.userInteraction.showInformationMessage(`Tutorial "${tutorial.title}" is active in this workspace.`);
@@ -276,7 +162,6 @@ export class TutorialController {
 
     try {
       this.progressReporter.reportStart(`Cloning ${repoUrl}...`);
-      //I dont like that we interact with the repository here. I guess it would make more sense to let the TutorialService handle this
       const tutorial = await this.tutorialService.cloneAndLoadTutorial(repoUrl, finalClonePath);
       this.progressReporter.reportEnd();
 
@@ -294,14 +179,12 @@ export class TutorialController {
       });
 
       if (openNowChoice) {
-        // Prepare data for the new window to pick up
         const pendingTutorialInfo = {
           autoOpenTutorialPath: finalClonePath,
           targetStepId: cloneOptions?.targetStepId,
         };
         await this.context.globalState.update('gitorial:pendingAutoOpen', pendingTutorialInfo);
 
-        // Open the cloned tutorial in a new VS Code window
         const folderUri = vscode.Uri.file(finalClonePath);
         vscode.commands.executeCommand('vscode.openFolder', folderUri, {
         });
@@ -341,10 +224,8 @@ export class TutorialController {
       this.progressReporter.reportEnd();
 
       if (tutorial) {
-        this.activeTutorial = tutorial;
-        this.activeGitAdapter = this.tutorialService.getActiveGitAdapter();
-
-        if (!this.activeGitAdapter) {
+        const activeGitAdapter = this.tutorialService.getActiveGitAdapter();
+        if (!activeGitAdapter) {
           console.error("TutorialController: GitAdapter is null after loading tutorial from service.");
           this.userInteraction.showErrorMessage("Failed to initialize Git operations for the tutorial.");
           this.clearActiveTutorialState();
@@ -434,7 +315,10 @@ export class TutorialController {
    * Note: this method does display the webview panel
    */
   public async selectStep(step: Step | string): Promise<void> {
-    if (!this.activeTutorial || !this.activeGitAdapter) {
+    const activeTutorial = this.tutorialService.getActiveTutorial();
+    const activeGitAdapter = this.tutorialService.getActiveGitAdapter();
+
+    if (!activeTutorial || !activeGitAdapter) {
       this.userInteraction.showWarningMessage('No active tutorial or Git adapter to select a step from.');
       return;
     }
@@ -443,7 +327,7 @@ export class TutorialController {
     let targetStepId: string | undefined;
 
     if (typeof step === 'string') {
-      targetStep = this.activeTutorial.steps.find(s => s.id === step || s.commitHash === step);
+      targetStep = activeTutorial.steps.find(s => s.id === step || s.commitHash === step);
       targetStepId = targetStep?.id;
     } else {
       targetStep = step;
@@ -455,7 +339,7 @@ export class TutorialController {
       return;
     }
 
-    if (this.activeTutorial.currentStepId === targetStepId) {
+    if (activeTutorial.currentStepId === targetStepId) {
       console.log(`TutorialController: Step '${targetStep.title}' is already active.`);
       await this._updateTutorialPanel();
       return;
@@ -465,7 +349,7 @@ export class TutorialController {
     try {
       this.progressReporter.reportStart(`Switching to step '${targetStep.title}'...`);
 
-      const stepIndex = this.activeTutorial.steps.findIndex(s => s.id === targetStepId);
+      const stepIndex = activeTutorial.steps.findIndex(s => s.id === targetStepId);
       if (stepIndex === -1) {
         this.userInteraction.showErrorMessage(`Could not find index for step: ${targetStepId}`);
         this.progressReporter.reportEnd();
@@ -475,8 +359,12 @@ export class TutorialController {
       const navigationSuccess = await this.tutorialService.navigateToStep(stepIndex);
 
       if (navigationSuccess) {
-        this.activeTutorial.currentStepId = targetStepId;
-        await this.stepProgressService.setCurrentStep(this.activeTutorial.id, targetStepId);
+        const updatedTutorial = this.tutorialService.getActiveTutorial();
+        if (updatedTutorial && updatedTutorial.currentStepId) {
+          await this.stepProgressService.setCurrentStep(updatedTutorial.id, updatedTutorial.currentStepId);
+        } else {
+          console.error("TutorialController: Failed to get updated tutorial or currentStepId after navigation.");
+        }
         this.progressReporter.reportEnd();
         await this._updateTutorialPanel();
         this.userInteraction.showInformationMessage(`Switched to step: ${targetStep.title}`);
@@ -495,16 +383,15 @@ export class TutorialController {
 
   /**
    * 
-   * @param tutorial 
+   * @param tutorial The tutorial object to activate (comes from TutorialService after loading)
    * @param initialStepId 
    * @returns 
    * 
    * Note: this method displays the webview panel
    */
   private async activateTutorialMode(tutorial: Tutorial, initialStepId?: string): Promise<void> {
-    // Clear all currently open editor tabs
     await this.tutorialViewService.resetEditorLayout();
-
+    //TODO: Find out what this commands does
     vscode.commands.executeCommand('setContext', 'gitorial.tutorialActive', true);
 
     let stepIdToSelect = initialStepId || tutorial.currentStepId;
@@ -521,11 +408,9 @@ export class TutorialController {
   }
 
   private clearActiveTutorialState(): void {
-    if (this.activeTutorial) {
+    if (this.tutorialService.getActiveTutorial()) {
       this.tutorialService.closeTutorial();
     }
-    this.activeTutorial = null;
-    this.activeGitAdapter = null;
     vscode.commands.executeCommand('setContext', 'gitorial.tutorialActive', false);
     TutorialPanelManager.disposeCurrentPanel();
     console.log('TutorialController: Active tutorial state cleared.');
@@ -533,22 +418,34 @@ export class TutorialController {
 
 
   public async requestNextStep(): Promise<void> {
-    if (!this.activeTutorial) return;
+    const activeTutorial = this.tutorialService.getActiveTutorial();
+    if (!activeTutorial) return;
+
     const success = await this.tutorialService.navigateToNextStep();
     if (success) {
-      this.activeTutorial.currentStepId = this.tutorialService.getActiveTutorial()!.currentStepId;
-      await this.stepProgressService.setCurrentStep(this.activeTutorial.id, this.activeTutorial.currentStepId);
+      const updatedTutorial = this.tutorialService.getActiveTutorial(); //TODO: I guess we could just use the 'activeTutorial' variable here
+      if (updatedTutorial && updatedTutorial.currentStepId) {
+        await this.stepProgressService.setCurrentStep(updatedTutorial.id, updatedTutorial.currentStepId); //TODO: The manual setting of the current step could be delegated to the TutorialService
+      } else {
+        console.error("TutorialController: Failed to get updated tutorial or currentStepId after navigating to next step.");
+      }
       await this._updateTutorialPanel();
     } else {
       this.userInteraction.showInformationMessage("You are already on the last step.");
     }
   }
   public async requestPreviousStep(): Promise<void> {
-    if (!this.activeTutorial) return;
+    const activeTutorial = this.tutorialService.getActiveTutorial();
+    if (!activeTutorial) return;
+
     const success = await this.tutorialService.navigateToPreviousStep();
     if (success) {
-      this.activeTutorial.currentStepId = this.tutorialService.getActiveTutorial()!.currentStepId;
-      await this.stepProgressService.setCurrentStep(this.activeTutorial.id, this.activeTutorial.currentStepId);
+      const updatedTutorial = this.tutorialService.getActiveTutorial();
+      if (updatedTutorial && updatedTutorial.currentStepId) {
+        await this.stepProgressService.setCurrentStep(updatedTutorial.id, updatedTutorial.currentStepId);
+      } else {
+        console.error("TutorialController: Failed to get updated tutorial or currentStepId after navigating to previous step.");
+      }
       await this._updateTutorialPanel();
     } else {
       this.userInteraction.showInformationMessage("You are already on the first step.");
@@ -559,15 +456,15 @@ export class TutorialController {
   }
 
   get tutorialViewModel(): TutorialViewModel | null {
-    if (this.activeTutorial) {
-      const tutorial = this.activeTutorial;
-      const currentStepIdInService = this.tutorialService.getActiveTutorial()?.currentStepId;
-      const actualCurrentStepId = currentStepIdInService || tutorial.currentStepId;
+    const activeTutorial = this.tutorialService.getActiveTutorial();
+    if (activeTutorial) {
+      const currentStepIdInService = activeTutorial.currentStepId;
+      const actualCurrentStepId = currentStepIdInService;
 
-      const stepsViewModel: TutorialStepViewModel[] = tutorial.steps.map(step => {
+      const stepsViewModel: TutorialStepViewModel[] = activeTutorial.steps.map(step => {
         let stepHtmlContent: string | undefined = undefined;
         if (step.id === actualCurrentStepId) {
-          stepHtmlContent = this.tutorialService.getCurrentStepHtmlContent() || undefined; // Get content only for the active step
+          stepHtmlContent = this.tutorialService.getCurrentStepHtmlContent() || undefined;
         }
 
         return {
@@ -583,8 +480,8 @@ export class TutorialController {
       });
 
       return {
-        id: tutorial.id,
-        title: tutorial.title,
+        id: activeTutorial.id,
+        title: activeTutorial.title,
         steps: stepsViewModel,
         currentStepId: actualCurrentStepId,
         isShowingSolution: this.tutorialService.getIsShowingSolution()

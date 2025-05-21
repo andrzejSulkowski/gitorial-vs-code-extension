@@ -13,6 +13,6 @@ export class MarkdownItConverter implements IMarkdownConverter {
   }
 }
 
-export const createMarkdownConverterAdapter = (): IMarkdownConverter => {
+export function createMarkdownConverterAdapter(): IMarkdownConverter {
   return new MarkdownItConverter();
 };

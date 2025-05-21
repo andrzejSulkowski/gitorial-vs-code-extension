@@ -55,7 +55,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<vscode
     stateStorage,
     gitAdapterFactory.createFromPath,
     gitAdapterFactory.createFromClone,
-    diffDisplayerAdapter,
     fileSystemAdapter,
     userInteractionAdapter
   );
@@ -76,7 +75,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<vscode
     tutorialRepository, 
     diffDisplayerAdapter, 
     gitAdapterFactory, 
-    fileSystemAdapter, 
     stepContentRepository, 
     markdownConverter, 
     activeTutorialStateRepository,
@@ -88,7 +86,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<vscode
   // --- UI Layer Controllers/Handlers (still no direct vscode registration logic inside them) ---
   const tutorialController = new TutorialController(
     context, // context can be passed for things like extensionUri, but avoid direct vscode API calls //TODO: refactor to not pass context
-    diffDisplayer,
     progressReportAdapter,
     userInteractionAdapter,
     stepProgressService,

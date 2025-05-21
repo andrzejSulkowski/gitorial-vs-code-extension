@@ -25,7 +25,6 @@ export class TutorialRepositoryImpl implements ITutorialRepository {
   private stateStorage: IStateStorage;
   private gitAdapterFactory: GitAdapterFactory;
   private gitCloneAdapterFactory: GitCloneAdapterFactory;
-  private diffDisplayer: IDiffDisplayer;
   private fileSystem: IFileSystem;
   private userInteraction: IUserInteraction;
 
@@ -43,14 +42,12 @@ export class TutorialRepositoryImpl implements ITutorialRepository {
     stateStorage: IStateStorage,
     gitAdapterFactory: GitAdapterFactory,
     gitCloneAdapterFactory: GitCloneAdapterFactory,
-    diffDisplayer: IDiffDisplayer,
     fileSystem: IFileSystem,
     userInteraction: IUserInteraction
   ) {
     this.stateStorage = stateStorage;
     this.gitAdapterFactory = gitAdapterFactory;
     this.gitCloneAdapterFactory = gitCloneAdapterFactory;
-    this.diffDisplayer = diffDisplayer;
     this.fileSystem = fileSystem;
     this.userInteraction = userInteraction;
   }

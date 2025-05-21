@@ -9,7 +9,6 @@ import { ITutorialRepository } from '../repositories/ITutorialRepository';
 import { EventBus, EventPayload } from '../events/EventBus';
 import { EventType } from '../events/EventTypes';
 import { IDiffDisplayer, DiffFile, DiffFilePayload } from '../ports/IDiffDisplayer';
-import { IFileSystem } from '../ports/IFileSystem';
 import { IGitAdapterFactory } from '../ports/IGitOperationsFactory';
 import { IGitOperations } from '../ports/IGitOperations';
 import { IStepContentRepository } from '../ports/IStepContentRepository';
@@ -49,7 +48,6 @@ export class TutorialService {
     private readonly repository: ITutorialRepository,
     private readonly diffDisplayer: IDiffDisplayer,
     private readonly gitAdapterFactory: IGitAdapterFactory,
-    private readonly fs: IFileSystem,
     private readonly stepContentRepository: IStepContentRepository,
     private readonly markdownConverter: IMarkdownConverter,
     private readonly activeTutorialStateRepository: IActiveTutorialStateRepository,

@@ -16,6 +16,7 @@ import { createMarkdownConverterAdapter } from "./infrastructure/adapters/Markdo
 import { StepContentRepository } from "./infrastructure/repositories/StepContentRepository";
 import { MementoActiveTutorialStateRepository } from "./infrastructure/repositories/MementoActiveTutorialStateRepository";
 import { TutorialViewService } from "./ui/services/TutorialViewService";
+import { AutoOpenState } from "./infrastructure/state/AutoOpenState";
 
 // Create a singleton instance of the VS Code diff displayer to be used throughout the application
 export const diffDisplayer = createDiffDisplayerAdapter();
@@ -44,7 +45,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<vscode
 
   // --- State ---
   // TODO: GlobalState will be used to restore sessions (for example if user opens project in a new window)
-  const globalState = new GlobalState(globalStateMementoAdapter); // GlobalState uses the global memento adapter
+  const autoOpenState = new AutoOpenState(new GlobalState(globalStateMementoAdapter));
 
   // --- Factories ---
   const gitAdapterFactory = new GitAdapterFactory();
@@ -76,18 +77,19 @@ export async function activate(context: vscode.ExtensionContext): Promise<vscode
     stepContentRepository, 
     markdownConverter, 
     activeTutorialStateRepository,
-    workspaceId
+    workspaceId,
   );
   const tutorialViewService = new TutorialViewService(fileSystemAdapter);
 
   // --- UI Layer Controllers/Handlers (still no direct vscode registration logic inside them) ---
   const tutorialController = new TutorialController(
-    context, 
+    context.extensionUri, 
     progressReportAdapter,
     userInteractionAdapter,
     fileSystemAdapter,
     tutorialService,
-    tutorialViewService
+    tutorialViewService,
+    autoOpenState
   );
 
   const commandHandler = new CommandHandler(tutorialController);
@@ -97,18 +99,19 @@ export async function activate(context: vscode.ExtensionContext): Promise<vscode
   commandHandler.register(context);
   uriHandler.register(context);
 
-  // --- Auto-open cloned tutorial (if any) ---
-  const pendingAutoOpen = context.globalState.get<{ autoOpenTutorialPath: string, targetStepId?: string }>('gitorial:pendingAutoOpen');
-  if (pendingAutoOpen && pendingAutoOpen.autoOpenTutorialPath) {
-    console.log("Gitorial: Pending auto-open found:", pendingAutoOpen);
-    // This command typically opens a new window, so state restoration might happen in that new window's activation.
-    // However, if it reuses the current window or for robustness:
-    // We might defer the checkWorkspaceForTutorial or ensure it doesn't conflict.
-    // For now, the `initiateCloneTutorial` handles opening the new window and setting this state.
-    // The primary session restoration will happen after this block.
+  // --- Auto-open tutorial (if any) ---
+  const pendingAutoOpen = autoOpenState.get()
+  //This case is only true if we cloned a tutorial and it got opened in a new workspace/vs code window
+  if (pendingAutoOpen) {
+    const savedTime = new Date(pendingAutoOpen.timestamp).getTime();
+    const now = new Date().getTime()
+
+    // less than 5 seconds
+    if(now - savedTime < 5_000) {
+      await tutorialController.checkWorkspaceForTutorial(true);
+    }
   } else {
     // --- Restore previous session OR Check workspace for tutorial ---
-    // Only attempt to restore if no pending auto-open is taking precedence for a *new* clone.
     if (workspaceId) {
       const activeState = await activeTutorialStateRepository.getActiveTutorial(workspaceId);
       if (activeState && activeState.tutorialId) {
@@ -136,10 +139,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<vscode
     }
   }
   
-  // Clear pending auto-open state regardless of whether it was used or session restored.
-  // If it was used, the new window's activation will handle its own state.
-  // If not used, we clear it to prevent stale state.
-  context.globalState.update('gitorial:pendingAutoOpen', undefined);
+  autoOpenState.clear();
 
   console.log("📖 Gitorial activation complete.");
   return context;

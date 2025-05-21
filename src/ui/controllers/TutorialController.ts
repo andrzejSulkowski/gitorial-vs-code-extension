@@ -8,15 +8,17 @@ import { IFileSystem } from 'src/domain/ports/IFileSystem';
 import { TutorialStepViewModel, TutorialViewModel } from 'shared/types/viewmodels';
 import { TutorialService } from '../../domain/services/TutorialService'; 
 import { TutorialViewService } from '../services/TutorialViewService';
+import { AutoOpenState } from 'src/infrastructure/state/AutoOpenState';
 
 export class TutorialController {
   constructor(
-    private readonly context: vscode.ExtensionContext,
+    private readonly extensionUri: vscode.Uri,
     private readonly progressReporter: IProgressReporter,
     private readonly userInteraction: IUserInteraction,
     private readonly fs: IFileSystem,
     private readonly tutorialService: TutorialService,
-    private readonly tutorialViewService: TutorialViewService
+    private readonly tutorialViewService: TutorialViewService,
+    private readonly autoOpenState: AutoOpenState
   ) {
   }
 
@@ -96,7 +98,8 @@ export class TutorialController {
     }
   }
 
-  public async initiateCloneTutorial(initialRepoUrl?: string, cloneOptions?: { targetStepId?: string }): Promise<void> {
+  //TODO: use cloneOptions
+  public async initiateCloneTutorial(initialRepoUrl?: string, options?: { targetStepId?: string }): Promise<void> {
     const repoUrl = initialRepoUrl || await this.userInteraction.showInputBox({
       prompt: 'Enter the Git URL of the tutorial repository to clone',
       placeHolder: 'https://github.com/user/gitorial-tutorial.git',
@@ -131,7 +134,7 @@ export class TutorialController {
 
     try {
       this.progressReporter.reportStart(`Cloning ${repoUrl}...`);
-      const tutorial = await this.tutorialService.cloneAndLoadTutorial(repoUrl, finalClonePath);
+      const tutorial = await this.tutorialService.cloneAndLoadTutorial(repoUrl, finalClonePath, { initialStepId:  options?.targetStepId });
       this.progressReporter.reportEnd();
 
       if (!tutorial) {
@@ -148,15 +151,10 @@ export class TutorialController {
       });
 
       if (openNowChoice) {
-        const pendingTutorialInfo = {
-          autoOpenTutorialPath: finalClonePath,
-          targetStepId: cloneOptions?.targetStepId,
-        };
-        await this.context.globalState.update('gitorial:pendingAutoOpen', pendingTutorialInfo);
+        await this.autoOpenState.set({tutorialId: tutorial.id, timestamp: Date.now()});
 
         const folderUri = vscode.Uri.file(finalClonePath);
-        vscode.commands.executeCommand('vscode.openFolder', folderUri, {
-        });
+        vscode.commands.executeCommand('vscode.openFolder', folderUri, {});
       }
     } catch (error) {
       this.progressReporter.reportEnd();
@@ -184,7 +182,7 @@ export class TutorialController {
     try {
       this.progressReporter.reportStart('Loading tutorial...');
       const tutorial = await this.tutorialService.loadTutorialFromPath(folderPath, {
-        initialStepIndex: options?.initialStepId ? undefined : undefined,
+        initialStepId: options?.initialStepId,
       });
       this.progressReporter.reportEnd();
 
@@ -434,7 +432,7 @@ export class TutorialController {
   private async _updateTutorialPanel(): Promise<void> {
     const tutorialViewModel = this.tutorialViewModel;
     if (tutorialViewModel) {
-      TutorialPanelManager.createOrShow(this.context.extensionUri, tutorialViewModel, this);
+      TutorialPanelManager.createOrShow(this.extensionUri, tutorialViewModel, this);
     } else {
       TutorialPanelManager.disposeCurrentPanel();
     }

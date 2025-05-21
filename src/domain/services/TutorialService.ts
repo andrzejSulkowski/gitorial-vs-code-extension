@@ -20,8 +20,8 @@ export interface LoadTutorialOptions {
   /**
    * Initial step index to load
    */
-  initialStepIndex?: number;
-  
+  initialStepId?: string;
+
   /**
    * Whether to show solution immediately
    */
@@ -37,7 +37,7 @@ export class TutorialService {
   private gitAdapter: IGitOperations | null = null;
   private currentStepHtmlContent: string | null = null;
   private readonly workspaceId: string | undefined;
-  
+
   /**
    * Create a new TutorialService
    */
@@ -52,7 +52,7 @@ export class TutorialService {
   ) {
     this.workspaceId = workspaceId;
   }
-  
+
   /**
    * Load a tutorial from its local path
    * @param localPath - The local path to the tutorial
@@ -64,7 +64,7 @@ export class TutorialService {
    */
   public async loadTutorialFromPath(localPath: string, options: LoadTutorialOptions = {}): Promise<Tutorial | null> {
     const isTutorial = await this.isTutorialInPath(localPath);
-    if(!isTutorial) {
+    if (!isTutorial) {
       console.warn(`TutorialService: No tutorial found at path ${localPath}`);
       if (this.workspaceId) {
         await this.activeTutorialStateRepository.clearActiveTutorial(this.workspaceId);
@@ -80,8 +80,8 @@ export class TutorialService {
       if (this.workspaceId) {
         await this.activeTutorialStateRepository.clearActiveTutorial(this.workspaceId);
       }
-      this.gitAdapter = null; 
-      return null; 
+      this.gitAdapter = null;
+      return null;
     }
 
     const tutorial = await this.repository.findByPath(localPath);
@@ -100,7 +100,7 @@ export class TutorialService {
   public async isTutorialInPath(localPath: string): Promise<boolean> {
     return this.repository.findByPath(localPath) !== null;
   }
-  
+
   /**
    * Clone and load a tutorial
    */
@@ -114,13 +114,14 @@ export class TutorialService {
         if (this.workspaceId) {
           await this.activeTutorialStateRepository.clearActiveTutorial(this.workspaceId);
         }
-        this.gitAdapter = null; 
-        return null; 
+        this.gitAdapter = null;
+        return null;
       }
       const tutorial = await this.repository.findByPath(targetPath);
       if (!tutorial) {
         throw new Error(`TutorialService: Failed to find tutorial at path ${targetPath} despite successful clone and branch setup`);
       }
+
       await this.activateTutorial(tutorial, options);
       return tutorial;
     } catch (error) {
@@ -128,29 +129,29 @@ export class TutorialService {
       return null;
     }
   }
-  
+
   /**
    * Get the active tutorial
    */
   public getActiveTutorial(): Tutorial | null {
     return this.activeTutorial;
   }
-  
+
   /**
    * Get the active git adapter
    */
   public getActiveGitAdapter(): IGitOperations | null {
     return this.gitAdapter;
   }
-  
+
   public getIsShowingSolution(): boolean {
     return this.isShowingSolution;
   }
-  
+
   public getCurrentStepHtmlContent(): string | null {
     return this.currentStepHtmlContent;
   }
-  
+
   /**
    * Navigate to a specific step
    */
@@ -193,7 +194,7 @@ export class TutorialService {
       return false;
     }
   }
-  
+
   /**
    * Navigate to the next step
    */
@@ -206,7 +207,7 @@ export class TutorialService {
     //TODO: Logic to jump over solution steps
     return this.navigateToStep(currentIndex + 1);
   }
-  
+
   /**
    * Navigate to the previous step
    */
@@ -218,7 +219,7 @@ export class TutorialService {
     }
     return this.navigateToStep(currentIndex - 1);
   }
-  
+
   /**
    * Toggle showing the solution
    */
@@ -230,9 +231,9 @@ export class TutorialService {
     this.isShowingSolution = newValue;
     if (this.isShowingSolution && this.activeTutorial && this.gitAdapter) {
       await this.showStepSolution();
-    } 
+    }
   }
-  
+
   /**
    * Close the active tutorial
    */
@@ -245,7 +246,7 @@ export class TutorialService {
       await this.activeTutorialStateRepository.clearActiveTutorial(this.workspaceId);
     }
   }
-  
+
   /**
    * Activate a tutorial
    */
@@ -258,37 +259,43 @@ export class TutorialService {
       this.activeTutorial = oldTutorialId ? await this.repository.findById(oldTutorialId) : null;
       return;
     }
-    
+
     this.isShowingSolution = options.showSolution || false;
-    
-    let targetStepIndex = options.initialStepIndex;
-    if (targetStepIndex === undefined) {
-        const currentStepId = tutorial.currentStepId;
-        const foundIndex = tutorial.steps.findIndex(s => s.id === currentStepId);
-        targetStepIndex = foundIndex !== -1 ? foundIndex : 0; 
+
+    //TODO: This looks pretty much like navigation here...
+    let targetStepId = options.initialStepId;
+    let targetStep;
+    if(options.initialStepId){
+      targetStep = tutorial.steps.find(s => s.id === options.initialStepId);
+    }else{
+      targetStep = tutorial.steps.find(s => s.id === tutorial.currentStepId);
     }
-    
+
+    if(!targetStep){
+      console.error("TutorialService: tutorial step couldnt be found")
+      targetStep = tutorial.steps[0];
+    }
+
     if (tutorial.steps.length > 0) {
-        const stepToActivate = tutorial.steps[Math.max(0, Math.min(targetStepIndex, tutorial.steps.length - 1))];
-        tutorial.currentStepId = stepToActivate.id;
-        
-        if (this.gitAdapter) {
-            try {
-                await this.gitAdapter.checkout(stepToActivate.commitHash);
-                await this.loadAndPrepareDisplayContentForStep(stepToActivate);
-                if (this.isShowingSolution) {
-                    await this.showStepSolution();
-                }
-            } catch (error) {
-                console.error(`TutorialService: Error during initial checkout for tutorial ${tutorial.title}:`, error);
-            }
-        } else {
-            console.error("TutorialService: GitAdapter is null during activateTutorial. Cannot checkout or load content.");
+      tutorial.currentStepId = targetStep.id;
+
+      if (this.gitAdapter) {
+        try {
+          await this.gitAdapter.checkout(targetStep.commitHash);
+          await this.loadAndPrepareDisplayContentForStep(targetStep);
+          if (this.isShowingSolution) {
+            await this.showStepSolution();
+          }
+        } catch (error) {
+          console.error(`TutorialService: Error during initial checkout for tutorial ${tutorial.title}:`, error);
         }
+      } else {
+        console.error("TutorialService: GitAdapter is null during activateTutorial. Cannot checkout or load content.");
+      }
     } else {
-        console.warn(`TutorialService: Tutorial "${tutorial.title}" has no steps.`);
+      console.warn(`TutorialService: Tutorial "${tutorial.title}" has no steps.`);
     }
-    
+
     if (this.workspaceId && tutorial.currentStepId) {
       await this.activeTutorialStateRepository.saveActiveTutorial(
         this.workspaceId,
@@ -297,7 +304,7 @@ export class TutorialService {
       );
     }
   }
-  
+
   private async showStepSolution(): Promise<void> {
     if (!this.activeTutorial || !this.gitAdapter || !this.activeTutorial.localPath) {
       console.warn('TutorialService: Cannot show solution. Missing active tutorial, git adapter, or local path.');
@@ -306,8 +313,8 @@ export class TutorialService {
 
     const currentStepIdx = this.activeTutorial.steps.findIndex(s => s.id === this.activeTutorial!.currentStepId);
     if (currentStepIdx === -1) {
-        console.warn('TutorialService: Current step not found by ID for showing solution.');
-        return;
+      console.warn('TutorialService: Current step not found by ID for showing solution.');
+      return;
     }
     const currentStep = this.activeTutorial.steps[currentStepIdx];
     const nextStep = this.activeTutorial.steps[currentStepIdx + 1];
@@ -319,7 +326,7 @@ export class TutorialService {
 
     try {
       const commitDiffPayloads: DiffFilePayload[] = await this.gitAdapter.getCommitDiff(nextStep.commitHash);
-      
+
       if (commitDiffPayloads.length === 0) {
         return;
       }
@@ -328,16 +335,16 @@ export class TutorialService {
       const filteredDiffPayloads = commitDiffPayloads.filter(payload => {
         const baseName = payload.relativeFilePath.substring(payload.relativeFilePath.lastIndexOf('/') + 1).toLowerCase();
         if (excludedFileNames.includes(baseName)) {
-            return false; 
+          return false;
         }
 
         // Check if the file in the *current step's state* (originalContent) had a "TODO:".
         // payload.originalContent is from currentStep.commitHash because we called getCommitDiff(nextStep.commitHash).
         if (payload.originalContent && payload.originalContent.includes("TODO:")) {
-            // This includes files Modified or Deleted in nextStep that had a TODO in currentStep.
-            return true;
+          // This includes files Modified or Deleted in nextStep that had a TODO in currentStep.
+          return true;
         }
-        
+
         // Files new in nextStep (payload.isNew = true) didn't exist in currentStep, so no prior TODO.
         // Files modified/deleted whose originalContent (currentStep state) didn't have TODO are also excluded.
         return false;
@@ -347,18 +354,18 @@ export class TutorialService {
         console.log(`TutorialService: No files with 'TODO:' in current step (after filtering) found in solution diff for step '${currentStep.title}'.`);
         return;
       }
-      
+
       const filesToDisplay: DiffFile[] = filteredDiffPayloads.map(payload => ({
-        leftContentProvider: async () => payload.originalContent || "", 
+        leftContentProvider: async () => payload.originalContent || "",
         rightContentProvider: async () => payload.modifiedContent || "",
         relativePath: payload.relativeFilePath,
-        leftCommitId: currentStep.commitHash, 
-        rightCommitId: nextStep.commitHash,  
-        titleCommitId: nextStep.commitHash.slice(0, 7) 
+        leftCommitId: currentStep.commitHash,
+        rightCommitId: nextStep.commitHash,
+        titleCommitId: nextStep.commitHash.slice(0, 7)
       }));
-      
+
       await this.diffDisplayer.displayDiff(filesToDisplay);
-      
+
     } catch (error) {
       console.error('Error showing step solution:', error);
     }

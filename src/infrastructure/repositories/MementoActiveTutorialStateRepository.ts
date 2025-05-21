@@ -1,28 +1,24 @@
-import { IActiveTutorialStateRepository } from "../../domain/repositories/IActiveTutorialStateRepository";
+import { IActiveTutorialStateRepository, StoredTutorialState } from "../../domain/repositories/IActiveTutorialStateRepository";
 import { IStateStorage } from "../../domain/ports/IStateStorage";
 import { TutorialId } from "shared/types/domain-primitives/TutorialId";
 
 const ACTIVE_TUTORIAL_STATE_KEY = 'gitorial:activeTutorialInfo';
 
-interface StoredTutorialState {
-  tutorialId: TutorialId;
-  currentStepId: string;
-}
 
 export class MementoActiveTutorialStateRepository implements IActiveTutorialStateRepository {
   constructor(private readonly workspaceState: IStateStorage) {}
 
-  async saveActiveTutorial(_workspaceId: string, tutorialId: TutorialId, currentStepId: string): Promise<void> {
+  async saveActiveTutorial(_workspaceId: string, tutorialId: TutorialId, currentStepId: string, openFileUris: string[]): Promise<void> {
     // The IStateStorage (MementoAdapter) is already scoped to a workspace or global.
     // The workspaceId parameter here is more for semantic correctness at the port level,
     // but with Memento, the scoping is implicit in how IStateStorage is instantiated.
     // We'll store it under a single key, assuming the IStateStorage instance is workspace-specific.
-    const state: StoredTutorialState = { tutorialId, currentStepId };
+    const state: StoredTutorialState = { tutorialId, currentStepId, openFileUris };
     await this.workspaceState.update<StoredTutorialState>(ACTIVE_TUTORIAL_STATE_KEY, state);
     console.log(`MementoActiveTutorialStateRepository: Saved active tutorial ${tutorialId}, step ${currentStepId} for workspace.`);
   }
 
-  async getActiveTutorial(_workspaceId: string): Promise<{ tutorialId: TutorialId; currentStepId: string; } | undefined> {
+  async getActiveTutorial(_workspaceId: string): Promise<StoredTutorialState | undefined> {
     // Again, workspaceId is for semantic consistency; IStateStorage instance dictates scope.
     const state = this.workspaceState.get<StoredTutorialState>(ACTIVE_TUTORIAL_STATE_KEY);
     if (state) {

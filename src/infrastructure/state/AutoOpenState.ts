@@ -10,7 +10,7 @@ interface AutoOpenStateData {
 
 export class AutoOpenState {
   private _db: IDB;
-  private key = "auto-open"
+  private key = "auto-open";
 
   constructor(globalDB: GlobalState){
     this._db = globalDB.getDB("auto-open-db");

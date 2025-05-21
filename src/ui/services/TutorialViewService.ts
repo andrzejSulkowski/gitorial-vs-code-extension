@@ -176,5 +176,54 @@ export class TutorialViewService {
         }
     }
 
+    /**
+     * Gets the file system paths of all open tabs that are part of the specified tutorial.
+     * @param tutorialLocalPath The absolute local path of the active tutorial.
+     * @returns An array of fsPath strings for the relevant open tutorial files.
+     */
+    public getTutorialOpenTabFsPaths(tutorialLocalPath: string): string[] {
+        const openTutorialTabs: string[] = [];
+        for (const tabGroup of vscode.window.tabGroups.all) {
+            for (const tab of tabGroup.tabs) {
+                if (tab.input instanceof vscode.TabInputText) {
+                    const tabFsPath = tab.input.uri.fsPath;
+                    // Normalize paths to ensure consistent comparison, especially on Windows
+                    const normalizedTabFsPath = path.normalize(tabFsPath);
+                    const normalizedTutorialLocalPath = path.normalize(tutorialLocalPath);
+                    if (normalizedTabFsPath.startsWith(normalizedTutorialLocalPath)) {
+                        // We store relative paths to make the state more portable if the tutorial
+                        // is moved, though for this feature, absolute might be fine.
+                        // Let's stick to absolute fsPath for now as per StoredTutorialState.openFileUris
+                        openTutorialTabs.push(tabFsPath);
+                    }
+                }
+            }
+        }
+        return openTutorialTabs;
+    }
+
+    /**
+     * Opens the specified URIs as editor tabs and attempts to focus the last one.
+     * @param uris An array of vscode.Uri objects to open.
+     */
+    public async openAndFocusTabs(uris: vscode.Uri[]): Promise<void> {
+        if (!uris || uris.length === 0) {
+            return;
+        }
+
+        for (let i = 0; i < uris.length; i++) {
+            try {
+                // Open all tabs, making sure they are not in preview mode.
+                // Preserve focus for all but the last one, or if there is only one, focus it.
+                const preserveFocus = i < uris.length - 1;
+                await vscode.window.showTextDocument(uris[i], { preview: false, preserveFocus, viewColumn: vscode.ViewColumn.Two });
+            } catch (error) {
+                console.error(`TutorialViewService: Error opening document ${uris[i].fsPath}:`, error);
+                // Optionally, inform the user if a specific file failed to open
+                // vscode.window.showWarningMessage(`Could not open file: ${path.basename(uris[i].fsPath)}`);
+            }
+        }
+    }
+
     // Further methods for UI orchestration will be added here.
 } 

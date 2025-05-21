@@ -11,7 +11,7 @@ import { IGitAdapterFactory } from '../ports/IGitOperationsFactory';
 import { IGitOperations } from '../ports/IGitOperations';
 import { IStepContentRepository } from '../ports/IStepContentRepository';
 import { IMarkdownConverter } from '../ports/IMarkdownConverter';
-import { IActiveTutorialStateRepository } from "../repositories/IActiveTutorialStateRepository";
+import { IActiveTutorialStateRepository, StoredTutorialState } from "../repositories/IActiveTutorialStateRepository";
 
 /**
  * Options for loading a tutorial
@@ -26,6 +26,11 @@ export interface LoadTutorialOptions {
    * Whether to show solution immediately
    */
   showSolution?: boolean;
+
+  /**
+   * Optional: Initial set of open tab fsPaths known at load time (e.g. from prior session state)
+   */
+  initialOpenTabFsPaths?: string[];
 }
 
 /**
@@ -72,6 +77,11 @@ export class TutorialService {
       return null;
     }
 
+    let persistedState: StoredTutorialState | undefined;
+    if (this.workspaceId) {
+      persistedState = await this.activeTutorialStateRepository.getActiveTutorial(this.workspaceId);
+    }
+
     this.gitAdapter = this.gitAdapterFactory.createFromPath(localPath);
     try {
       await this.gitAdapter.ensureGitorialBranch();
@@ -90,7 +100,12 @@ export class TutorialService {
       return null;
     }
 
-    await this.activateTutorial(tutorial, options);
+    let effectiveInitialTabs: string[] | undefined = options.initialOpenTabFsPaths;
+    if (!effectiveInitialTabs && persistedState && persistedState.tutorialId === tutorial.id) {
+        effectiveInitialTabs = persistedState.openFileUris;
+    }
+
+    await this.activateTutorial(tutorial, { ...options, initialOpenTabFsPaths: effectiveInitialTabs });
     return tutorial;
   }
 
@@ -181,7 +196,8 @@ export class TutorialService {
         await this.activeTutorialStateRepository.saveActiveTutorial(
           this.workspaceId,
           this.activeTutorial.id,
-          this.activeTutorial.currentStepId
+          this.activeTutorial.currentStepId,
+          this.activeTutorial.lastPersistedOpenTabFsPaths || []
         );
       }
 
@@ -306,10 +322,14 @@ export class TutorialService {
     }
 
     if (this.workspaceId && tutorial.currentStepId) {
+      const tabsToSave = options.initialOpenTabFsPaths || [];
+      tutorial.lastPersistedOpenTabFsPaths = tabsToSave;
+
       await this.activeTutorialStateRepository.saveActiveTutorial(
         this.workspaceId,
         tutorial.id,
-        tutorial.currentStepId
+        tutorial.currentStepId,
+        tabsToSave
       );
     }
   }
@@ -405,6 +425,38 @@ export class TutorialService {
       this.currentStepHtmlContent = this.markdownConverter.convertToHtml(
         `> Error loading content for step "${step.title}".\n\nDetails: ${error instanceof Error ? error.message : String(error)}`
       );
+    }
+  }
+
+  /**
+   * Gets the URIs of files that were open when the tutorial state was last persisted.
+   * This is used by the controller to restore tabs.
+   * @returns An array of fsPath strings or undefined if not available.
+   */
+  public getRestoredOpenTabFsPaths(): string[] | undefined {
+    if (this.activeTutorial && this.activeTutorial.lastPersistedOpenTabFsPaths) {
+        return this.activeTutorial.lastPersistedOpenTabFsPaths;
+    }
+    return undefined; 
+  }
+
+  /**
+   * Updates the persisted list of open tab file system paths for the current active tutorial and step.
+   * @param openTabFsPaths An array of fsPath strings representing the currently open tutorial files.
+   */
+  public async updatePersistedOpenTabs(openTabFsPaths: string[]): Promise<void> {
+    if (this.workspaceId && this.activeTutorial && this.activeTutorial.currentStepId) {
+      await this.activeTutorialStateRepository.saveActiveTutorial(
+        this.workspaceId,
+        this.activeTutorial.id,
+        this.activeTutorial.currentStepId,
+        openTabFsPaths
+      );
+      if (this.activeTutorial) { 
+        this.activeTutorial.lastPersistedOpenTabFsPaths = openTabFsPaths;
+      }
+    } else {
+      console.warn('TutorialService: Cannot update persisted open tabs. No active workspace, tutorial, or current step.');
     }
   }
 }

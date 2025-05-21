@@ -20,6 +20,7 @@ export interface TutorialData {
     description?: string;
     steps: Step[];
     workspaceFolder?: string;
+    lastPersistedOpenTabFsPaths?: string[];
 }
 
 /**
@@ -33,6 +34,7 @@ export class Tutorial {
     public readonly localPath?: string;
     public readonly description?: string;
     public readonly workspaceFolder?: string;
+    public lastPersistedOpenTabFsPaths?: string[];
     public currentStepId: string;
     
     constructor(data: TutorialData) {
@@ -44,5 +46,6 @@ export class Tutorial {
         this.description = data.description;
         this.workspaceFolder = data.workspaceFolder;
         this.currentStepId = data.currentStepId || data.steps[0].id;
+        this.lastPersistedOpenTabFsPaths = data.lastPersistedOpenTabFsPaths;
     }
 }

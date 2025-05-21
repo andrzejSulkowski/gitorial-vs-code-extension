@@ -1,7 +1,6 @@
 import * as vscode from 'vscode';
 import { IProgressReporter } from '../../domain/ports/IProgressReporter';
 import { IUserInteraction } from '../../domain/ports/IUserInteraction';
-import { StepProgressService } from '../../domain/services/StepProgressService';
 import { Tutorial } from '../../domain/models/Tutorial';
 import { Step } from 'src/domain/models/Step';
 import { TutorialPanelManager } from '../panels/TutorialPanelManager';
@@ -17,7 +16,6 @@ export class TutorialController {
     private readonly context: vscode.ExtensionContext,
     private readonly progressReporter: IProgressReporter,
     private readonly userInteraction: IUserInteraction,
-    private readonly stepProgressService: StepProgressService,
     private readonly fs: IFileSystem,
     private readonly tutorialService: TutorialService,
     private readonly tutorialViewService: TutorialViewService
@@ -359,12 +357,6 @@ export class TutorialController {
       const navigationSuccess = await this.tutorialService.navigateToStep(stepIndex);
 
       if (navigationSuccess) {
-        const updatedTutorial = this.tutorialService.getActiveTutorial();
-        if (updatedTutorial && updatedTutorial.currentStepId) {
-          await this.stepProgressService.setCurrentStep(updatedTutorial.id, updatedTutorial.currentStepId);
-        } else {
-          console.error("TutorialController: Failed to get updated tutorial or currentStepId after navigation.");
-        }
         this.progressReporter.reportEnd();
         await this._updateTutorialPanel();
         this.userInteraction.showInformationMessage(`Switched to step: ${targetStep.title}`);
@@ -423,12 +415,6 @@ export class TutorialController {
 
     const success = await this.tutorialService.navigateToNextStep();
     if (success) {
-      const updatedTutorial = this.tutorialService.getActiveTutorial(); //TODO: I guess we could just use the 'activeTutorial' variable here
-      if (updatedTutorial && updatedTutorial.currentStepId) {
-        await this.stepProgressService.setCurrentStep(updatedTutorial.id, updatedTutorial.currentStepId); //TODO: The manual setting of the current step could be delegated to the TutorialService
-      } else {
-        console.error("TutorialController: Failed to get updated tutorial or currentStepId after navigating to next step.");
-      }
       await this._updateTutorialPanel();
     } else {
       this.userInteraction.showInformationMessage("You are already on the last step.");
@@ -440,12 +426,6 @@ export class TutorialController {
 
     const success = await this.tutorialService.navigateToPreviousStep();
     if (success) {
-      const updatedTutorial = this.tutorialService.getActiveTutorial();
-      if (updatedTutorial && updatedTutorial.currentStepId) {
-        await this.stepProgressService.setCurrentStep(updatedTutorial.id, updatedTutorial.currentStepId);
-      } else {
-        console.error("TutorialController: Failed to get updated tutorial or currentStepId after navigating to previous step.");
-      }
       await this._updateTutorialPanel();
     } else {
       this.userInteraction.showInformationMessage("You are already on the first step.");

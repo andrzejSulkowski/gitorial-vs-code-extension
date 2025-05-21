@@ -71,6 +71,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<vscode
   }
 
   // --- Domain Services ---
+  const stepProgressService = new StepProgressService(stepStateRepository);
   const tutorialService = new TutorialService(
     tutorialRepository, 
     diffDisplayerAdapter, 
@@ -78,9 +79,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<vscode
     stepContentRepository, 
     markdownConverter, 
     activeTutorialStateRepository,
+    stepProgressService,
     workspaceId
   );
-  const stepProgressService = new StepProgressService(stepStateRepository);
+
+  // --- Tutorial UI Service ---
   const tutorialViewService = new TutorialViewService(fileSystemAdapter);
 
   // --- UI Layer Controllers/Handlers (still no direct vscode registration logic inside them) ---
@@ -88,7 +91,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<vscode
     context, // context can be passed for things like extensionUri, but avoid direct vscode API calls //TODO: refactor to not pass context
     progressReportAdapter,
     userInteractionAdapter,
-    stepProgressService,
     fileSystemAdapter,
     tutorialService,
     tutorialViewService

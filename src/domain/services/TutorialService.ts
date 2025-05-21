@@ -14,6 +14,7 @@ import { IGitOperations } from '../ports/IGitOperations';
 import { IStepContentRepository } from '../ports/IStepContentRepository';
 import { IMarkdownConverter } from '../ports/IMarkdownConverter';
 import { IActiveTutorialStateRepository } from "../repositories/IActiveTutorialStateRepository";
+import { StepProgressService } from './StepProgressService';
 
 /**
  * Options for loading a tutorial
@@ -51,6 +52,7 @@ export class TutorialService {
     private readonly stepContentRepository: IStepContentRepository,
     private readonly markdownConverter: IMarkdownConverter,
     private readonly activeTutorialStateRepository: IActiveTutorialStateRepository,
+    private readonly stepProgressService: StepProgressService,
     workspaceId?: string
   ) {
     this.eventBus = EventBus.getInstance();
@@ -207,6 +209,7 @@ export class TutorialService {
           this.activeTutorial.id,
           this.activeTutorial.currentStepId
         );
+        await this.stepProgressService.setCurrentStep(this.activeTutorial.id, this.activeTutorial.currentStepId);
       }
 
       this.eventBus.publish(EventType.STEP_CHANGED, {
@@ -237,6 +240,7 @@ export class TutorialService {
     if (currentIndex === -1 || currentIndex >= this.activeTutorial.steps.length - 1) {
       return false; // No next step or current step not found
     }
+    //TODO: Logic to jump over solution steps
     return this.navigateToStep(currentIndex + 1);
   }
   
@@ -313,6 +317,9 @@ export class TutorialService {
             try {
                 await this.gitAdapter.checkout(stepToActivate.commitHash);
                 await this.loadAndPrepareDisplayContentForStep(stepToActivate);
+                if (this.workspaceId && tutorial.currentStepId) {
+                    await this.stepProgressService.setCurrentStep(tutorial.id, tutorial.currentStepId);
+                }
             } catch (error) {
                 console.error(`TutorialService: Error during initial checkout for tutorial ${tutorial.title}:`, error);
                 this.eventBus.publish(EventType.ERROR_OCCURRED, {
@@ -336,6 +343,7 @@ export class TutorialService {
         tutorial.id,
         tutorial.currentStepId
       );
+      await this.stepProgressService.setCurrentStep(tutorial.id, tutorial.currentStepId);
     }
 
     this.eventBus.publish(EventType.TUTORIAL_LOADED, {

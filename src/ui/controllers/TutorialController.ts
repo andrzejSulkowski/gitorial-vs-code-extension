@@ -7,8 +7,6 @@ import { TutorialPanelManager } from '../panels/TutorialPanelManager';
 import { IFileSystem } from 'src/domain/ports/IFileSystem';
 import { TutorialStepViewModel, TutorialViewModel } from 'shared/types/viewmodels';
 import { TutorialService } from '../../domain/services/TutorialService'; 
-import { EventBus, EventPayload } from '../../domain/events/EventBus';
-import { EventType } from '../../domain/events/EventTypes';
 import { TutorialViewService } from '../services/TutorialViewService';
 
 export class TutorialController {
@@ -20,8 +18,6 @@ export class TutorialController {
     private readonly tutorialService: TutorialService,
     private readonly tutorialViewService: TutorialViewService
   ) {
-    EventBus.getInstance().subscribe(EventType.STEP_CHANGED, this.handleStepChangedEvent.bind(this));
-    EventBus.getInstance().subscribe(EventType.SOLUTION_TOGGLED, this.handleSolutionToggledEvent.bind(this));
   }
 
   /**
@@ -34,6 +30,7 @@ export class TutorialController {
       return;
     }
     await this.tutorialService.toggleSolution(true);
+    await this.tutorialViewService.handleSolutionToggleUI(true);
     await this._updateTutorialPanel(); 
   }
 
@@ -43,48 +40,22 @@ export class TutorialController {
       return;
     }
     await this.tutorialService.toggleSolution(false);
-    await this._updateTutorialPanel();
-  }
-
-  private async handleSolutionToggledEvent(payload: EventPayload): Promise<void> {
-    const activeTutorial = this.tutorialService.getActiveTutorial();
+    let currentStep: Step | undefined;
+    let changedFilePaths: string[] = [];
+    let tutorialLocalPath: string | undefined;
     const activeGitAdapter = this.tutorialService.getActiveGitAdapter();
 
-    if (payload.showing === true) {
-      await this.tutorialViewService.handleSolutionToggleUI(true);
-    } else {
-      let currentStep: Step | undefined;
-      let changedFilePaths: string[] = [];
-      let tutorialLocalPath: string | undefined;
-
-      if (activeTutorial && activeTutorial.currentStepId) {
-        currentStep = activeTutorial.steps.find(s => s.id === activeTutorial!.currentStepId);
-        if (currentStep && activeGitAdapter && activeTutorial.localPath) {
-          changedFilePaths = await activeGitAdapter.getChangesInCommit(currentStep.commitHash);
-          tutorialLocalPath = activeTutorial.localPath;
-        }
+    if (activeTutorial.currentStepId) {
+      currentStep = activeTutorial.steps.find(s => s.id === activeTutorial!.currentStepId);
+      if (currentStep && activeGitAdapter && activeTutorial.localPath) {
+        changedFilePaths = await activeGitAdapter.getChangesInCommit(currentStep.commitHash);
+        tutorialLocalPath = activeTutorial.localPath;
       }
-      await this.tutorialViewService.handleSolutionToggleUI(false, currentStep, changedFilePaths, tutorialLocalPath);
     }
+    await this.tutorialViewService.handleSolutionToggleUI(false, currentStep, changedFilePaths, tutorialLocalPath);
     await this._updateTutorialPanel();
   }
 
-  private async handleStepChangedEvent(payload: EventPayload): Promise<void> {
-    const activeTutorial = this.tutorialService.getActiveTutorial();
-    if (!activeTutorial || !payload.step || !payload.changedFilePaths || !activeTutorial.localPath) {
-      console.warn('TutorialController: Received STEP_CHANGED event with missing data for TutorialViewService.', payload);
-      return;
-    }
-
-    const step = payload.step as Step; 
-    const changedFilePaths = payload.changedFilePaths as string[];
-    const tutorialLocalPath = activeTutorial.localPath;
-
-    console.log(`TutorialController: Handling STEP_CHANGED event for step '${step.title}'. Delegating to TutorialViewService.`);
-    await this.tutorialViewService.updateSidePanelFiles(step, changedFilePaths, tutorialLocalPath);
-  }
-
-  //TODO: check if autoOpen actually does a difference
   public async checkWorkspaceForTutorial(autoOpen: boolean): Promise<void> {
     console.log('TutorialController: Checking workspace for existing tutorial...');
     const workspaceFolders = vscode.workspace.workspaceFolders;
@@ -186,10 +157,6 @@ export class TutorialController {
         const folderUri = vscode.Uri.file(finalClonePath);
         vscode.commands.executeCommand('vscode.openFolder', folderUri, {
         });
-        // Note: After this command, the context might change. 
-        // The current extension host might be shutting down if the window is replaced, 
-        // or a new one will activate in the new window.
-        // We probably shouldn't call openTutorialFromPath here for the *current* controller instance.
       }
     } catch (error) {
       this.progressReporter.reportEnd();
@@ -247,29 +214,22 @@ export class TutorialController {
   }
 
   public async handleExternalTutorialRequest(
-    options: { repoUrl: string; commitHash?: string } // Primarily expects repoUrl and optional commitHash
+    options: { repoUrl: string; commitHash?: string }
   ): Promise<void> {
     const { repoUrl, commitHash } = options;
     this.progressReporter.reportStart(`Processing tutorial request for ${repoUrl}...`);
     console.log(`TutorialController: Handling external request. RepoURL: ${repoUrl}, Commit: ${commitHash}`);
 
     try {
-      // Ask the user to choose between cloning or opening a local directory.
-      // We'll use showQuickPick if available, otherwise a simpler confirmation.
-      // For IUserInteraction, let's assume a generic way to present choices or use sequential confirmations.
-      // Since IUserInteraction might not have showQuickPick directly, we'll use two confirmations.
-
       const cloneConfirmation = await this.userInteraction.askConfirmation({
         message: `Gitorial from "${repoUrl}".\nWould you like to clone it?`,
         confirmActionTitle: 'Clone and Sync',
-        cancelActionTitle: 'Open Local Instead' // Or simply "Use Local"
+        cancelActionTitle: 'Open Local Instead'
       });
 
       if (cloneConfirmation) {
-        // User chose to Clone
         await this.initiateCloneTutorial(repoUrl, { targetStepId: commitHash });
       } else {
-        // User chose to Open Local (or cancelled the first dialog and implicitly wants to use local or cancel entirely)
         const openLocalConfirmation = await this.userInteraction.askConfirmation({
           message: `Open a local version of the Gitorial from "${repoUrl}"?`,
           confirmActionTitle: 'Select Local Folder and Sync',
@@ -305,13 +265,6 @@ export class TutorialController {
     }
   }
 
-  /**
-   * 
-   * @param step 
-   * @returns 
-   * 
-   * Note: this method does display the webview panel
-   */
   public async selectStep(step: Step | string): Promise<void> {
     const activeTutorial = this.tutorialService.getActiveTutorial();
     const activeGitAdapter = this.tutorialService.getActiveGitAdapter();
@@ -337,16 +290,15 @@ export class TutorialController {
       return;
     }
 
-    if (activeTutorial.currentStepId === targetStepId) {
-      console.log(`TutorialController: Step '${targetStep.title}' is already active.`);
-      await this._updateTutorialPanel();
+    if (activeTutorial.currentStepId === targetStepId && this.tutorialService.getCurrentStepHtmlContent() !== null) {
+      console.log(`TutorialController: Step '${targetStep.title}' is already active and content loaded.`);
+      await this._updateTutorialPanel(); 
       return;
     }
 
     console.log(`TutorialController: Selecting step '${targetStep.title}' (Commit: ${targetStep.commitHash})`);
     try {
       this.progressReporter.reportStart(`Switching to step '${targetStep.title}'...`);
-
       const stepIndex = activeTutorial.steps.findIndex(s => s.id === targetStepId);
       if (stepIndex === -1) {
         this.userInteraction.showErrorMessage(`Could not find index for step: ${targetStepId}`);
@@ -355,16 +307,20 @@ export class TutorialController {
       }
 
       const navigationSuccess = await this.tutorialService.navigateToStep(stepIndex);
+      this.progressReporter.reportEnd();
 
       if (navigationSuccess) {
-        this.progressReporter.reportEnd();
-        await this._updateTutorialPanel();
+        const updatedTutorial = this.tutorialService.getActiveTutorial();
+        const currentActiveStep = updatedTutorial?.steps.find(s => s.id === updatedTutorial.currentStepId);
+        if (updatedTutorial && currentActiveStep && updatedTutorial.localPath && activeGitAdapter) {
+            const changedFilePaths = await activeGitAdapter.getChangesInCommit(currentActiveStep.commitHash);
+            await this.tutorialViewService.updateSidePanelFiles(currentActiveStep, changedFilePaths, updatedTutorial.localPath);
+        }
         this.userInteraction.showInformationMessage(`Switched to step: ${targetStep.title}`);
       } else {
-        this.progressReporter.reportEnd();
         this.userInteraction.showErrorMessage(`Failed to switch to step '${targetStep.title}'.`);
-        await this._updateTutorialPanel();
       }
+      await this._updateTutorialPanel();
     } catch (error) {
       this.progressReporter.reportEnd();
       console.error(`TutorialController: Error selecting step '${targetStep.title}':`, error);
@@ -373,21 +329,12 @@ export class TutorialController {
     }
   }
 
-  /**
-   * 
-   * @param tutorial The tutorial object to activate (comes from TutorialService after loading)
-   * @param initialStepId 
-   * @returns 
-   * 
-   * Note: this method displays the webview panel
-   */
   private async activateTutorialMode(tutorial: Tutorial, initialStepId?: string): Promise<void> {
     await this.tutorialViewService.resetEditorLayout();
     //TODO: Find out what this commands does
     vscode.commands.executeCommand('setContext', 'gitorial.tutorialActive', true);
 
     let stepIdToSelect = initialStepId || tutorial.currentStepId;
-
     if (!tutorial.steps.find(s => s.id === stepIdToSelect) && tutorial.steps.length > 0) {
       stepIdToSelect = tutorial.steps[0].id;
     } else if (tutorial.steps.length === 0) {
@@ -395,7 +342,6 @@ export class TutorialController {
       await this._updateTutorialPanel();
       return;
     }
-
     await this.selectStep(stepIdToSelect);
   }
 
@@ -408,29 +354,44 @@ export class TutorialController {
     console.log('TutorialController: Active tutorial state cleared.');
   }
 
-
   public async requestNextStep(): Promise<void> {
     const activeTutorial = this.tutorialService.getActiveTutorial();
     if (!activeTutorial) return;
 
     const success = await this.tutorialService.navigateToNextStep();
     if (success) {
-      await this._updateTutorialPanel();
+        const updatedTutorial = this.tutorialService.getActiveTutorial();
+        const nextStep = updatedTutorial?.steps.find(s => s.id === updatedTutorial.currentStepId);
+        const activeGitAdapter = this.tutorialService.getActiveGitAdapter();
+        if (updatedTutorial && nextStep && updatedTutorial.localPath && activeGitAdapter) {
+            const changedFilePaths = await activeGitAdapter.getChangesInCommit(nextStep.commitHash);
+            await this.tutorialViewService.updateSidePanelFiles(nextStep, changedFilePaths, updatedTutorial.localPath);
+        }
     } else {
       this.userInteraction.showInformationMessage("You are already on the last step.");
     }
+    await this._updateTutorialPanel();
   }
+
   public async requestPreviousStep(): Promise<void> {
     const activeTutorial = this.tutorialService.getActiveTutorial();
     if (!activeTutorial) return;
 
     const success = await this.tutorialService.navigateToPreviousStep();
     if (success) {
-      await this._updateTutorialPanel();
+        const updatedTutorial = this.tutorialService.getActiveTutorial();
+        const prevStep = updatedTutorial?.steps.find(s => s.id === updatedTutorial.currentStepId);
+        const activeGitAdapter = this.tutorialService.getActiveGitAdapter();
+        if (updatedTutorial && prevStep && updatedTutorial.localPath && activeGitAdapter) {
+            const changedFilePaths = await activeGitAdapter.getChangesInCommit(prevStep.commitHash);
+            await this.tutorialViewService.updateSidePanelFiles(prevStep, changedFilePaths, updatedTutorial.localPath);
+        }
     } else {
       this.userInteraction.showInformationMessage("You are already on the first step.");
     }
+    await this._updateTutorialPanel();
   }
+
   public async requestGoToStep(stepId: string): Promise<void> {
     await this.selectStep(stepId);
   }

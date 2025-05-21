@@ -4,8 +4,6 @@
 */
 
 import { DiffModel, DiffChangeType } from '../models/DiffModel';
-import { EventBus } from '../events/EventBus';
-import { EventType } from '../events/EventTypes';
 import { IGitOperations, DomainCommit, DefaultLogFields, ListLogLine } from '../ports/IGitOperations';
 
 // Provides domain-specific Git operations relevant to tutorials. It uses the
@@ -18,8 +16,6 @@ import { IGitOperations, DomainCommit, DefaultLogFields, ListLogLine } from '../
  */
 export class GitService {
   private gitAdapter: IGitOperations;
-  private repoPath: string;
-  private eventBus: EventBus;
 
   /**
    * Create a new GitService
@@ -28,11 +24,8 @@ export class GitService {
    */
   constructor(
     gitAdapter: IGitOperations,
-    repoPath: string,
   ) {
     this.gitAdapter = gitAdapter;
-    this.repoPath = repoPath;
-    this.eventBus = EventBus.getInstance();
   }
 
 
@@ -50,21 +43,9 @@ export class GitService {
    */
   public async navigateToCommit(commitHash: string): Promise<void> {
     try {
-      // Checkout the commit
       await this.gitAdapter.checkout(commitHash);
-
-      // Emit event
-      this.eventBus.publish(EventType.GIT_CHECKOUT_COMPLETED, {
-        commitHash,
-        repoPath: this.repoPath
-      });
     } catch (error) {
       console.error(`Error navigating to commit ${commitHash}:`, error);
-      this.eventBus.publish(EventType.ERROR_OCCURRED, {
-        error,
-        message: `Failed to navigate to commit: ${error instanceof Error ? error.message : String(error)}`,
-        source: 'GitService.navigateToCommit'
-      });
       throw error;
     }
   }
@@ -105,11 +86,6 @@ export class GitService {
       });
     } catch (error) {
       console.error(`Error getting diff models:`, error);
-      this.eventBus.publish(EventType.ERROR_OCCURRED, {
-        error,
-        message: `Failed to get diff models: ${error instanceof Error ? error.message : String(error)}`,
-        source: 'GitService.getDiffModels'
-      });
       return [];
     }
   }
@@ -124,11 +100,6 @@ export class GitService {
       return await this.gitAdapter.getFileContent(commitHash, filePath);
     } catch (error) {
       console.error(`Error getting file content for ${filePath} at ${commitHash}:`, error);
-      this.eventBus.publish(EventType.ERROR_OCCURRED, {
-        error,
-        message: `Failed to get file content: ${error instanceof Error ? error.message : String(error)}`,
-        source: 'GitService.getFileContentAtCommit'
-      });
       throw error;
     }
   }
@@ -141,11 +112,6 @@ export class GitService {
       return await this.gitAdapter.getCurrentCommitHash();
     } catch (error) {
       console.error(`Error getting current commit:`, error);
-      this.eventBus.publish(EventType.ERROR_OCCURRED, {
-        error,
-        message: `Failed to get current commit: ${error instanceof Error ? error.message : String(error)}`,
-        source: 'GitService.getCurrentCommit'
-      });
       throw error;
     }
   }
@@ -170,11 +136,6 @@ export class GitService {
 
     } catch (error) {
       console.error(`Error getting commit history:`, error);
-      this.eventBus.publish(EventType.ERROR_OCCURRED, {
-        error,
-        message: `Failed to get commit history: ${error instanceof Error ? error.message : String(error)}`,
-        source: 'GitService.getCommitHistory'
-      });
       throw error;
     }
   }
@@ -188,11 +149,6 @@ export class GitService {
       return webUrl;
     } catch (error) {
       console.error(`Error getting repository URL:`, error);
-      this.eventBus.publish(EventType.ERROR_OCCURRED, {
-        error,
-        message: `Failed to get repository URL: ${error instanceof Error ? error.message : String(error)}`,
-        source: 'GitService.getRepositoryUrl'
-      });
       throw error;
     }
   }
@@ -242,12 +198,6 @@ export class GitService {
     } catch (error) {
       // Log and publish an error event, then return false
       console.error(`Error checking if repository is valid:`, error);
-      this.eventBus.publish(EventType.ERROR_OCCURRED, {
-        error,
-        message: `Failed to check if repository is valid: ${error instanceof Error ? error.message : String(error)
-          }`,
-        source: 'GitService.isValidGitorialRepository'
-      });
       return false;
     }
   }

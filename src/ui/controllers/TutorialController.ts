@@ -81,8 +81,8 @@ export class TutorialController {
             }
             console.log(`TutorialController: Found and loaded tutorial '${tutorial.title}' from workspace via TutorialService.`);
 
-            this.userInteraction.showInformationMessage(`Tutorial "${tutorial.title}" is active in this workspace.`);
             this.activateTutorialMode(tutorial);
+            this.userInteraction.showInformationMessage(`Tutorial "${tutorial.title}" is active in this workspace.`);
             if (autoOpen) {
               this.openTutorialFromPath(workspacePath);
             }

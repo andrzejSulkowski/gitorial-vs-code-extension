@@ -204,8 +204,12 @@ export class TutorialService {
     if (currentIndex === -1 || currentIndex >= this.activeTutorial.steps.length - 1) {
       return false; // No next step or current step not found
     }
-    //TODO: Logic to jump over solution steps
-    return this.navigateToStep(currentIndex + 1);
+
+    let jump = 1;
+    if(this.activeTutorial.steps[currentIndex + 1].type === "solution") {
+      jump = 2;
+    }
+    return this.navigateToStep(currentIndex + jump);
   }
 
   /**
@@ -217,7 +221,12 @@ export class TutorialService {
     if (currentIndex <= 0) {
       return false; // No previous step or current step not found
     }
-    return this.navigateToStep(currentIndex - 1);
+
+    let jump = 1;
+    if (this.activeTutorial.steps[currentIndex - 1].type === "solution"){
+      jump = 2;
+    }
+    return this.navigateToStep(currentIndex - jump);
   }
 
   /**

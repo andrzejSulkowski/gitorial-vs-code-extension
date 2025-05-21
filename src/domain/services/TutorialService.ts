@@ -12,7 +12,6 @@ import { IGitOperations } from '../ports/IGitOperations';
 import { IStepContentRepository } from '../ports/IStepContentRepository';
 import { IMarkdownConverter } from '../ports/IMarkdownConverter';
 import { IActiveTutorialStateRepository } from "../repositories/IActiveTutorialStateRepository";
-import { StepProgressService } from './StepProgressService';
 
 /**
  * Options for loading a tutorial
@@ -49,7 +48,6 @@ export class TutorialService {
     private readonly stepContentRepository: IStepContentRepository,
     private readonly markdownConverter: IMarkdownConverter,
     private readonly activeTutorialStateRepository: IActiveTutorialStateRepository,
-    private readonly stepProgressService: StepProgressService,
     workspaceId?: string
   ) {
     this.workspaceId = workspaceId;
@@ -167,7 +165,7 @@ export class TutorialService {
       if (this.currentStepHtmlContent === null) {
         await this.loadAndPrepareDisplayContentForStep(targetStep);
       }
-      if (this.isShowingSolution) { //Check if this is correct when navigating to the same step
+      if (this.isShowingSolution) {
         await this.showStepSolution();
       }
       return true;
@@ -184,7 +182,6 @@ export class TutorialService {
           this.activeTutorial.id,
           this.activeTutorial.currentStepId
         );
-        await this.stepProgressService.setCurrentStep(this.activeTutorial.id, this.activeTutorial.currentStepId);
       }
 
       if (this.isShowingSolution) {
@@ -279,9 +276,6 @@ export class TutorialService {
             try {
                 await this.gitAdapter.checkout(stepToActivate.commitHash);
                 await this.loadAndPrepareDisplayContentForStep(stepToActivate);
-                if (this.workspaceId && tutorial.currentStepId) {
-                    await this.stepProgressService.setCurrentStep(tutorial.id, tutorial.currentStepId);
-                }
                 if (this.isShowingSolution) {
                     await this.showStepSolution();
                 }
@@ -301,7 +295,6 @@ export class TutorialService {
         tutorial.id,
         tutorial.currentStepId
       );
-      await this.stepProgressService.setCurrentStep(tutorial.id, tutorial.currentStepId);
     }
   }
   

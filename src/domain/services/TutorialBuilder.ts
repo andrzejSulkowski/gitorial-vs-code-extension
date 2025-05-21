@@ -8,8 +8,10 @@ import * as crypto from 'crypto';
 import { Tutorial, TutorialData } from '../models/Tutorial';
 import { GitService } from './GitService';
 import { TutorialId } from 'shared/types/domain-primitives/TutorialId';
-import { StepProgressService } from './StepProgressService';
 import { DomainCommit } from '../ports/IGitOperations';
+import { Step, StepData } from '../models/Step';
+import { StepState } from 'shared/types/domain-primitives/StepState';
+import { StepType } from '@shared/types/domain-primitives/StepType';
 
 /**
  * Constructs Tutorial domain objects from raw data (e.g., repository information,
@@ -38,7 +40,7 @@ export class TutorialBuilder {
         console.log(`No commits found in repository: ${repoPath}`);
         return null;
       }
-      const steps = StepProgressService.extractStepsFromCommits(domainCommits, id);
+      const steps = TutorialBuilder.extractStepsFromCommits(domainCommits, id);
       const tutorialData: TutorialData = {
         id,
         title,
@@ -135,5 +137,56 @@ export class TutorialBuilder {
     
     //FIX: This is currently a wrong deep link format
     return `gitorial://sync?platform=${repoDetails.platform}&owner=${repoDetails.owner}&repo=${repoDetails.repo}&commitHash=${step.commitHash}`;
+  }
+
+  /**
+   * Converts raw commit data (from IGitOperations) into Step domain models.
+   */
+  public static extractStepsFromCommits(commits: DomainCommit[], tutorialId: TutorialId): Step[] {
+    const chronologicalCommits = [...commits].reverse(); 
+    const steps: Step[] = [];
+    const validTypes: ReadonlyArray<StepType> = ["section", "template", "solution", "action"];
+
+    let relevantCommits = chronologicalCommits;
+    if (relevantCommits.length > 0 && relevantCommits[0].message.toLowerCase().startsWith("readme:")) {
+      relevantCommits = relevantCommits.slice(1);
+    }
+
+    relevantCommits.forEach((commit, index) => {
+      const message = commit.message.trim();
+      const colonIndex = message.indexOf(":");
+      let stepType: StepType | undefined = undefined; // Initialize to undefined
+      let stepTitle = message;
+
+      if (colonIndex > 0) {
+        const parsedType = message.substring(0, colonIndex).toLowerCase();
+        if (validTypes.includes(parsedType as StepType)) {
+          stepType = parsedType as StepType;
+          stepTitle = message.substring(colonIndex + 1).trim();
+        } else {
+          console.warn(`TutorialBuilder: Invalid step type "${parsedType}" in commit message: "${message}". Defaulting to type 'section'.`);
+          stepTitle = message.substring(colonIndex + 1).trim() || message; 
+          stepType = 'section'; // Default to section if parsing fails but colon was present
+        }
+      } else {
+        // If no colon, it could be a simple message; decide on a default type or throw.
+        // For now, let's assume it's an error as per original logic, but this could be relaxed.
+        // Or, default to a type like 'section' and use the whole message as title.
+        // throw new Error(`TutorialBuilder: Commit message "${message}" missing type prefix.`);
+        console.warn(`TutorialBuilder: Commit message "${message}" missing type prefix. Defaulting to type 'section'.`);
+        stepType = 'section'; 
+        stepTitle = message; // Use full message as title
+      }
+      
+      const stepData: StepData = {
+        id: `${tutorialId}-step-${index + 1}-${commit.hash.substring(0, 7)}`,
+        title: stepTitle || 'Unnamed Step',
+        commitHash: commit.hash,
+        type: stepType!, 
+        description: commit.message.substring(commit.message.indexOf('\n') + 1).trim() || undefined,
+      };
+      steps.push(new Step(stepData, StepState.PENDING));
+    });
+    return steps;
   }
 }

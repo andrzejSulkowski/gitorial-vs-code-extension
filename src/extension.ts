@@ -7,8 +7,6 @@ import { TutorialUriHandler } from "./ui/handlers/UriHandler";
 import { TutorialController } from "./ui/controllers/TutorialController";
 import { CommandHandler } from "./ui/handlers/CommandHandler";
 import { TutorialRepositoryImpl } from "./domain/repositories/TutorialRepositoryImpl";
-import { StepProgressService } from "./domain/services/StepProgressService";
-import { MementoStepStateRepository } from "./infrastructure/repositories/MementoStepStateRepository";
 import { GlobalState } from "./infrastructure/state/GlobalState";
 import { IStateStorage } from "./domain/ports/IStateStorage";
 import { createUserInteractionAdapter } from "./infrastructure/adapters/VSCodeUserInteractionAdapter";
@@ -45,6 +43,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<vscode
   const markdownConverter = createMarkdownConverterAdapter();
 
   // --- State ---
+  // TODO: GlobalState will be used to restore sessions (for example if user opens project in a new window)
   const globalState = new GlobalState(globalStateMementoAdapter); // GlobalState uses the global memento adapter
 
   // --- Factories ---
@@ -59,7 +58,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<vscode
     userInteractionAdapter
   );
   const stepContentRepository = new StepContentRepository(fileSystemAdapter);
-  const stepStateRepository = new MementoStepStateRepository(globalState); // Uses globalState (MementoAdapter with global Memento)
   const activeTutorialStateRepository = new MementoActiveTutorialStateRepository(workspaceStateMementoAdapter); // Use workspace-specific MementoAdapter
 
   // --- Determine Workspace ID ---
@@ -71,7 +69,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<vscode
   }
 
   // --- Domain Services ---
-  const stepProgressService = new StepProgressService(stepStateRepository);
   const tutorialService = new TutorialService(
     tutorialRepository, 
     diffDisplayerAdapter, 
@@ -79,16 +76,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<vscode
     stepContentRepository, 
     markdownConverter, 
     activeTutorialStateRepository,
-    stepProgressService,
     workspaceId
   );
-
-  // --- Tutorial UI Service ---
   const tutorialViewService = new TutorialViewService(fileSystemAdapter);
 
   // --- UI Layer Controllers/Handlers (still no direct vscode registration logic inside them) ---
   const tutorialController = new TutorialController(
-    context, // context can be passed for things like extensionUri, but avoid direct vscode API calls //TODO: refactor to not pass context
+    context, 
     progressReportAdapter,
     userInteractionAdapter,
     fileSystemAdapter,

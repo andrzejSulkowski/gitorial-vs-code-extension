@@ -6,7 +6,7 @@ import { Step } from 'src/domain/models/Step';
 import { TutorialPanelManager } from '../panels/TutorialPanelManager';
 import { IFileSystem } from 'src/domain/ports/IFileSystem';
 import { TutorialStepViewModel, TutorialViewModel } from 'shared/types/viewmodels';
-import { TutorialService } from '../../domain/services/TutorialService'; 
+import { TutorialService } from '../../domain/services/TutorialService';
 import { TutorialViewService } from '../services/TutorialViewService';
 import { AutoOpenState } from 'src/infrastructure/state/AutoOpenState';
 
@@ -34,7 +34,7 @@ export class TutorialController {
     private readonly tutorialService: TutorialService,
     private readonly tutorialViewService: TutorialViewService,
     private readonly autoOpenState: AutoOpenState
-  ) {}
+  ) { }
 
   /**
    * Handles the user request to show the solution for the current step.
@@ -48,7 +48,7 @@ export class TutorialController {
     }
     await this.tutorialService.toggleSolution(true);
     await this.tutorialViewService.handleSolutionToggleUI(true);
-    await this._updateTutorialPanel(); 
+    await this._updateTutorialPanel();
   }
 
   /**
@@ -101,7 +101,7 @@ export class TutorialController {
           if (openTutorialChoice) {
             console.log(`TutorialController: Tutorial found in workspace. Proceeding to open from path: ${workspacePath}`);
             // Delegate to openTutorialFromPath for actual loading and activation
-            await this.openTutorialFromPath(workspacePath, { isNewClone: autoOpen }); 
+            await this.openTutorialFromPath(workspacePath, { isNewClone: autoOpen });
           } else {
             console.log('TutorialController: User chose not to open the tutorial found in the workspace.');
           }
@@ -123,9 +123,9 @@ export class TutorialController {
    * Handles potential overwriting of existing directories and manages progress reporting.
    * After successful cloning, it may trigger opening the tutorial in a new VS Code window.
    * @param initialRepoUrl Optional Git URL to start with, avoiding user prompt.
-   * @param options Optional parameters, e.g., a targetStepId to sync to after cloning.
+   * @param options Optional parameters, e.g., a commitHash to sync to after cloning.
    */
-  public async initiateCloneTutorial(initialRepoUrl?: string, options?: { targetStepId?: string }): Promise<void> {
+  public async initiateCloneTutorial(initialRepoUrl?: string, options?: { commitHash?: string }): Promise<void> {
     const repoUrl = initialRepoUrl || await this.userInteraction.showInputBox({
       prompt: 'Enter the Git URL of the tutorial repository to clone',
       placeHolder: 'https://github.com/user/gitorial-tutorial.git',
@@ -152,7 +152,7 @@ export class TutorialController {
 
     try {
       this.progressReporter.reportStart(`Cloning ${repoUrl}...`);
-      const tutorial = await this.tutorialService.cloneAndLoadTutorial(repoUrl, finalClonePath, { initialStepId:  options?.targetStepId });
+      const tutorial = await this.tutorialService.cloneAndLoadTutorial(repoUrl, finalClonePath, { initialStepCommitHash: options?.commitHash });
       this.progressReporter.reportEnd();
 
       if (!tutorial) {
@@ -187,11 +187,11 @@ export class TutorialController {
     });
 
     if (openNowChoice) {
-      await this.autoOpenState.set({tutorialId: tutorial.id, timestamp: Date.now()});
+      await this.autoOpenState.set({ tutorialId: tutorial.id, timestamp: Date.now() });
       const folderUri = vscode.Uri.file(clonedPath);
       // This command opens the folder in the current window or a new one depending on user settings / current state.
       // For auto-open to work reliably if it opens in a new window, state is saved via autoOpenState.
-      vscode.commands.executeCommand('vscode.openFolder', folderUri, {}); 
+      vscode.commands.executeCommand('vscode.openFolder', folderUri, {});
     }
   }
 
@@ -221,17 +221,15 @@ export class TutorialController {
    * @param options Optional parameters, e.g., initialStepId to activate or if it's a new clone.
    * TODO: Check if 'isNewClone' is of any help here.
    */
-  public async openTutorialFromPath(folderPath: string, options?: { initialStepId?: string, isNewClone?: boolean }): Promise<void> {
+  public async openTutorialFromPath(folderPath: string, options?: { initialStepCommitHash?: string, isNewClone?: boolean }): Promise<void> {
     try {
-      this.progressReporter.reportStart('Loading tutorial...');
       const tutorial = await this.tutorialService.loadTutorialFromPath(folderPath, {
-        initialStepId: options?.initialStepId,
+        initialStepCommitHash: options?.initialStepCommitHash,
       });
-      this.progressReporter.reportEnd();
 
       if (tutorial) {
         // isNewClone from options can be passed along if _processLoadedTutorial needs it
-        await this._processLoadedTutorial(tutorial, options?.initialStepId);
+        await this._processLoadedTutorial(tutorial, options?.initialStepCommitHash);
       } else {
         this.userInteraction.showErrorMessage(`Could not load Gitorial from: ${folderPath}`);
         this.clearActiveTutorialState();
@@ -250,7 +248,7 @@ export class TutorialController {
    * @param tutorial The loaded Tutorial object.
    * @param initialStepId Optional ID of the step to activate initially.
    */
-  private async _processLoadedTutorial(tutorial: Tutorial, initialStepId?: string): Promise<void> {
+  private async _processLoadedTutorial(tutorial: Tutorial, initialStepCommitHash?: string): Promise<void> {
     const activeGitAdapter = this.tutorialService.getActiveGitAdapter();
     if (!activeGitAdapter) {
       console.error("TutorialController: GitAdapter is null after loading tutorial from service.");
@@ -261,9 +259,9 @@ export class TutorialController {
 
     console.log(`TutorialController: Successfully opened/loaded tutorial '${tutorial.title}'.`);
     this.userInteraction.showInformationMessage(`Tutorial "${tutorial.title}" is now active.`);
-    
+
     // Activate tutorial mode, which includes selecting the initial step
-    await this.activateTutorialMode(tutorial, initialStepId);
+    await this.activateTutorialMode(tutorial, initialStepCommitHash);
 
     // After activation and initial step selection, attempt to restore previously open tabs
     const pathsToRestore = this.tutorialService.getRestoredOpenTabFsPaths();
@@ -272,14 +270,14 @@ export class TutorialController {
       const urisToRestore = pathsToRestore.map(fsPath => vscode.Uri.file(fsPath));
       await this.tutorialViewService.openAndFocusTabs(urisToRestore);
     }
-    
+
     // Regardless of restoration, immediately save the current state of open tabs for this tutorial
     // This ensures that if activateTutorialMode or openAndFocusTabs changed the open tab state,
     // or if no tabs were restored, the current reality is persisted.
     if (tutorial.localPath) {
-        const currentOpenTabs = this.tutorialViewService.getTutorialOpenTabFsPaths(tutorial.localPath);
-        await this.tutorialService.updatePersistedOpenTabs(currentOpenTabs);
-        console.log('TutorialController: Persisted current open tabs after tutorial load/activation:', currentOpenTabs);
+      const currentOpenTabs = this.tutorialViewService.getTutorialOpenTabFsPaths(tutorial.localPath);
+      await this.tutorialService.updatePersistedOpenTabs(currentOpenTabs);
+      console.log('TutorialController: Persisted current open tabs after tutorial load/activation:', currentOpenTabs);
     }
     // Panel update was already part of activateTutorialMode (via selectStep -> _updateTutorialPanel)
   }
@@ -293,18 +291,33 @@ export class TutorialController {
     options: { repoUrl: string; commitHash?: string }
   ): Promise<void> {
     const { repoUrl, commitHash } = options;
-    this.progressReporter.reportStart(`Processing tutorial request for ${repoUrl}...`);
     console.log(`TutorialController: Handling external request. RepoURL: ${repoUrl}, Commit: ${commitHash}`);
 
     try {
-      const cloneConfirmation = await this.userInteraction.askConfirmation({
+      // Auto Sync if the tutorial is already open in the current vs code instance
+      // Note: to do so we need to somehow derive the id of the tutorial... I guess the easiest way would be through:
+      // id: {provider}:{user}:{tutorial-name}
+      let isTutorialOpen = false;
+      const workspaceFolders = vscode.workspace.workspaceFolders;
+      if (workspaceFolders && workspaceFolders.length > 0) {
+        const workspacePath = workspaceFolders[0].uri.fsPath;
+        const isTutorial = await this.tutorialService.isTutorialInPath(workspacePath);
+        if (isTutorial) {
+          const tutorial = await this.tutorialService.loadTutorialFromPath(workspacePath)
+          if (tutorial?.repoUrl === options.repoUrl) {
+            isTutorialOpen = true;
+          }
+        }
+      }
+
+      const cloneConfirmation = isTutorialOpen ? true : await this.userInteraction.askConfirmation({
         message: `Gitorial from "${repoUrl}".\nWould you like to clone it?`,
         confirmActionTitle: 'Clone and Sync',
         cancelActionTitle: 'Open Local Instead'
       });
 
       if (cloneConfirmation) {
-        await this.initiateCloneTutorial(repoUrl, { targetStepId: commitHash });
+        await this.initiateCloneTutorial(repoUrl, { commitHash });
       } else {
         await this._handleOpenLocalForExternalRequest(repoUrl, commitHash);
       }
@@ -312,8 +325,6 @@ export class TutorialController {
       console.error(`TutorialController: Error handling external tutorial request for ${repoUrl}:`, error);
       this.userInteraction.showErrorMessage(`Failed to process tutorial request: ${error instanceof Error ? error.message : String(error)}`);
       this.clearActiveTutorialState();
-    } finally {
-      this.progressReporter.reportEnd();
     }
   }
 
@@ -324,30 +335,21 @@ export class TutorialController {
    * @param commitHash Optional commit hash (step ID) to sync to after opening.
    */
   private async _handleOpenLocalForExternalRequest(repoUrl: string, commitHash?: string): Promise<void> {
-    const openLocalConfirmation = await this.userInteraction.askConfirmation({
-      message: `Open a local version of the Gitorial from "${repoUrl}"?`,
-      confirmActionTitle: 'Select Local Folder and Sync',
-      cancelActionTitle: 'Cancel'
+
+    const dirAbsPathResult = await this.userInteraction.showOpenDialog({
+      canSelectFolders: true,
+      canSelectFiles: false,
+      canSelectMany: false,
+      openLabel: 'Select Local Tutorial Folder to Sync',
+      title: 'Open Local Gitorial for Syncing'
     });
 
-    if (openLocalConfirmation) {
-      const dirAbsPathResult = await this.userInteraction.showOpenDialog({
-        canSelectFolders: true,
-        canSelectFiles: false,
-        canSelectMany: false,
-        openLabel: 'Select Local Tutorial Folder to Sync',
-        title: 'Open Local Gitorial for Syncing'
-      });
-
-      if (dirAbsPathResult && dirAbsPathResult.length > 0) {
-        const localPath = dirAbsPathResult;
-        console.log(`TutorialController: User selected local path "${localPath}" for repo "${repoUrl}". Attempting to open and sync.`);
-        await this.openTutorialFromPath(localPath, { initialStepId: commitHash });
-      } else {
-        this.userInteraction.showInformationMessage('Open local operation cancelled: No folder selected.');
-      }
+    if (dirAbsPathResult && dirAbsPathResult.length > 0) {
+      const localPath = dirAbsPathResult;
+      console.log(`TutorialController: User selected local path "${localPath}" for repo "${repoUrl}". Attempting to open and sync.`);
+      await this.openTutorialFromPath(localPath, { initialStepCommitHash: commitHash });
     } else {
-      this.userInteraction.showInformationMessage('Tutorial request cancelled.');
+      this.userInteraction.showInformationMessage('Open local operation cancelled: No folder selected.');
     }
   }
 
@@ -383,7 +385,7 @@ export class TutorialController {
 
     if (activeTutorial.currentStepId === targetStepId && this.tutorialService.getCurrentStepHtmlContent() !== null) {
       console.log(`TutorialController: Step '${targetStep.title}' is already active and content loaded.`);
-      await this._updateTutorialPanel(); 
+      await this._updateTutorialPanel();
       return;
     }
 
@@ -403,15 +405,15 @@ export class TutorialController {
       if (navigationSuccess) {
         const updatedTutorial = this.tutorialService.getActiveTutorial();
         const currentActiveStep = updatedTutorial?.steps.find(s => s.id === updatedTutorial.currentStepId);
-        
+
         if (updatedTutorial && currentActiveStep && updatedTutorial.localPath && activeGitAdapter) {
-            const changedFilePaths = await activeGitAdapter.getChangesInCommit(currentActiveStep.commitHash);
-            await this.tutorialViewService.updateSidePanelFiles(currentActiveStep, changedFilePaths, updatedTutorial.localPath);
-            
-            // After step navigation and side panel update, persist open tabs
-            const openTabs = this.tutorialViewService.getTutorialOpenTabFsPaths(updatedTutorial.localPath);
-            await this.tutorialService.updatePersistedOpenTabs(openTabs);
-            console.log('TutorialController: Persisted open tabs after step selection:', openTabs);
+          const changedFilePaths = await activeGitAdapter.getChangesInCommit(currentActiveStep.commitHash);
+          await this.tutorialViewService.updateSidePanelFiles(currentActiveStep, changedFilePaths, updatedTutorial.localPath);
+
+          // After step navigation and side panel update, persist open tabs
+          const openTabs = this.tutorialViewService.getTutorialOpenTabFsPaths(updatedTutorial.localPath);
+          await this.tutorialService.updatePersistedOpenTabs(openTabs);
+          console.log('TutorialController: Persisted open tabs after step selection:', openTabs);
         }
         this.userInteraction.showInformationMessage(`Switched to step: ${targetStep.title}`);
       } else {
@@ -433,14 +435,15 @@ export class TutorialController {
    * @param tutorial The Tutorial object that has been loaded.
    * @param initialStepId Optional ID of the step to make active initially. If not provided, uses the tutorial's current step or the first step.
    */
-  private async activateTutorialMode(tutorial: Tutorial, initialStepId?: string): Promise<void> {
+  private async activateTutorialMode(tutorial: Tutorial, stepCommitHash?: string): Promise<void> {
     await this.tutorialViewService.resetEditorLayout();
     // Set a context flag that can be used for conditional UI elements (e.g., in package.json for views)
     vscode.commands.executeCommand('setContext', 'gitorial.tutorialActive', true);
 
-    let stepIdToSelect = initialStepId || tutorial.currentStepId;
-    if (!tutorial.steps.find(s => s.id === stepIdToSelect) && tutorial.steps.length > 0) {
-      stepIdToSelect = tutorial.steps[0].id;
+
+    let stepIdToSelect = stepCommitHash || tutorial.currentStepId;
+    if (!tutorial.steps.find(s => s.commitHash === stepIdToSelect) && tutorial.steps.length > 0) {
+      stepIdToSelect = tutorial.steps[0].commitHash;
     } else if (tutorial.steps.length === 0) {
       console.warn("TutorialController: activateTutorialMode called for a tutorial with no steps.");
       await this._updateTutorialPanel();
@@ -472,18 +475,18 @@ export class TutorialController {
 
     const success = await this.tutorialService.navigateToNextStep();
     if (success) {
-        const updatedTutorial = this.tutorialService.getActiveTutorial();
-        const nextStep = updatedTutorial?.steps.find(s => s.id === updatedTutorial.currentStepId);
-        const activeGitAdapter = this.tutorialService.getActiveGitAdapter();
-        if (updatedTutorial && nextStep && updatedTutorial.localPath && activeGitAdapter) {
-            const changedFilePaths = await activeGitAdapter.getChangesInCommit(nextStep.commitHash);
-            await this.tutorialViewService.updateSidePanelFiles(nextStep, changedFilePaths, updatedTutorial.localPath);
+      const updatedTutorial = this.tutorialService.getActiveTutorial();
+      const nextStep = updatedTutorial?.steps.find(s => s.id === updatedTutorial.currentStepId);
+      const activeGitAdapter = this.tutorialService.getActiveGitAdapter();
+      if (updatedTutorial && nextStep && updatedTutorial.localPath && activeGitAdapter) {
+        const changedFilePaths = await activeGitAdapter.getChangesInCommit(nextStep.commitHash);
+        await this.tutorialViewService.updateSidePanelFiles(nextStep, changedFilePaths, updatedTutorial.localPath);
 
-            // After step navigation and side panel update, persist open tabs
-            const openTabs = this.tutorialViewService.getTutorialOpenTabFsPaths(updatedTutorial.localPath);
-            await this.tutorialService.updatePersistedOpenTabs(openTabs);
-            console.log('TutorialController: Persisted open tabs after next step:', openTabs);
-        }
+        // After step navigation and side panel update, persist open tabs
+        const openTabs = this.tutorialViewService.getTutorialOpenTabFsPaths(updatedTutorial.localPath);
+        await this.tutorialService.updatePersistedOpenTabs(openTabs);
+        console.log('TutorialController: Persisted open tabs after next step:', openTabs);
+      }
     } else {
       this.userInteraction.showInformationMessage("You are already on the last step.");
     }
@@ -500,18 +503,18 @@ export class TutorialController {
 
     const success = await this.tutorialService.navigateToPreviousStep();
     if (success) {
-        const updatedTutorial = this.tutorialService.getActiveTutorial();
-        const prevStep = updatedTutorial?.steps.find(s => s.id === updatedTutorial.currentStepId);
-        const activeGitAdapter = this.tutorialService.getActiveGitAdapter();
-        if (updatedTutorial && prevStep && updatedTutorial.localPath && activeGitAdapter) {
-            const changedFilePaths = await activeGitAdapter.getChangesInCommit(prevStep.commitHash);
-            await this.tutorialViewService.updateSidePanelFiles(prevStep, changedFilePaths, updatedTutorial.localPath);
-            
-            // After step navigation and side panel update, persist open tabs
-            const openTabs = this.tutorialViewService.getTutorialOpenTabFsPaths(updatedTutorial.localPath);
-            await this.tutorialService.updatePersistedOpenTabs(openTabs);
-            console.log('TutorialController: Persisted open tabs after previous step:', openTabs);
-        }
+      const updatedTutorial = this.tutorialService.getActiveTutorial();
+      const prevStep = updatedTutorial?.steps.find(s => s.id === updatedTutorial.currentStepId);
+      const activeGitAdapter = this.tutorialService.getActiveGitAdapter();
+      if (updatedTutorial && prevStep && updatedTutorial.localPath && activeGitAdapter) {
+        const changedFilePaths = await activeGitAdapter.getChangesInCommit(prevStep.commitHash);
+        await this.tutorialViewService.updateSidePanelFiles(prevStep, changedFilePaths, updatedTutorial.localPath);
+
+        // After step navigation and side panel update, persist open tabs
+        const openTabs = this.tutorialViewService.getTutorialOpenTabFsPaths(updatedTutorial.localPath);
+        await this.tutorialService.updatePersistedOpenTabs(openTabs);
+        console.log('TutorialController: Persisted open tabs after previous step:', openTabs);
+      }
     } else {
       this.userInteraction.showInformationMessage("You are already on the first step.");
     }

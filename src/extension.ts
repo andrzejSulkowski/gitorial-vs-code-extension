@@ -197,7 +197,7 @@ async function restoreOrCheckWorkspace(
             const tutorialToRestore = await tutorialRepository.findById(activeState.tutorialId);
             if (tutorialToRestore && tutorialToRestore.localPath) {
                 console.log(`Gitorial: Restoring session for tutorial at ${tutorialToRestore.localPath}, step ${activeState.currentStepId}`);
-                await tutorialController.openTutorialFromPath(tutorialToRestore.localPath, { initialStepId: activeState.currentStepId });
+                await tutorialController.openTutorialFromPath(tutorialToRestore.localPath);
             } else {
                 console.warn(`Gitorial: Could not find local path for stored active tutorial ID ${activeState.tutorialId}. Clearing state.`);
                 await activeTutorialStateRepository.clearActiveTutorial(workspaceId);

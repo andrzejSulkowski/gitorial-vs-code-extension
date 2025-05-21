@@ -257,14 +257,6 @@ export interface IGitOperations {
    * @returns An object containing remotes and branch summary.
    */
   getRepoInfo(): Promise<{
-    /**
-     * A normalized HTTP(S) URL to the repository's home page.
-     *
-     * Examples:
-     * - "https://github.com/owner/repo"
-     * - "https://gitlab.com/group/project"
-     */
-    webUrl: string;
     remotes: RemoteWithRefs[]; 
     branches: BranchSummary
   }>;

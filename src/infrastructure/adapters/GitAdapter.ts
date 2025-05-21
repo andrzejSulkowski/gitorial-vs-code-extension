@@ -241,12 +241,12 @@ export class GitAdapter implements IGitOperations {
   /**
    * Get repository information
    */
-  public async getRepoInfo(): Promise<{ webUrl: string; remotes: RemoteWithRefs[], branches: BranchSummary }> {
+  public async getRepoInfo(): Promise<{ remotes: RemoteWithRefs[], branches: BranchSummary }> {
     const [remotes, branches] = await Promise.all([
       this.git.getRemotes(true),
       this.git.branch()
     ]);
-    return { webUrl: '', remotes, branches };
+    return { remotes, branches };
   }
   
   /**
@@ -274,8 +274,8 @@ export class GitAdapter implements IGitOperations {
     return path.basename(this.repoPath);
   }
 
-  async getCommits(branchOrHash?: string): Promise<Array<DefaultLogFields & ListLogLine>> {
-    const log = await this.git.log(branchOrHash ? [branchOrHash] : []);
+  async getCommits(branch?: string): Promise<Array<DefaultLogFields & ListLogLine>> {
+    const log = await this.git.log(branch ? [branch] : []);
     return log.all as Array<DefaultLogFields & ListLogLine>; // Type assertion, ensure compatibility
   }
 

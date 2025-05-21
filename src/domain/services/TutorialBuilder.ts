@@ -31,6 +31,7 @@ export class TutorialBuilder {
     gitService: GitService
   ): Promise<Tutorial | null> {
     try {
+      //TODO: this gets the repo name not the url
       const repoUrl = await gitService.getRepoName();
       const id = this.generateTutorialId(repoUrl);
       const title = path.basename(repoPath);
@@ -164,9 +165,7 @@ export class TutorialBuilder {
           stepType = parsedType as StepType;
           stepTitle = message.substring(colonIndex + 1).trim();
         } else {
-          console.warn(`TutorialBuilder: Invalid step type "${parsedType}" in commit message: "${message}". Defaulting to type 'section'.`);
-          stepTitle = message.substring(colonIndex + 1).trim() || message; 
-          stepType = 'section'; // Default to section if parsing fails but colon was present
+          throw new Error(`TutorialBuilder: Invalid step type "${parsedType}" in commit message: "${message}".`);
         }
       } else {
         // If no colon, it could be a simple message; decide on a default type or throw.

@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { TutorialController } from '../controllers/TutorialController';
+import { TutorialUriHandler } from './UriHandler';
 
 /**
  * Handles VS Code commands related to Gitorial tutorials.
@@ -53,10 +54,18 @@ export class CommandHandler {
       })
     );
 
-    // Add other command registrations here, e.g.:
-    // vscode.commands.registerCommand('gitorial.nextStep', () => this.tutorialController.requestNextStep());
-    // vscode.commands.registerCommand('gitorial.previousStep', () => this.tutorialController.requestPreviousStep());
+    context.subscriptions.push(
+      vscode.commands.registerCommand('gitorial.debug', () => {
+        tempTestExternalUri(this.tutorialController);
+      })
+    );
 
     console.log('Gitorial commands registered.');
   }
 } 
+
+async function tempTestExternalUri(controller: TutorialController) {
+  const uri = vscode.Uri.parse("cursor://AndrzejSulkowski.gitorial/sync?platform=github&creator=shawntabrizi&repo=rust-state-machine&commitHash=b74e58d9b3165a2e18f11f0fead411a754386c75");
+  const uriHandler = new TutorialUriHandler(controller);
+  await uriHandler.handleUri(uri);
+}

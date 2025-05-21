@@ -18,9 +18,9 @@ import { IActiveTutorialStateRepository, StoredTutorialState } from "../reposito
  */
 export interface LoadTutorialOptions {
   /**
-   * Initial step index to load
+   * Initial commit hash to load
    */
-  initialStepId?: string;
+  initialStepCommitHash?: string;
 
   /**
    * Whether to show solution immediately
@@ -113,7 +113,8 @@ export class TutorialService {
    * Check if a tutorial exists in a given local path
    */
   public async isTutorialInPath(localPath: string): Promise<boolean> {
-    return this.repository.findByPath(localPath) !== null;
+    const tutorial = await this.repository.findByPath(localPath);
+    return tutorial !== null;
   }
 
   /**
@@ -288,10 +289,9 @@ export class TutorialService {
     this.isShowingSolution = options.showSolution || false;
 
     //TODO: This looks pretty much like navigation here...
-    let targetStepId = options.initialStepId;
     let targetStep;
-    if(options.initialStepId){
-      targetStep = tutorial.steps.find(s => s.id === options.initialStepId);
+    if(options.initialStepCommitHash){
+      targetStep = tutorial.steps.find(s => s.commitHash === options.initialStepCommitHash);
     }else{
       targetStep = tutorial.steps.find(s => s.id === tutorial.currentStepId);
     }

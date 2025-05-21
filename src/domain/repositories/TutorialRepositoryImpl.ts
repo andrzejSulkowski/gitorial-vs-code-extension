@@ -59,6 +59,10 @@ export class TutorialRepositoryImpl implements ITutorialRepository {
     try {
       const gitAdapter = this.gitAdapterFactory(localPath);
       const gitService = new GitService(gitAdapter);
+      const isValid = await gitService.isValidGitorialRepository();
+      if(!isValid){
+        return null;
+      }
       const tutorial = await TutorialBuilder.buildFromLocalPath(localPath, gitService);
       if (tutorial) {
         // Save the mapping from tutorial.id to localPath

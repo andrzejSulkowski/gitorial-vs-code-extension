@@ -65,8 +65,8 @@
         "title": "Gitorial: Open Tutorial"
       },
       {
-        "command": "gitorial.tempTestExternalUri",
-        "title": "Gitorial: Temp Test External URI"
+        "command": "gitorial.debug",
+        "title": "Gitorial: Temp Debugging"
       }
     ],
     "uriHandler": [

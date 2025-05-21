@@ -121,7 +121,7 @@ export class GitService {
    */
   public async getCommitHistory(): Promise<DomainCommit[]> {
     try {
-      const rawCommits: Array<DefaultLogFields & ListLogLine> = await this.gitAdapter.getCommits();
+      const rawCommits: Array<DefaultLogFields & ListLogLine> = await this.gitAdapter.getCommits("gitorial");
       
       const domainCommits: DomainCommit[] = rawCommits.map(commit => {
         return {
@@ -140,18 +140,6 @@ export class GitService {
     }
   }
 
-  /**
-   * Get the repository URL
-   */
-  public async getRepositoryUrl(): Promise<string> {
-    try {
-      const { webUrl } = await this.gitAdapter.getRepoInfo();
-      return webUrl;
-    } catch (error) {
-      console.error(`Error getting repository URL:`, error);
-      throw error;
-    }
-  }
 
   /**
    * Determines whether the given repository contains a "gitorial" branch
@@ -164,40 +152,41 @@ export class GitService {
    */
   public async isValidGitorialRepository(): Promise<boolean> {
     try {
-      const repoUrl = await this.getRepositoryUrl();
-      // Ask Git to list all remote heads in the form:
-      //   COMMIT_SHA<TAB>refs/heads/BRANCH_NAME
-      //   …
-      // We expect a string where each line is one branch.
-      const remoteInfo = await this.gitAdapter.listRemote(['--heads', repoUrl]);
-      if (typeof remoteInfo !== 'string') {
-        return false;
+      const { remotes, branches } = await this.gitAdapter.getRepoInfo();
+
+      // Check local branches first
+      for (const localBranch of branches.all) {
+        if (this._isGitorialBranchNamePattern(localBranch)) {
+          return true;
+        }
       }
 
-      // Split into lines, then extract the branch reference from each
-      const remoteBranches = remoteInfo
-        .split('\n')
-        .map(line => {
-          const parts = line.split('\t');
-          return parts.length > 1 ? parts[1] : '';
-        })
-        .filter(name => name); // drop any empty entries
+      // Check remote-tracking branches
+      for (const remote of remotes) {
+        // Assuming remote.refs.fetch gives strings like 'refs/remotes/origin/main' or just 'origin/main'
+        // and remote.name is like 'origin'
+        for (const remoteRef of remote.refs.fetch) {
+          let branchName = remoteRef;
+          // Normalize: refs/remotes/origin/branch -> origin/branch
+          // or refs/heads/branch -> branch (though remote.refs.fetch should be remote-tracking)
+          if (branchName.startsWith('refs/remotes/')) {
+            branchName = branchName.substring('refs/remotes/'.length);
+          } else if (branchName.startsWith('refs/heads/')) { // Less likely for remote.refs.fetch but good to be safe
+            branchName = branchName.substring('refs/heads/'.length);
+          }
+          // Now branchName could be 'origin/gitorial/step1' or just 'gitorial/step1' if remote name was part of ref
+          // The _isGitorialBranchNamePattern splits by '/' and checks segments.
+          if (this._isGitorialBranchNamePattern(branchName)) {
+            return true;
+          }
+        }
+      }
 
-      // Normalize refs/heads/BRANCH_NAME → BRANCH_NAME
-      const normalizedRemoteBranches = remoteBranches.map(ref =>
-        ref.startsWith('refs/heads/')
-          ? ref.substring('refs/heads/'.length)
-          : ref
-      );
-
-      // Return true if any branch segment equals "gitorial"
-      return normalizedRemoteBranches.some(branchName =>
-        this._isGitorialBranchNamePattern(branchName)
-      );
+      return false; // No gitorial branch found in local or remotes
 
     } catch (error) {
       // Log and publish an error event, then return false
-      console.error(`Error checking if repository is valid:`, error);
+      console.error(`Error checking if repository is valid Gitorial repository:`, error);
       return false;
     }
   }

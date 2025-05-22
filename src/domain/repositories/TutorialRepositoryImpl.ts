@@ -4,19 +4,12 @@ import { TutorialBuilder } from '../services/TutorialBuilder';
 import { GitService } from '../services/GitService';
 import { IGitOperations } from '../ports/IGitOperations';
 import { IStateStorage } from '../ports/IStateStorage';
-import { IFileSystem } from '../ports/IFileSystem';
-import { IUserInteraction } from '../ports/IUserInteraction';
-import { IStepContentRepository } from '../ports/IStepContentRepository';
 
 /**
  * Factory function type for creating Git adapters
  */
 export type GitAdapterFactory = (repoPath: string) => IGitOperations;
 
-/**
- * Factory function type for creating Git adapters from clones
- */
-export type GitCloneAdapterFactory = (repoUrl: string, targetPath: string) => Promise<IGitOperations>;
 
 /**
  * Implementation of the TutorialRepository
@@ -29,17 +22,10 @@ export class TutorialRepositoryImpl implements ITutorialRepository {
    * Create a new TutorialRepositoryImpl
    * @param stateStorage Storage for persisting tutorial data
    * @param gitAdapterFactory Factory function to create Git adapters
-   * @param gitCloneAdapterFactory Factory function to create Git adapters from clones
-   * @param fileSystem File system operations
-   * @param userInteraction User interaction operations
    */
   constructor(
     private readonly stateStorage: IStateStorage,
     private readonly gitAdapterFactory: GitAdapterFactory,
-    private readonly gitCloneAdapterFactory: GitCloneAdapterFactory,
-    private readonly fileSystem: IFileSystem,
-    private readonly userInteraction: IUserInteraction,
-    private readonly stepContentRepository: IStepContentRepository
   ) {}
   /**
    * Find a tutorial by its local path
@@ -54,9 +40,8 @@ export class TutorialRepositoryImpl implements ITutorialRepository {
       if(!isValid){
         return null;
       }
-      const tutorial = await TutorialBuilder.buildFromLocalPath(localPath, gitService, this.stepContentRepository);
+      const tutorial = await TutorialBuilder.buildFromLocalPath(localPath, gitService);
       if (tutorial) {
-        // Save the mapping from tutorial.id to localPath
         await this.stateStorage.update(`${this.TUTORIAL_PATH_MAP_KEY_PREFIX}${tutorial.id}`, localPath);
       }
       return tutorial;
@@ -75,53 +60,10 @@ export class TutorialRepositoryImpl implements ITutorialRepository {
     const localPath = this.stateStorage.get<string>(`${this.TUTORIAL_PATH_MAP_KEY_PREFIX}${id}`);
     if (localPath) {
       console.log(`TutorialRepositoryImpl: Found path '${localPath}' for tutorial ID '${id}'. Attempting to load...`);
-      // Now that we have the path, use the existing findByPath logic
       return await this.findByPath(localPath);
     } else {
       console.warn(`TutorialRepositoryImpl: No local path found mapped to tutorial ID '${id}'.`);
       return null;
-    }
-  }
-  
-  /**
-   * Create a tutorial from a clone operation
-   * @param repoUrl The repository URL to clone
-   * @param targetPath The local path to clone to
-   * @returns The created tutorial
-   */
-  public async createFromClone(repoUrl: string, targetPath: string): Promise<Tutorial> {
-    try {
-      if (await this.fileSystem.pathExists(targetPath)) {
-        if (await this.fileSystem.isDirectory(targetPath)) {
-          const confirmed = await this.userInteraction.askConfirmation({
-            message: `The directory '${targetPath}' already exists. Do you want to delete its contents and proceed with the clone?`,
-            confirmActionTitle: 'Delete and Clone',
-            cancelActionTitle: 'Cancel'
-          });
-          if (!confirmed) {
-            throw new Error(`Clone operation cancelled by user: Directory '${targetPath}' not overwritten.`);
-          }
-          await this.fileSystem.deleteDirectory(targetPath);
-        } else {
-          throw new Error(`Cannot clone into '${targetPath}' because a file with the same name already exists.`);
-        }
-      }
-
-      const gitAdapter = await this.gitCloneAdapterFactory(repoUrl, targetPath);
-      const gitService = new GitService(gitAdapter);
-      await gitService.clone();
-      
-      const tutorial = await TutorialBuilder.buildFromLocalPath(targetPath, gitService, this.stepContentRepository);
-      
-      if (!tutorial) {
-        throw new Error(`Failed to build tutorial from cloned repository at ${targetPath}`);
-      }
-      await this.stateStorage.update(`${this.TUTORIAL_PATH_MAP_KEY_PREFIX}${tutorial.id}`, targetPath);
-      
-      return tutorial;
-    } catch (error) {
-      console.error(`Error creating tutorial from clone ${repoUrl} to ${targetPath}:`, error);
-      throw error;
     }
   }
 } 

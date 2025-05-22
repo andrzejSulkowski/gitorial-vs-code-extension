@@ -40,13 +40,13 @@ export class TutorialController {
    * It delegates to TutorialService to toggle the solution state and updates the UI.
    */
   public async requestShowSolution(): Promise<void> {
-    const activeTutorial = this.tutorialService.getActiveTutorial();
+    const activeTutorial = this.tutorialService.tutorial;
     if (!activeTutorial) {
       this.userInteraction.showWarningMessage("No active tutorial to show solution for.");
       return;
     }
     await this.tutorialService.toggleSolution(true);
-    await this.tutorialViewService.display(activeTutorial);
+    await this.tutorialViewService.display(activeTutorial, this);
   }
 
   /**
@@ -54,15 +54,15 @@ export class TutorialController {
    * It delegates to TutorialService and updates the UI, including file views.
    */
   public async requestHideSolution(): Promise<void> {
-    const activeTutorial = this.tutorialService.getActiveTutorial();
+    const activeTutorial = this.tutorialService.tutorial;
     if (!activeTutorial) {
       return;
     }
     await this.tutorialService.toggleSolution(false);
-    let currentStep: Step | undefined;
+    let currentStep;
     let changedFilePaths: string[] = [];
     let tutorialLocalPath: string | undefined;
-    const activeGitOperations = this.tutorialService.getActiveGitOperations();
+    const activeGitOperations = this.tutorialService.gitOperations;
 
     if (activeTutorial.activeStep.id) {
       currentStep = activeTutorial.steps.find(s => s.id === activeTutorial!.activeStep.id);
@@ -71,7 +71,7 @@ export class TutorialController {
         tutorialLocalPath = activeTutorial.localPath;
       }
     }
-    await this.tutorialViewService.display(activeTutorial);
+    await this.tutorialViewService.display(activeTutorial, this);
   }
 
   /**
@@ -149,7 +149,6 @@ export class TutorialController {
 
     try {
       this.progressReporter.reportStart(`Cloning ${repoUrl}...`);
-      debugger;
       const tutorial = await this.tutorialService.cloneAndLoadTutorial(repoUrl, finalClonePath, { initialStepCommitHash: options?.commitHash });
       this.progressReporter.reportEnd();
 
@@ -175,7 +174,7 @@ export class TutorialController {
    * @param clonedPath The file system path where the tutorial was cloned.
    * @param wasInitiatedProgrammatically Internal flag if repoUrl was provided (e.g. via deeplink)
    */
-  private async _handlePostCloneActions(tutorial: Tutorial, clonedPath: string, options?: {wasInitiatedProgrammatically?: string, commitHash?: string}): Promise<void> {
+  private async _handlePostCloneActions(tutorial: Tutorial, clonedPath: string, options?: { wasInitiatedProgrammatically?: string, commitHash?: string }): Promise<void> {
     this.userInteraction.showInformationMessage(`Tutorial "${tutorial.title}" cloned to ${clonedPath}.`);
 
     const openNowChoice = options?.wasInitiatedProgrammatically ? true : await this.userInteraction.askConfirmation({
@@ -247,7 +246,7 @@ export class TutorialController {
    * @param initialStepId Optional ID of the step to activate initially.
    */
   private async _processLoadedTutorial(tutorial: Tutorial, initialStepCommitHash?: string): Promise<void> {
-    const activeGitOperations = this.tutorialService.getActiveGitOperations();
+    const activeGitOperations = this.tutorialService.gitOperations;
     if (!activeGitOperations) {
       console.error("TutorialController: GitOperations is null after loading tutorial from service.");
       this.userInteraction.showErrorMessage("Failed to initialize Git operations for the tutorial.");
@@ -302,7 +301,7 @@ export class TutorialController {
         const workspacePath = workspaceFolders[0].uri.fsPath;
         const isTutorial = await this.tutorialService.isTutorialInPath(workspacePath);
         if (isTutorial) {
-          const tutorial = await this.tutorialService.loadTutorialFromPath(workspacePath)
+          const tutorial = await this.tutorialService.loadTutorialFromPath(workspacePath);
           if (tutorial?.repoUrl === options.repoUrl) {
             isTutorialOpen = true;
             await this.openTutorialFromPath(workspacePath, { initialStepCommitHash: commitHash });
@@ -362,15 +361,15 @@ export class TutorialController {
    * @param step The Step object or the ID or commit hash of the step to navigate to.
    */
   public async selectStep(step: Step | string): Promise<void> {
-    const activeTutorial = this.tutorialService.getActiveTutorial();
-    const activeGitOperations = this.tutorialService.getActiveGitOperations();
+    const activeTutorial = this.tutorialService.tutorial;
+    const activeGitOperations = this.tutorialService.gitOperations;
 
     if (!activeTutorial || !activeGitOperations) {
       this.userInteraction.showWarningMessage('No active tutorial or Git operations to select a step from.');
       return;
     }
 
-    let targetStep: Step | undefined;
+    let targetStep;
     let targetStepId: string | undefined;
 
     if (typeof step === 'string') {
@@ -388,7 +387,7 @@ export class TutorialController {
 
     if (activeTutorial.activeStep.id === targetStepId) {
       console.log(`TutorialController: Step '${targetStep.title}' is already active and content loaded.`);
-      await this.tutorialViewService.display(activeTutorial);
+      await this.tutorialViewService.display(activeTutorial, this);
       //await this.tutorialViewService.updateTutorialPanel(this.extensionUri, activeTutorial, new WebviewMessageHandler(this));
       return;
     }
@@ -403,17 +402,17 @@ export class TutorialController {
         return;
       }
 
-      const navigationSuccess = await this.tutorialService.navigateToStep(stepIndex);
+      const navigationSuccess = await this.tutorialService.forceStepIndex(stepIndex);
       this.progressReporter.reportEnd();
 
       if (navigationSuccess) {
-        const updatedTutorial = this.tutorialService.getActiveTutorial();
-        const currentActiveStep = updatedTutorial?.steps.find(s => s.id === updatedTutorial.activeStep.id);
+        const updatedTutorial = this.tutorialService.tutorial;
+        const currentActiveStep = updatedTutorial.activeStep;
 
         if (updatedTutorial && currentActiveStep && updatedTutorial.localPath && activeGitOperations) {
           const changedFilePaths = await activeGitOperations.getChangesInCommit(currentActiveStep.commitHash);
           //await this.tutorialViewService.updateSidePanelFiles(currentActiveStep, changedFilePaths, updatedTutorial.localPath);
-          await this.tutorialViewService.display(updatedTutorial);
+          await this.tutorialViewService.display(updatedTutorial, this);
 
           // After step navigation and side panel update, persist open tabs
           const openTabs = this.tutorialViewService.getTutorialOpenTabFsPaths(updatedTutorial.localPath);
@@ -425,13 +424,13 @@ export class TutorialController {
         this.userInteraction.showErrorMessage(`Failed to switch to step '${targetStep.title}'.`);
       }
       //await this.tutorialViewService.updateTutorialPanel(this.extensionUri, activeTutorial, new WebviewMessageHandler(this)) //TODO: refactor to remove always new creation of handler
-      await this.tutorialViewService.display(activeTutorial);
+      await this.tutorialViewService.display(activeTutorial, this);
     } catch (error) {
       this.progressReporter.reportEnd();
       console.error(`TutorialController: Error selecting step '${targetStep.title}':`, error);
       this.userInteraction.showErrorMessage(`Failed to switch to step '${targetStep.title}': ${error instanceof Error ? error.message : String(error)}`);
       //await this.tutorialViewService.updateTutorialPanel(this.extensionUri, activeTutorial, new WebviewMessageHandler(this)) //TODO: refactor to remove always new creation of handler
-      await this.tutorialViewService.display(activeTutorial);
+      await this.tutorialViewService.display(activeTutorial, this);
     }
   }
 
@@ -463,7 +462,7 @@ export class TutorialController {
    * and resetting the VS Code context flag.
    */
   private clearActiveTutorialState(): void {
-    if (this.tutorialService.getActiveTutorial()) {
+    if (this.tutorialService.tutorial) {
       this.tutorialService.closeTutorial();
     }
     TutorialPanelManager.disposeCurrentPanel();
@@ -475,18 +474,18 @@ export class TutorialController {
    * Updates UI and side panel files accordingly.
    */
   public async requestNextStep(): Promise<void> {
-    const activeTutorial = this.tutorialService.getActiveTutorial();
+    const activeTutorial = this.tutorialService.tutorial;
     if (!activeTutorial) return;
 
     const success = await this.tutorialService.navigateToNextStep();
     if (success) {
-      const updatedTutorial = this.tutorialService.getActiveTutorial();
-      const nextStep = updatedTutorial?.steps.find(s => s.id === updatedTutorial.activeStep.id);
-      const activeGitOperations = this.tutorialService.getActiveGitOperations();
+      const updatedTutorial = this.tutorialService.tutorial;
+      const nextStep = updatedTutorial.activeStep;
+      const activeGitOperations = this.tutorialService.gitOperations;
       if (updatedTutorial && nextStep && updatedTutorial.localPath && activeGitOperations) {
         const changedFilePaths = await activeGitOperations.getChangesInCommit(nextStep.commitHash);
         //await this.tutorialViewService.updateSidePanelFiles(nextStep, changedFilePaths, updatedTutorial.localPath);
-        await this.tutorialViewService.display(updatedTutorial);
+        await this.tutorialViewService.display(updatedTutorial, this);
 
         // After step navigation and side panel update, persist open tabs
         const openTabs = this.tutorialViewService.getTutorialOpenTabFsPaths(updatedTutorial.localPath);
@@ -496,7 +495,7 @@ export class TutorialController {
     } else {
       this.userInteraction.showInformationMessage("You are already on the last step.");
     }
-    await this.tutorialViewService.display(activeTutorial);
+    await this.tutorialViewService.display(activeTutorial, this);
     //await this.tutorialViewService.updateTutorialPanel(this.extensionUri, activeTutorial, new WebviewMessageHandler(this)) //TODO: refactor to remove always new creation of handler
   }
 
@@ -505,18 +504,18 @@ export class TutorialController {
    * Updates UI and side panel files accordingly.
    */
   public async requestPreviousStep(): Promise<void> {
-    const activeTutorial = this.tutorialService.getActiveTutorial();
+    const activeTutorial = this.tutorialService.tutorial;
     if (!activeTutorial) return;
 
     const success = await this.tutorialService.navigateToPreviousStep();
     if (success) {
-      const updatedTutorial = this.tutorialService.getActiveTutorial();
-      const prevStep = updatedTutorial?.steps.find(s => s.id === updatedTutorial.activeStep.id);
-      const activeGitOperations = this.tutorialService.getActiveGitOperations();
+      const updatedTutorial = this.tutorialService.tutorial;
+      const prevStep = updatedTutorial.activeStep;
+      const activeGitOperations = this.tutorialService.gitOperations;
       if (updatedTutorial && prevStep && updatedTutorial.localPath && activeGitOperations) {
         //const changedFilePaths = await activeGitOperations.getChangesInCommit(prevStep.commitHash);
         //await this.tutorialViewService.updateSidePanelFiles(prevStep, changedFilePaths, updatedTutorial.localPath);
-        await this.tutorialViewService.display(updatedTutorial);
+        await this.tutorialViewService.display(updatedTutorial, this);
 
         // After step navigation and side panel update, persist open tabs
         const openTabs = this.tutorialViewService.getTutorialOpenTabFsPaths(updatedTutorial.localPath);
@@ -526,7 +525,7 @@ export class TutorialController {
     } else {
       this.userInteraction.showInformationMessage("You are already on the first step.");
     }
-    await this.tutorialViewService.display(activeTutorial);
+    await this.tutorialViewService.display(activeTutorial, this);
     //await this.tutorialViewService.updateTutorialPanel(this.extensionUri, activeTutorial, new WebviewMessageHandler(this)) //TODO: refactor to remove always new creation of handler
   }
 

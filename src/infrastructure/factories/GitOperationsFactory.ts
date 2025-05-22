@@ -19,7 +19,7 @@ export class GitOperationsFactory implements IGitOperationsFactory {
    * Creates a GitAdapter for an existing local repository path.
    * @param repoPath The file system path to the repository.
    */
-  public createFromPath(repoPath: string): IGitOperations {
+  public fromPath(repoPath: string): IGitOperations {
     // Could add validation here to ensure path exists or is a git repo before creating
     return new GitAdapter(repoPath);
   }
@@ -31,7 +31,7 @@ export class GitOperationsFactory implements IGitOperationsFactory {
    * @param progressCallback Optional callback for clone progress.
    * @returns An IGitOperations instance for the cloned repository.
    */
-  public async createFromClone(
+  public async fromClone(
     repoUrl: string, 
     targetPath: string, 
     progressCallback?: (message: string) => void

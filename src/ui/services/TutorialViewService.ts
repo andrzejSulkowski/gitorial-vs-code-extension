@@ -6,26 +6,44 @@ import { Tutorial } from 'src/domain/models/Tutorial';
 import { IMarkdownConverter } from '../ports/IMarkdownConverter';
 import { TutorialViewModel } from '@shared/types/viewmodels/TutorialViewModel';
 import { TutorialStepViewModel } from '@shared/types/viewmodels/TutorialStepViewModel';
-import { ActiveStep } from 'src/domain/models/ActiveStep';
+import { EnrichedStep } from 'src/domain/models/EnrichedStep';
 import { TutorialPanelManager } from '../panels/TutorialPanelManager';
 import { WebviewMessageHandler } from '../panels/WebviewMessageHandler';
 import { DiffViewService } from './DiffViewService';
 import { IGitChanges } from '../ports/IGitChanges';
 import { IGitChangesFactory } from '../ports/IGitChangesFactory';
+import { TutorialController } from '../controllers/TutorialController';
+
 
 export class TutorialViewService {
   private _gitAdapter: IGitChanges | null = null;
+  private _webviewMessageHandler: WebviewMessageHandler | null = null;
 
-  constructor(private readonly fs: IFileSystem, private readonly markdownConverter: IMarkdownConverter, private readonly diffViewService: DiffViewService, private readonly gitAdapterFactory: IGitChangesFactory) { }
+  constructor(
+    private readonly fs: IFileSystem, 
+    private readonly markdownConverter: IMarkdownConverter, 
+    private readonly diffViewService: DiffViewService, 
+    private readonly gitAdapterFactory: IGitChangesFactory,
+    private readonly extensionUri: vscode.Uri
+  ) {}
 
-  public async display(tutorial: Tutorial) {
-    if(!this._gitAdapter) {
+  public async display(tutorial: Tutorial, controller: TutorialController) {
+    if (!this._webviewMessageHandler) {
+      this._webviewMessageHandler = new WebviewMessageHandler(controller);
+    }
+
+    if (!this._gitAdapter) {
       this._gitAdapter = this.gitAdapterFactory.createFromPath(tutorial.localPath);
     }
+    debugger;
     const tutorialViewModel = this._tutorialViewModel(tutorial);
 
-    if(tutorialViewModel?.isShowingSolution) {
+    if (tutorialViewModel?.isShowingSolution) {
       this.diffViewService.showStepSolution(tutorial, this._gitAdapter);
+    }
+
+    if (tutorialViewModel) {
+      this._updateTutorialPanel(this.extensionUri, tutorialViewModel, this._webviewMessageHandler);
     }
   }
 
@@ -35,40 +53,38 @@ export class TutorialViewService {
    * Returns null if no tutorial is active.
    */
   private _tutorialViewModel(tutorial: Tutorial): TutorialViewModel | null {
-      const currentStepIdInService = tutorial.activeStep.id;
-      const actualCurrentStepId = currentStepIdInService;
+    const actualCurrentStepId = tutorial.activeStep.id;
 
-      const stepsViewModel: TutorialStepViewModel[] = tutorial.steps.map(step => {
-        let stepHtmlContent: string | undefined = undefined;
-        if (step.id === actualCurrentStepId && step instanceof ActiveStep) {
-          stepHtmlContent = this.markdownConverter.render(step.markdown)
-        }
-
-        return {
-          id: step.id,
-          title: step.title,
-          commitHash: step.commitHash,
-          type: step.type,
-          isActive: step.id === actualCurrentStepId,
-          htmlContent: stepHtmlContent
-        };
-      });
+    const stepsViewModel: TutorialStepViewModel[] = tutorial.steps.map(step => {
+      let stepHtmlContent: string | undefined = undefined;
+      if (step.id === actualCurrentStepId && step instanceof EnrichedStep) {
+        stepHtmlContent = this.markdownConverter.render(step.markdown);
+      }
 
       return {
-        id: tutorial.id,
-        title: tutorial.title,
-        steps: stepsViewModel,
-        currentStepId: actualCurrentStepId,
-        isShowingSolution: tutorial.isShowingSolution
+        id: step.id,
+        title: step.title,
+        commitHash: step.commitHash,
+        type: step.type,
+        isActive: step.id === actualCurrentStepId,
+        htmlContent: stepHtmlContent
       };
+    });
+
+    return {
+      id: tutorial.id,
+      title: tutorial.title,
+      steps: stepsViewModel,
+      currentStepId: actualCurrentStepId,
+      isShowingSolution: tutorial.isShowingSolution
+    };
   }
 
   /**
    * Updates the tutorial panel UI by creating or showing it with the latest view model.
    * If no tutorial is active, it disposes of any existing panel.
    */
-  private async _updateTutorialPanel(extensionUri: vscode.Uri, tutorial: Tutorial, messageHandler: WebviewMessageHandler): Promise<void> {
-    const tutorialViewModel = this._tutorialViewModel(tutorial);
+  private async _updateTutorialPanel(extensionUri: vscode.Uri, tutorialViewModel: TutorialViewModel, messageHandler: WebviewMessageHandler): Promise<void> {
     if (tutorialViewModel) {
       TutorialPanelManager.createOrShow(extensionUri, tutorialViewModel, messageHandler);
     } else {

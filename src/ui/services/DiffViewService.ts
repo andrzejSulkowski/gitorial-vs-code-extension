@@ -2,7 +2,7 @@
 import { Tutorial } from "src/domain/models/Tutorial";
 import { DiffModel, DiffChangeType } from "../viewmodels/DiffModel";
 import { IGitChanges, DiffFilePayload } from "../ports/IGitChanges";
-import { ActiveStep } from "src/domain/models/ActiveStep";
+import { EnrichedStep } from "src/domain/models/EnrichedStep";
 import { IDiffDisplayer, DiffFile } from 'src/ui/ports/IDiffDisplayer';
 
 
@@ -13,11 +13,11 @@ export class DiffViewService {
   /**
    * Get the diff models for changes between the current commit and its parent
    */
-  public async getDiffModelsForParent(tutorial: Tutorial, activeStep: ActiveStep, gitAdapter: IGitChanges): Promise<DiffModel[]> {
+  public async getDiffModelsForParent(tutorial: Tutorial, activeStep: EnrichedStep, gitAdapter: IGitChanges): Promise<DiffModel[]> {
     const currentCommitHash = activeStep.commitHash;
     const commitHashHistory = tutorial.steps.map(s => s.commitHash);
 
-    const currentCommitIdx = commitHashHistory.findIndex(h => h === currentCommitHash)
+    const currentCommitIdx = commitHashHistory.findIndex(h => h === currentCommitHash);
     const parentCommitHash = commitHashHistory.at(currentCommitIdx + 1);
 
     try {

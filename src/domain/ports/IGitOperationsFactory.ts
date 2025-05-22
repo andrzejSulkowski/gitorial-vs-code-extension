@@ -12,7 +12,7 @@ export interface IGitOperationsFactory {
      * @param repoPath The file system path to the local repository.
      * @returns An IGitOperations instance.
      */
-    createFromPath(repoPath: string): IGitOperations;
+    fromPath(repoPath: string): IGitOperations;
 
     /**
      * Clones a repository from a URL and then creates an IGitOperations instance for it.
@@ -22,5 +22,5 @@ export interface IGitOperationsFactory {
      *                         It receives a string message describing the current progress.
      * @returns A promise that resolves to an IGitOperations instance for the cloned repository.
      */
-    createFromClone(repoUrl: string, targetPath: string, progressCallback?: (message: string) => void): Promise<IGitOperations>;
+    fromClone(repoUrl: string, targetPath: string, progressCallback?: (message: string) => void): Promise<IGitOperations>;
 }

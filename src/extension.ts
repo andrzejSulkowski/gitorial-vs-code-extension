@@ -117,11 +117,7 @@ async function bootstrapApplication(context: vscode.ExtensionContext): Promise<B
   const activeTutorialStateRepository = new MementoActiveTutorialStateRepository(workspaceStateMementoAdapter);
   const tutorialRepository = new TutorialRepositoryImpl(
     workspaceStateMementoAdapter, // Using workspace specific state for tutorials
-    gitOperationsFactory.createFromPath,
-    gitOperationsFactory.createFromClone,
-    fileSystemAdapter,
-    userInteractionAdapter,
-    stepContentRepository
+    gitOperationsFactory.fromPath,
   );
 
   // --- Domain Services ---
@@ -136,7 +132,7 @@ async function bootstrapApplication(context: vscode.ExtensionContext): Promise<B
 
   // --- UI Services ---
   const diffViewService = new DiffViewService(diffDisplayerAdapter);
-  const tutorialViewService = new TutorialViewService(fileSystemAdapter, markdownConverter, diffViewService, gitChangesFactory);
+  const tutorialViewService = new TutorialViewService(fileSystemAdapter, markdownConverter, diffViewService, gitChangesFactory, context.extensionUri);
 
   // --- UI Layer Controllers ---
   const tutorialController = new TutorialController(
@@ -183,6 +179,7 @@ async function handleApplicationStartup(
       }
     } else {
       console.log("Gitorial: Stale pending auto-open found, older than 5 seconds. Ignoring. Proceeding with normal startup.");
+      autoOpenState.set(null);
       await restoreOrCheckWorkspace(tutorialController, activeTutorialStateRepository, tutorialRepository, workspaceId);
     }
   } else {
@@ -198,7 +195,7 @@ async function restoreOrCheckWorkspace(
   workspaceId: string | undefined
 ): Promise<void> {
   if (workspaceId) {
-    const activeState = await activeTutorialStateRepository.getActiveTutorial(workspaceId);
+    const activeState = await activeTutorialStateRepository.getActiveTutorial();
     if (activeState && activeState.tutorialId) {
       console.log(`Gitorial: Found active tutorial state for workspace ${workspaceId}:`, activeState);
       const tutorialToRestore = await tutorialRepository.findById(activeState.tutorialId);
@@ -207,7 +204,7 @@ async function restoreOrCheckWorkspace(
         await tutorialController.openTutorialFromPath(tutorialToRestore.localPath);
       } else {
         console.warn(`Gitorial: Could not find local path for stored active tutorial ID ${activeState.tutorialId}. Clearing state.`);
-        await activeTutorialStateRepository.clearActiveTutorial(workspaceId);
+        await activeTutorialStateRepository.clearActiveTutorial();
         await tutorialController.checkWorkspaceForTutorial(false);
       }
     } else {

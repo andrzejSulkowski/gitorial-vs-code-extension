@@ -27,14 +27,4 @@ export interface ITutorialRepository {
    * @returns The tutorial if found, null otherwise
    */
   findById(id: string): Promise<Tutorial | null>;
-  
-  /**
-   * Create a tutorial from a clone operation
-   * @param repoUrl The repository URL to clone
-   * @param targetPath The local path to clone to
-   * @returns The created tutorial
-   * @throws Error if cloning or building the tutorial fails
-   */
-  //This is now being handled by the GitAdapterFactory
-  //createFromClone(repoUrl: string, targetPath: string): Promise<Tutorial>;
 }

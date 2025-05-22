@@ -9,9 +9,7 @@ import { GitService } from './GitService';
 import { TutorialId } from 'shared/types/domain-primitives/TutorialId';
 import { DomainCommit } from '../ports/IGitOperations';
 import { Step, StepData } from '../models/Step';
-import { ActiveStep } from '../models/ActiveStep';
 import { StepType } from '@shared/types/domain-primitives/StepType';
-import { IStepContentRepository } from '../ports/IStepContentRepository';
 
 /**
  * Constructs Tutorial domain objects from raw data (e.g., repository information,
@@ -29,7 +27,6 @@ export class TutorialBuilder {
   public static async buildFromLocalPath(
     repoPath: string,
     gitService: GitService,
-    stepContentRepository: IStepContentRepository
   ): Promise<Tutorial | null> {
     try {
       const repoUrl = await gitService.getRepoUrl();
@@ -51,18 +48,13 @@ export class TutorialBuilder {
         return null;
       }
       const steps = TutorialBuilder.extractStepsFromCommits(domainCommits, id);
-      const markdown = await stepContentRepository.getStepMarkdownContent(repoPath)
-      if (!markdown) {
-        console.error("Could not extract markdown of the current step")
-        return null;
-      }
       const tutorialData: TutorialData = {
         id,
         title,
         repoUrl: repoUrl || undefined,
         localPath: repoPath,
         steps,
-        activeStep: new ActiveStep({ ...steps[0], markdown })
+        activeStepIndex: 0
       };
 
       return new Tutorial(tutorialData);
@@ -183,7 +175,7 @@ export class TutorialBuilder {
         title: stepTitle || 'Unnamed Step',
         commitHash: commit.hash,
         type: stepType!,
-        description: commit.message.substring(commit.message.indexOf('\n') + 1).trim() || undefined,
+        index: index,
       };
       steps.push(new Step(stepData));
     });

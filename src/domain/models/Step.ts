@@ -2,13 +2,15 @@
 // (e.g., pending, active, completed).
 
 import { StepType } from "@shared/types/domain-primitives/StepType";
+import { EnrichedStep } from "./EnrichedStep";
+import { Markdown } from "./Markdown";
 
 export interface StepData {
   id: string;
   title: string;
   commitHash: string;
   type: StepType;
-  description?: string;
+  index: number;
 }
 
 export class Step {
@@ -16,14 +18,22 @@ export class Step {
   public readonly title: string;
   public readonly commitHash: string;
   public readonly type: StepType;
-  public description?: string; // Added optional description
+  public readonly index: number;
 
   constructor(data: StepData) {
     this.id = data.id;
     this.title = data.title;
     this.commitHash = data.commitHash;
     this.type = data.type;
-    this.description = data.description;
+    this.index = data.index;
+  }
+
+
+  public toEnrichedStep(markdown: Markdown): EnrichedStep {
+    return new EnrichedStep({
+      markdown: markdown,
+      ...(this as StepData),
+    });
   }
 }
 

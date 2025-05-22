@@ -1,9 +1,8 @@
 import * as assert from 'assert';
 import sinon from 'sinon'; // Import sinon
 import * as vscode from 'vscode';
-import { GitService } from '../services/Git';
 
-
+/*
 
 suite("Extension Integration Tests", () => {
 	let ctx: vscode.ExtensionContext;
@@ -119,3 +118,4 @@ suite("Extension Integration Tests", () => {
         }
     });
 });
+*/

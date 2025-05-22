@@ -4,14 +4,14 @@
 */
 
 import * as path from 'path';
-import * as crypto from 'crypto';
 import { Tutorial, TutorialData } from '../models/Tutorial';
 import { GitService } from './GitService';
 import { TutorialId } from 'shared/types/domain-primitives/TutorialId';
 import { DomainCommit } from '../ports/IGitOperations';
 import { Step, StepData } from '../models/Step';
-import { StepState } from 'shared/types/domain-primitives/StepState';
+import { ActiveStep } from '../models/ActiveStep';
 import { StepType } from '@shared/types/domain-primitives/StepType';
+import { IStepContentRepository } from '../ports/IStepContentRepository';
 
 /**
  * Constructs Tutorial domain objects from raw data (e.g., repository information,
@@ -28,51 +28,58 @@ export class TutorialBuilder {
    */
   public static async buildFromLocalPath(
     repoPath: string,
-    gitService: GitService
+    gitService: GitService,
+    stepContentRepository: IStepContentRepository
   ): Promise<Tutorial | null> {
     try {
       const repoUrl = await gitService.getRepoUrl();
-      if(!repoUrl) {
+      if (!repoUrl) {
         throw new Error("For now a gitorial needs to be linked to a remote origin\nOtherwise we can not derive the Gitorials Identifier")
       }
       const details = this.extractRepoDetails(repoUrl);
 
-      if(!details) {
+      if (!details) {
         throw new Error("Could not get repo details out of remote url: " + repoUrl);
       }
 
       const id = this.generateTutorialId(details.owner, details.repo);
       const title = path.basename(repoPath);
-      
+
       const domainCommits = await gitService.getCommitHistory();
       if (domainCommits.length === 0) {
         console.log(`No commits found in repository: ${repoPath}`);
         return null;
       }
       const steps = TutorialBuilder.extractStepsFromCommits(domainCommits, id);
+      const markdown = await stepContentRepository.getStepMarkdownContent(repoPath)
+      if (!markdown) {
+        console.error("Could not extract markdown of the current step")
+        return null;
+      }
       const tutorialData: TutorialData = {
         id,
         title,
         repoUrl: repoUrl || undefined,
         localPath: repoPath,
         steps,
-        description: undefined,
+        activeStep: new ActiveStep({ ...steps[0], markdown })
       };
+
       return new Tutorial(tutorialData);
     } catch (error) {
       console.error(`Error building tutorial from path ${repoPath}:`, error);
       return null;
     }
   }
-  
+
   /**
    * Generate a tutorial ID from a repository URL
    */
-  public static generateTutorialId(owner: string, repo:string): TutorialId {
+  public static generateTutorialId(owner: string, repo: string): TutorialId {
     const identifier = `${owner}/${repo}`;
     return identifier as TutorialId;
   }
-  
+
   /**
    * Extract repository details from a repository URL
    */
@@ -92,7 +99,7 @@ export class TutorialBuilder {
           repo: githubMatch[2]
         };
       }
-      
+
       // Handle GitLab URLs
       const gitlabRegex = /gitlab\.com[\/:]([^\/]+)\/([^\/\.]+)(\.git)?$/i;
       const gitlabMatch = repoUrl.match(gitlabRegex);
@@ -103,7 +110,7 @@ export class TutorialBuilder {
           repo: gitlabMatch[2]
         };
       }
-      
+
       // Unknown platform
       return null;
     } catch (error) {
@@ -111,7 +118,7 @@ export class TutorialBuilder {
       return null;
     }
   }
-  
+
   /**
    * Create a deep link URL for a tutorial step
    */
@@ -124,12 +131,12 @@ export class TutorialBuilder {
     if (!repoDetails) {
       return null;
     }
-    
+
     const step = tutorial.steps[stepIndex];
     if (!step) {
       return null;
     }
-    
+
     //FIX: This is currently a wrong deep link format
     return `gitorial://sync?platform=${repoDetails.platform}&owner=${repoDetails.owner}&repo=${repoDetails.repo}&commitHash=${step.commitHash}`;
   }
@@ -138,7 +145,7 @@ export class TutorialBuilder {
    * Converts raw commit data (from IGitOperations) into Step domain models.
    */
   public static extractStepsFromCommits(commits: DomainCommit[], tutorialId: TutorialId): Step[] {
-    const chronologicalCommits = [...commits].reverse(); 
+    const chronologicalCommits = [...commits].reverse();
     const steps: Step[] = [];
     const validTypes: ReadonlyArray<StepType> = ["section", "template", "solution", "action"];
 
@@ -167,18 +174,18 @@ export class TutorialBuilder {
         // Or, default to a type like 'section' and use the whole message as title.
         // throw new Error(`TutorialBuilder: Commit message "${message}" missing type prefix.`);
         console.warn(`TutorialBuilder: Commit message "${message}" missing type prefix. Defaulting to type 'section'.`);
-        stepType = 'section'; 
+        stepType = 'section';
         stepTitle = message; // Use full message as title
       }
-      
+
       const stepData: StepData = {
         id: `${tutorialId}-step-${index + 1}-${commit.hash.substring(0, 7)}`,
         title: stepTitle || 'Unnamed Step',
         commitHash: commit.hash,
-        type: stepType!, 
+        type: stepType!,
         description: commit.message.substring(commit.message.indexOf('\n') + 1).trim() || undefined,
       };
-      steps.push(new Step(stepData, StepState.PENDING));
+      steps.push(new Step(stepData));
     });
     return steps;
   }

@@ -1,6 +1,6 @@
 // Implements the IDiffDisplayer port using VS Code's vscode.diff command
 // and related APIs to show diffs to the user.
-import { IDiffDisplayer, DiffFile } from "src/domain/ports/IDiffDisplayer";
+import { IDiffDisplayer, DiffFile } from "src/ui/ports/IDiffDisplayer";
 import * as vscode from 'vscode';
 
 export class DiffDisplayerAdapter implements IDiffDisplayer {

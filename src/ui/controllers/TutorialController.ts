@@ -5,10 +5,10 @@ import { Tutorial } from '../../domain/models/Tutorial';
 import { Step } from 'src/domain/models/Step';
 import { TutorialPanelManager } from '../panels/TutorialPanelManager';
 import { IFileSystem } from 'src/domain/ports/IFileSystem';
-import { TutorialStepViewModel, TutorialViewModel } from 'shared/types/viewmodels';
 import { TutorialService } from '../../domain/services/TutorialService';
 import { TutorialViewService } from '../services/TutorialViewService';
 import { AutoOpenState } from 'src/infrastructure/state/AutoOpenState';
+import { WebviewMessageHandler } from '../panels/WebviewMessageHandler';
 
 /**
  * Controller responsible for orchestrating tutorial-related UI interactions and actions.
@@ -48,7 +48,7 @@ export class TutorialController {
     }
     await this.tutorialService.toggleSolution(true);
     await this.tutorialViewService.handleSolutionToggleUI(true);
-    await this._updateTutorialPanel();
+    await this.tutorialViewService.updateTutorialPanel(this.extensionUri, activeTutorial, new WebviewMessageHandler(this)) //TODO: refactor to remove always new creation of handler
   }
 
   /**
@@ -66,15 +66,15 @@ export class TutorialController {
     let tutorialLocalPath: string | undefined;
     const activeGitAdapter = this.tutorialService.getActiveGitAdapter();
 
-    if (activeTutorial.currentStepId) {
-      currentStep = activeTutorial.steps.find(s => s.id === activeTutorial!.currentStepId);
+    if (activeTutorial.activeStep.id) {
+      currentStep = activeTutorial.steps.find(s => s.id === activeTutorial!.activeStep.id);
       if (currentStep && activeGitAdapter && activeTutorial.localPath) {
         changedFilePaths = await activeGitAdapter.getChangesInCommit(currentStep.commitHash);
         tutorialLocalPath = activeTutorial.localPath;
       }
     }
     await this.tutorialViewService.handleSolutionToggleUI(false, currentStep, changedFilePaths, tutorialLocalPath);
-    await this._updateTutorialPanel();
+    await this.tutorialViewService.updateTutorialPanel(this.extensionUri, activeTutorial, new WebviewMessageHandler(this)) //TODO: refactor to remove always new creation of handler
   }
 
   /**
@@ -362,7 +362,7 @@ export class TutorialController {
   /**
    * Selects and navigates to a specific step within the active tutorial.
    * Handles loading step content, updating UI elements (like side panel files), and managing progress.
-   * @param step The Step object or the ID/commit hash of the step to navigate to.
+   * @param step The Step object or the ID or commit hash of the step to navigate to.
    */
   public async selectStep(step: Step | string): Promise<void> {
     const activeTutorial = this.tutorialService.getActiveTutorial();
@@ -389,9 +389,9 @@ export class TutorialController {
       return;
     }
 
-    if (activeTutorial.currentStepId === targetStepId && this.tutorialService.getCurrentStepHtmlContent() !== null) {
+    if (activeTutorial.activeStep.id === targetStepId) {
       console.log(`TutorialController: Step '${targetStep.title}' is already active and content loaded.`);
-      await this._updateTutorialPanel();
+      await this.tutorialViewService.updateTutorialPanel(this.extensionUri, activeTutorial, new WebviewMessageHandler(this))
       return;
     }
 
@@ -410,7 +410,7 @@ export class TutorialController {
 
       if (navigationSuccess) {
         const updatedTutorial = this.tutorialService.getActiveTutorial();
-        const currentActiveStep = updatedTutorial?.steps.find(s => s.id === updatedTutorial.currentStepId);
+        const currentActiveStep = updatedTutorial?.steps.find(s => s.id === updatedTutorial.activeStep.id);
 
         if (updatedTutorial && currentActiveStep && updatedTutorial.localPath && activeGitAdapter) {
           const changedFilePaths = await activeGitAdapter.getChangesInCommit(currentActiveStep.commitHash);
@@ -425,12 +425,12 @@ export class TutorialController {
       } else {
         this.userInteraction.showErrorMessage(`Failed to switch to step '${targetStep.title}'.`);
       }
-      await this._updateTutorialPanel();
+      await this.tutorialViewService.updateTutorialPanel(this.extensionUri, activeTutorial, new WebviewMessageHandler(this)) //TODO: refactor to remove always new creation of handler
     } catch (error) {
       this.progressReporter.reportEnd();
       console.error(`TutorialController: Error selecting step '${targetStep.title}':`, error);
       this.userInteraction.showErrorMessage(`Failed to switch to step '${targetStep.title}': ${error instanceof Error ? error.message : String(error)}`);
-      await this._updateTutorialPanel();
+      await this.tutorialViewService.updateTutorialPanel(this.extensionUri, activeTutorial, new WebviewMessageHandler(this)) //TODO: refactor to remove always new creation of handler
     }
   }
 
@@ -447,13 +447,11 @@ export class TutorialController {
     vscode.commands.executeCommand('setContext', 'gitorial.tutorialActive', true);
 
 
-    let stepIdToSelect = stepCommitHash || tutorial.currentStepId;
+    let stepIdToSelect = stepCommitHash || tutorial.activeStep.id;
     if (!tutorial.steps.find(s => s.commitHash === stepIdToSelect) && tutorial.steps.length > 0) {
       stepIdToSelect = tutorial.steps[0].commitHash;
     } else if (tutorial.steps.length === 0) {
-      console.warn("TutorialController: activateTutorialMode called for a tutorial with no steps.");
-      await this._updateTutorialPanel();
-      return;
+      throw new Error("TutorialController: activateTutorialMode called for a tutorial with no steps.");
     }
     await this.selectStep(stepIdToSelect);
   }
@@ -482,7 +480,7 @@ export class TutorialController {
     const success = await this.tutorialService.navigateToNextStep();
     if (success) {
       const updatedTutorial = this.tutorialService.getActiveTutorial();
-      const nextStep = updatedTutorial?.steps.find(s => s.id === updatedTutorial.currentStepId);
+      const nextStep = updatedTutorial?.steps.find(s => s.id === updatedTutorial.activeStep.id);
       const activeGitAdapter = this.tutorialService.getActiveGitAdapter();
       if (updatedTutorial && nextStep && updatedTutorial.localPath && activeGitAdapter) {
         const changedFilePaths = await activeGitAdapter.getChangesInCommit(nextStep.commitHash);
@@ -496,7 +494,7 @@ export class TutorialController {
     } else {
       this.userInteraction.showInformationMessage("You are already on the last step.");
     }
-    await this._updateTutorialPanel();
+    await this.tutorialViewService.updateTutorialPanel(this.extensionUri, activeTutorial, new WebviewMessageHandler(this)) //TODO: refactor to remove always new creation of handler
   }
 
   /**
@@ -510,7 +508,7 @@ export class TutorialController {
     const success = await this.tutorialService.navigateToPreviousStep();
     if (success) {
       const updatedTutorial = this.tutorialService.getActiveTutorial();
-      const prevStep = updatedTutorial?.steps.find(s => s.id === updatedTutorial.currentStepId);
+      const prevStep = updatedTutorial?.steps.find(s => s.id === updatedTutorial.activeStep.id);
       const activeGitAdapter = this.tutorialService.getActiveGitAdapter();
       if (updatedTutorial && prevStep && updatedTutorial.localPath && activeGitAdapter) {
         const changedFilePaths = await activeGitAdapter.getChangesInCommit(prevStep.commitHash);
@@ -524,62 +522,9 @@ export class TutorialController {
     } else {
       this.userInteraction.showInformationMessage("You are already on the first step.");
     }
-    await this._updateTutorialPanel();
+    await this.tutorialViewService.updateTutorialPanel(this.extensionUri, activeTutorial, new WebviewMessageHandler(this)) //TODO: refactor to remove always new creation of handler
   }
 
-
-  /**
-   * Gets the view model representing the current state of the active tutorial.
-   * This is used to populate and update the tutorial panel UI.
-   * Returns null if no tutorial is active.
-   */
-  get tutorialViewModel(): TutorialViewModel | null {
-    const activeTutorial = this.tutorialService.getActiveTutorial();
-    if (activeTutorial) {
-      const currentStepIdInService = activeTutorial.currentStepId;
-      const actualCurrentStepId = currentStepIdInService;
-
-      const stepsViewModel: TutorialStepViewModel[] = activeTutorial.steps.map(step => {
-        let stepHtmlContent: string | undefined = undefined;
-        if (step.id === actualCurrentStepId) {
-          stepHtmlContent = this.tutorialService.getCurrentStepHtmlContent() || undefined;
-        }
-
-        return {
-          id: step.id,
-          title: step.title,
-          description: step.description,
-          commitHash: step.commitHash,
-          state: step.state,
-          type: step.type,
-          isActive: step.id === actualCurrentStepId,
-          htmlContent: stepHtmlContent
-        };
-      });
-
-      return {
-        id: activeTutorial.id,
-        title: activeTutorial.title,
-        steps: stepsViewModel,
-        currentStepId: actualCurrentStepId,
-        isShowingSolution: this.tutorialService.getIsShowingSolution()
-      };
-    }
-    return null;
-  }
-
-  /**
-   * Updates the tutorial panel UI by creating or showing it with the latest view model.
-   * If no tutorial is active, it disposes of any existing panel.
-   */
-  private async _updateTutorialPanel(): Promise<void> {
-    const tutorialViewModel = this.tutorialViewModel;
-    if (tutorialViewModel) {
-      TutorialPanelManager.createOrShow(this.extensionUri, tutorialViewModel, this);
-    } else {
-      TutorialPanelManager.disposeCurrentPanel();
-    }
-  }
 
   /**
    * Ensures that the target subdirectory for cloning is usable.

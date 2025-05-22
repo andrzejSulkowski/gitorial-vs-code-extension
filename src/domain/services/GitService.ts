@@ -3,7 +3,6 @@
 - Uses GitAdapter but focuses on tutorial-related logic
 */
 
-import { DiffModel, DiffChangeType } from '../models/DiffModel';
 import { IGitOperations, DomainCommit, DefaultLogFields, ListLogLine } from '../ports/IGitOperations';
 
 // Provides domain-specific Git operations relevant to tutorials. It uses the
@@ -49,45 +48,6 @@ export class GitService {
     }
   }
 
-  /**
-   * Get the diff models for changes between the current commit and its parent
-   */
-  public async getDiffModelsForParent(): Promise<DiffModel[]> {
-    const currentCommitHash = await this.getCurrentCommitHash();
-    const commitHistory = await this.getCommitHistory();
-
-    const currentCommitIdx = commitHistory.findIndex(c => c.hash === currentCommitHash)
-    const parentCommit = commitHistory.at(currentCommitIdx + 1);
-
-    try {
-
-      if (!parentCommit) {
-        throw new Error("The current commit is at the HEAD of the branch.\nThere is no parent commit");
-      }
-
-      const changedFiles = await this.gitAdapter.getCommitDiff(parentCommit.hash);
-
-      return changedFiles.map(file => {
-        let changeType: DiffChangeType | undefined;
-        if (file.isNew) {
-          changeType = DiffChangeType.ADDED;
-        } else if (file.isDeleted) {
-          changeType = DiffChangeType.DELETED;
-        } else if (file.isModified) {
-          changeType = DiffChangeType.MODIFIED;
-        }
-        return new DiffModel(
-          file.relativeFilePath,
-          file.absoluteFilePath,
-          parentCommit.hash,
-          changeType
-        );
-      });
-    } catch (error) {
-      console.error(`Error getting diff models:`, error);
-      return [];
-    }
-  }
 
   /**
    * Get the content of a file at a specific commit

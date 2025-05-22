@@ -1,5 +1,8 @@
-import { Tutorial } from "src/domain/models/Tutorial";
+import { Markdown } from "../models/Markdown";
 
 export interface IStepContentRepository {
-  getStepMarkdownContent(tutorial: Tutorial): Promise<string | null>;
+  /**
+  * @param path: path to the tutorial root
+  */
+  getStepMarkdownContent(path: string): Promise<Markdown | null>;
 }

@@ -26,6 +26,7 @@ import { TutorialViewService } from "./ui/services/TutorialViewService";
 import { AutoOpenState } from "./infrastructure/state/AutoOpenState";
 import { IActiveTutorialStateRepository } from "./domain/repositories/IActiveTutorialStateRepository";
 import { ITutorialRepository } from "./domain/repositories/ITutorialRepository";
+import { DiffViewService } from "./ui/services/DiffViewService";
 
 
 /**
@@ -110,27 +111,30 @@ async function bootstrapApplication(context: vscode.ExtensionContext): Promise<B
   }
 
   // --- Infrastructure Repositories ---
+  const stepContentRepository = new StepContentRepository(fileSystemAdapter);
+  const activeTutorialStateRepository = new MementoActiveTutorialStateRepository(workspaceStateMementoAdapter);
   const tutorialRepository = new TutorialRepositoryImpl(
     workspaceStateMementoAdapter, // Using workspace specific state for tutorials
     gitAdapterFactory.createFromPath,
     gitAdapterFactory.createFromClone,
     fileSystemAdapter,
-    userInteractionAdapter
+    userInteractionAdapter,
+    stepContentRepository
   );
-  const stepContentRepository = new StepContentRepository(fileSystemAdapter);
-  const activeTutorialStateRepository = new MementoActiveTutorialStateRepository(workspaceStateMementoAdapter);
 
   // --- Domain Services ---
   const tutorialService = new TutorialService(
     tutorialRepository,
-    diffDisplayerAdapter,
     gitAdapterFactory,
     stepContentRepository,
-    markdownConverter,
     activeTutorialStateRepository,
     workspaceId
   );
-  const tutorialViewService = new TutorialViewService(fileSystemAdapter);
+
+  
+  // --- UI Services ---
+  const tutorialViewService = new TutorialViewService(fileSystemAdapter, markdownConverter);
+  const diffViewService = new DiffViewService(diffDisplayerAdapter);
 
   // --- UI Layer Controllers ---
   const tutorialController = new TutorialController(

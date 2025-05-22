@@ -6,8 +6,6 @@
 * Infrastructure layer (e.g., using `simple-git` and VS Code APIs).
 */
 
-import { DiffFilePayload } from "./IDiffDisplayer";
-
 /**
  * Abstract representation of a Git commit.
  * Implementations should map raw commit data (e.g., from `simple-git`) into this shape.
@@ -240,12 +238,6 @@ export interface IGitOperations {
    * @returns An array of log entries with summary and optional diff.
    */
   getCommits(branchOrHash?: string): Promise<Array<DefaultLogFields & ListLogLine>>;
-
-  /**
-   * Get the list of file‑level changes for a given commit.
-   * @param commitHash - The commit hash to diff against its parent.
-   */
-  getCommitDiff(commitHash: string): Promise<DiffFilePayload[]>;
 
   /**
    * Determine if the current working directory is inside a Git repository.

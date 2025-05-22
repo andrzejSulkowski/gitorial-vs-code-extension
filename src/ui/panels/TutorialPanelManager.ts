@@ -2,16 +2,15 @@
 // handling its messages to/from the webview content, and displaying tutorial data.
 // It interacts with the TutorialController.
 import * as vscode from 'vscode';
-import { TutorialController } from '../controllers/TutorialController'; // To send actions back
 import { TutorialPanel } from './TutorialPanel'; // Import the new TutorialPanel
 import { WebviewMessageHandler } from './WebviewMessageHandler'; // Added import
-import { TutorialViewModel } from '@shared/types/viewmodels';
+import { TutorialViewModel } from '@shared/types/viewmodels/TutorialViewModel';
 
 export class TutorialPanelManager {
   private static currentPanelInstance: TutorialPanel | undefined;
   private static currentPanelManagerDisposables: vscode.Disposable[] = [];
 
-  public static createOrShow(extensionUri: vscode.Uri, tutorial: TutorialViewModel, tutorialController: TutorialController): void {
+  public static createOrShow(extensionUri: vscode.Uri, tutorial: TutorialViewModel, messageHandler: WebviewMessageHandler): void {
     if (TutorialPanelManager.currentPanelInstance) {
       TutorialPanelManager.currentPanelInstance.reveal(vscode.ViewColumn.One);
       TutorialPanelManager.currentPanelInstance.updateTutorial(tutorial);
@@ -35,7 +34,6 @@ export class TutorialPanelManager {
       }
     );
 
-    const messageHandler = new WebviewMessageHandler(tutorialController); // Create message handler
     const newTutorialPanel = new TutorialPanel(vscodePanel, extensionUri, messageHandler); // Pass handler to panel
     TutorialPanelManager.currentPanelInstance = newTutorialPanel;
 

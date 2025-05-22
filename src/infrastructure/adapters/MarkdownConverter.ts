@@ -1,5 +1,7 @@
 import MarkdownIt from 'markdown-it';
-import { IMarkdownConverter } from '../../domain/ports/IMarkdownConverter';
+import { IMarkdownConverter } from '../../ui/ports/IMarkdownConverter';
+import { HTML } from '@shared/types/viewmodels/HTML';
+import { Markdown } from 'src/domain/models/Markdown';
 
 export class MarkdownItConverter implements IMarkdownConverter {
   private md: MarkdownIt;
@@ -8,8 +10,8 @@ export class MarkdownItConverter implements IMarkdownConverter {
     this.md = new MarkdownIt();
   }
 
-  convertToHtml(markdown: string): string {
-    return this.md.render(markdown);
+  render(markdown: Markdown): HTML {
+    return this.md.render(markdown) as HTML;
   }
 }
 

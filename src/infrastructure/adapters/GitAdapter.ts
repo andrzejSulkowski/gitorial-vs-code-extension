@@ -3,16 +3,16 @@
 - Provides Git operations (clone, checkout, etc.)
 */
 
-import simpleGit, { SimpleGit, BranchSummary, RemoteWithRefs, CommitResult, CheckRepoActions, TaskOptions } from 'simple-git';
-import * as path from 'path';
+import simpleGit, { SimpleGit, BranchSummary, RemoteWithRefs, CheckRepoActions, TaskOptions } from 'simple-git';
+import * as path from 'path'; //TODO: Remove this import and use IFileSystem instead
 import { IGitOperations, DefaultLogFields, ListLogLine } from '../../domain/ports/IGitOperations';
-import { DiffFilePayload } from 'src/domain/ports/IDiffDisplayer';
+import { IGitChanges, DiffFilePayload } from 'src/ui/ports/IGitChanges';
 
 /**
  * Adapter for Git operations using simple-git
  * This is the "adapter" in the ports & adapters pattern
  */
-export class GitAdapter implements IGitOperations {
+export class GitAdapter implements IGitOperations, IGitChanges {
   private git: SimpleGit;
   private repoPath: string;
   
@@ -24,48 +24,33 @@ export class GitAdapter implements IGitOperations {
     this.repoPath = repoPath;
     this.git = simpleGit({ baseDir: repoPath, binary: 'git', maxConcurrentProcesses: 6 });
   }
-
-  // Helper to parse git diff --name-status output
-  private parseNameStatus(diffOutput: string): Array<{ status: string, path: string, oldPath?: string }> {
-    const files: Array<{ status: string, path: string, oldPath?: string }> = [];
-    if (!diffOutput) return files;
-
-    const lines = diffOutput.trim().split('\n');
-    for (const line of lines) {
-      if (line.trim() === '') continue;
-      // Lines are typically "S\tpath" or "SXXX\tpath" for A, M, D, T
-      // or "SXXX\told_path\tnew_path" for R, C (where S is the status char like R or C)
-      const parts = line.split('\t');
-      const rawStatus = parts[0].trim(); // e.g., "A", "M", "D", "R100", "C075"
-      const statusChar = rawStatus[0]; // "A", "M", "D", "R", "C"
-
-      if (statusChar === 'R' || statusChar === 'C') {
-        if (parts.length === 3) { // R_old_new or C_old_new
-          files.push({ status: statusChar, oldPath: parts[1].trim(), path: parts[2].trim() });
-        } else {
-          console.warn(`GitAdapter.parseNameStatus: Unexpected format for Renamed/Copied line: '${line}'`);
-        }
-      } else { // A, M, D, T
-        if (parts.length === 2) {
-          files.push({ status: statusChar, path: parts[1].trim() });
-        } else {
-          console.warn(`GitAdapter.parseNameStatus: Unexpected format for line: '${line}'`);
-        }
-      }
-    }
-    return files;
-  }
-
   /**
-   * Centralized helper to check if a branch name matches gitorial patterns.
+   * Clone a repository to a target directory
    */
-  private static _isGitorialBranchNamePattern(branchName: string): boolean {
-    // Check if 'gitorial' is one of the path segments in the branch name.
-    const segments = branchName.split('/');
-    return segments.includes('gitorial');
+  static async cloneRepo(repoUrl: string, targetPath: string, progressCallback?: (message: string) => void): Promise<void> {
+    if (progressCallback) progressCallback(`Cloning ${repoUrl} into ${targetPath}...`);
+    await simpleGit().clone(repoUrl, targetPath);
+    if (progressCallback) progressCallback(`Cloned successfully.`);
+  }
+  /**
+   * Factory method to create a GitAdapter after cloning a repo
+   */
+  public static async createFromClone(repoUrl: string, targetDir: string): Promise<GitAdapter> {
+    const git = simpleGit();
+    await git.clone(repoUrl, targetDir);
+    return new GitAdapter(targetDir);
   }
 
-  async ensureGitorialBranch(): Promise<void> {
+
+  //   _____ _____ _ _    ____                       _   _                 
+  //  |_   _/ ____(_) |  / __ \                     | | (_)                
+  //    | || |  __ _| |_| |  | |_ __   ___ _ __ __ _| |_ _  ___  _ __  ___ 
+  //    | || | |_ | | __| |  | | '_ \ / _ \ '__/ _` | __| |/ _ \| '_ \/ __|
+  //   _| || |__| | | |_| |__| | |_) |  __/ | | (_| | |_| | (_) | | | \__ \
+  //  |_____\_____|_|\__|\____/| .__/ \___|_|  \__,_|\__|_|\___/|_| |_|___/
+  //                           | |                                         
+  //                           |_|                                         
+  public async ensureGitorialBranch(): Promise<void> {
     const branches = await this.git.branch();
 
     // 1. Check if current branch is already 'gitorial'
@@ -145,24 +130,6 @@ export class GitAdapter implements IGitOperations {
   }
   public async listRemote(args: TaskOptions): Promise<string> {
     return await this.git.listRemote(args);
-  }
-  
-  /**
-   * Factory method to create a GitAdapter after cloning a repo
-   */
-  public static async createFromClone(repoUrl: string, targetDir: string): Promise<GitAdapter> {
-    const git = simpleGit();
-    await git.clone(repoUrl, targetDir);
-    return new GitAdapter(targetDir);
-  }
-  
-  /**
-   * Clone a repository to a target directory
-   */
-  static async cloneRepo(repoUrl: string, targetPath: string, progressCallback?: (message: string) => void): Promise<void> {
-    if (progressCallback) progressCallback(`Cloning ${repoUrl} into ${targetPath}...`);
-    await simpleGit().clone(repoUrl, targetPath);
-    if (progressCallback) progressCallback(`Cloned successfully.`);
   }
   
   /**
@@ -262,9 +229,6 @@ export class GitAdapter implements IGitOperations {
     }
   }
   
-  /**
-   * Get the absolute path from a relative path
-   */
   public getAbsolutePath(relativePath: string): string {
     return path.join(this.repoPath, relativePath);
   }
@@ -295,11 +259,91 @@ export class GitAdapter implements IGitOperations {
     }
   }
 
-  async getCommits(branch?: string): Promise<Array<DefaultLogFields & ListLogLine>> {
+  public async getCommits(branch?: string): Promise<Array<DefaultLogFields & ListLogLine>> {
     const log = await this.git.log(branch ? [branch] : []);
     return log.all as Array<DefaultLogFields & ListLogLine>; // Type assertion, ensure compatibility
   }
 
+  public async isGitRepository(): Promise<boolean> {
+    return this.git.checkIsRepo(CheckRepoActions.IS_REPO_ROOT);
+  }
+
+  public async getChangesInCommit(commitHash: string): Promise<string[]> {
+    if (!commitHash) {
+      console.warn("GitAdapter: getChangesInCommit called with no commitHash.");
+      return [];
+    }
+    try {
+      // Diff against the parent. If it's the initial commit, it has no parent.
+      // simple-git might throw an error for `HEAD^` on initial commit, or an empty diff might result.
+      // Using `git.show` with `--name-only --pretty=format:` is also an option for listing files in a commit,
+      // but `diff` is more direct for changes *introduced* by the commit.
+      const diffOutput = await this.git.diff([`${commitHash}^`, commitHash, '--name-only', '--diff-filter=AM']); // Filter for Added or Modified files only
+      if (diffOutput) {
+        return diffOutput.split('\n').filter(line => line.trim().length > 0);
+      }
+      return [];
+    } catch (error: any) {
+      // A common error here is if the commitHash is the very first commit (no parent ^).
+      // In such cases, all files in that commit are effectively "changes".
+      if (error.message && (error.message.includes('unknown revision or path not in the working tree') || error.message.includes('bad revision ')) && error.message.includes(`${commitHash}^`)){
+        console.log(`GitAdapter: Likely initial commit (${commitHash}). Listing all files in the commit instead of diffing against parent.`);
+        const showOutput = await this.git.show([commitHash, '--name-only', '--pretty=format:', '--no-abbrev']);
+        if (showOutput) {
+          // The output of show --name-only --pretty=format: is just a list of files, one per line, often with an extra newline at the end.
+          return showOutput.split('\n').filter(line => line.trim().length > 0);
+        }
+        return [];
+      }
+      console.error(`GitAdapter: Error getting changes in commit ${commitHash}:`, error);
+      throw error;
+    }
+  }
+
+  private parseNameStatus(diffOutput: string): Array<{ status: string, path: string, oldPath?: string }> {
+    const files: Array<{ status: string, path: string, oldPath?: string }> = [];
+    if (!diffOutput) return files;
+
+    const lines = diffOutput.trim().split('\n');
+    for (const line of lines) {
+      if (line.trim() === '') continue;
+      // Lines are typically "S\tpath" or "SXXX\tpath" for A, M, D, T
+      // or "SXXX\told_path\tnew_path" for R, C (where S is the status char like R or C)
+      const parts = line.split('\t');
+      const rawStatus = parts[0].trim(); // e.g., "A", "M", "D", "R100", "C075"
+      const statusChar = rawStatus[0]; // "A", "M", "D", "R", "C"
+
+      if (statusChar === 'R' || statusChar === 'C') {
+        if (parts.length === 3) { // R_old_new or C_old_new
+          files.push({ status: statusChar, oldPath: parts[1].trim(), path: parts[2].trim() });
+        } else {
+          console.warn(`GitAdapter.parseNameStatus: Unexpected format for Renamed/Copied line: '${line}'`);
+        }
+      } else { // A, M, D, T
+        if (parts.length === 2) {
+          files.push({ status: statusChar, path: parts[1].trim() });
+        } else {
+          console.warn(`GitAdapter.parseNameStatus: Unexpected format for line: '${line}'`);
+        }
+      }
+    }
+    return files;
+  }
+
+  private static _isGitorialBranchNamePattern(branchName: string): boolean {
+    // Check if 'gitorial' is one of the path segments in the branch name.
+    const segments = branchName.split('/');
+    return segments.includes('gitorial');
+  }
+
+  //   _____ _____ _ _    _____ _                                 
+  //  |_   _/ ____(_) |  / ____| |                                
+  //    | || |  __ _| |_| |    | |__   __ _ _ __   __ _  ___  ___ 
+  //    | || | |_ | | __| |    | '_ \ / _` | '_ \ / _` |/ _ \/ __|
+  //   _| || |__| | | |_| |____| | | | (_| | | | | (_| |  __/\__ \
+  //  |_____\_____|_|\__|\_____|_| |_|\__,_|_| |_|\__, |\___||___/
+  //                                               __/ |          
+  //                                              |___/           
   async getCommitDiff(targetCommitHash: string): Promise<DiffFilePayload[]> {
     const payloads: DiffFilePayload[] = [];
     let parentCommitHash: string | null = null;
@@ -371,43 +415,9 @@ export class GitAdapter implements IGitOperations {
     }
     return payloads;
   }
-
-  async isGitRepository(): Promise<boolean> {
-    return this.git.checkIsRepo(CheckRepoActions.IS_REPO_ROOT);
-  }
-
-  async getChangesInCommit(commitHash: string): Promise<string[]> {
-    if (!commitHash) {
-      console.warn("GitAdapter: getChangesInCommit called with no commitHash.");
-      return [];
-    }
-    try {
-      // Diff against the parent. If it's the initial commit, it has no parent.
-      // simple-git might throw an error for `HEAD^` on initial commit, or an empty diff might result.
-      // Using `git.show` with `--name-only --pretty=format:` is also an option for listing files in a commit,
-      // but `diff` is more direct for changes *introduced* by the commit.
-      const diffOutput = await this.git.diff([`${commitHash}^`, commitHash, '--name-only', '--diff-filter=AM']); // Filter for Added or Modified files only
-      if (diffOutput) {
-        return diffOutput.split('\n').filter(line => line.trim().length > 0);
-      }
-      return [];
-    } catch (error: any) {
-      // A common error here is if the commitHash is the very first commit (no parent ^).
-      // In such cases, all files in that commit are effectively "changes".
-      if (error.message && (error.message.includes('unknown revision or path not in the working tree') || error.message.includes('bad revision ')) && error.message.includes(`${commitHash}^`)){
-        console.log(`GitAdapter: Likely initial commit (${commitHash}). Listing all files in the commit instead of diffing against parent.`);
-        const showOutput = await this.git.show([commitHash, '--name-only', '--pretty=format:', '--no-abbrev']);
-        if (showOutput) {
-          // The output of show --name-only --pretty=format: is just a list of files, one per line, often with an extra newline at the end.
-          return showOutput.split('\n').filter(line => line.trim().length > 0);
-        }
-        return [];
-      }
-      console.error(`GitAdapter: Error getting changes in commit ${commitHash}:`, error);
-      throw error;
-    }
-  }
 }
+
+
 
 /**
  * Factory function to create a GitAdapter

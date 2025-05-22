@@ -6,12 +6,11 @@
 
 import { Tutorial } from '../models/Tutorial';
 import { ITutorialRepository } from '../repositories/ITutorialRepository';
-import { IDiffDisplayer, DiffFile, DiffFilePayload } from '../ports/IDiffDisplayer';
 import { IGitAdapterFactory } from '../ports/IGitOperationsFactory';
 import { IGitOperations } from '../ports/IGitOperations';
 import { IStepContentRepository } from '../ports/IStepContentRepository';
-import { IMarkdownConverter } from '../ports/IMarkdownConverter';
 import { IActiveTutorialStateRepository, StoredTutorialState } from "../repositories/IActiveTutorialStateRepository";
+import { ActiveStep } from '../models/ActiveStep';
 
 /**
  * Options for loading a tutorial
@@ -38,9 +37,7 @@ export interface LoadTutorialOptions {
  */
 export class TutorialService {
   private activeTutorial: Tutorial | null = null;
-  private isShowingSolution: boolean = false;
   private gitAdapter: IGitOperations | null = null;
-  private currentStepHtmlContent: string | null = null;
   private readonly workspaceId: string | undefined;
 
   /**
@@ -48,10 +45,8 @@ export class TutorialService {
    */
   constructor(
     private readonly repository: ITutorialRepository,
-    private readonly diffDisplayer: IDiffDisplayer,
     private readonly gitAdapterFactory: IGitAdapterFactory,
     private readonly stepContentRepository: IStepContentRepository,
-    private readonly markdownConverter: IMarkdownConverter,
     private readonly activeTutorialStateRepository: IActiveTutorialStateRepository,
     workspaceId?: string
   ) {
@@ -102,7 +97,7 @@ export class TutorialService {
 
     let effectiveInitialTabs: string[] | undefined = options.initialOpenTabFsPaths;
     if (!effectiveInitialTabs && persistedState && persistedState.tutorialId === tutorial.id) {
-        effectiveInitialTabs = persistedState.openFileUris;
+      effectiveInitialTabs = persistedState.openFileUris;
     }
 
     await this.activateTutorial(tutorial, { ...options, initialOpenTabFsPaths: effectiveInitialTabs });
@@ -161,11 +156,11 @@ export class TutorialService {
   }
 
   public getIsShowingSolution(): boolean {
-    return this.isShowingSolution;
+    return this.activeTutorial?.isShowingSolution ?? false;
   }
 
-  public getCurrentStepHtmlContent(): string | null {
-    return this.currentStepHtmlContent;
+  public getActiveStep(): ActiveStep | null {
+    return this.activeTutorial?.activeStep ?? null;
   }
 
   /**
@@ -178,33 +173,35 @@ export class TutorialService {
     }
 
     const targetStep = this.activeTutorial.steps[stepIndex];
-    if (this.activeTutorial.currentStepId === targetStep.id) {
-      if (this.currentStepHtmlContent === null) {
-        await this.loadAndPrepareDisplayContentForStep(targetStep);
-      }
+    if (this.activeTutorial.activeStep.id === targetStep.id) {
+      const markdown = await this._loadMarkdown();
+      const activeStep = new ActiveStep({ ...targetStep, markdown });
+      this.activeTutorial.activeStep = activeStep;
+      /*
       if (this.isShowingSolution) {
         await this.showStepSolution();
       }
+      */
       return true;
     }
 
     try {
       await this.gitAdapter.checkout(targetStep.commitHash);
-      this.activeTutorial.currentStepId = targetStep.id;
-      await this.loadAndPrepareDisplayContentForStep(targetStep);
+      const markdown = await this._loadMarkdown();
+      this.activeTutorial.activeStep = new ActiveStep({ ...targetStep, markdown });
 
-      if (this.workspaceId && this.activeTutorial && this.activeTutorial.currentStepId) {
+      if (this.workspaceId && this.activeTutorial) {
         await this.activeTutorialStateRepository.saveActiveTutorial(
           this.workspaceId,
           this.activeTutorial.id,
-          this.activeTutorial.currentStepId,
+          this.activeTutorial.activeStep.id,
           this.activeTutorial.lastPersistedOpenTabFsPaths || []
         );
       }
 
-      if (this.isShowingSolution) {
+      /*if (this.isShowingSolution) {
         await this.showStepSolution();
-      }
+      }*/
       return true;
     } catch (error) {
       console.error(`TutorialService: Error navigating to step ${targetStep.title}:`, error);
@@ -217,13 +214,13 @@ export class TutorialService {
    */
   public async navigateToNextStep(): Promise<boolean> {
     if (!this.activeTutorial || !this.gitAdapter) return false;
-    const currentIndex = this.activeTutorial.steps.findIndex(s => s.id === this.activeTutorial!.currentStepId);
+    const currentIndex = this.activeTutorial.steps.findIndex(s => s.id === this.activeTutorial!.activeStep.id);
     if (currentIndex === -1 || currentIndex >= this.activeTutorial.steps.length - 1) {
       return false; // No next step or current step not found
     }
 
     let jump = 1;
-    if(this.activeTutorial.steps[currentIndex + 1].type === "solution") {
+    if (this.activeTutorial.steps[currentIndex + 1].type === "solution") {
       jump = 2;
     }
     return this.navigateToStep(currentIndex + jump);
@@ -234,13 +231,13 @@ export class TutorialService {
    */
   public async navigateToPreviousStep(): Promise<boolean> {
     if (!this.activeTutorial || !this.gitAdapter) return false;
-    const currentIndex = this.activeTutorial.steps.findIndex(s => s.id === this.activeTutorial!.currentStepId);
+    const currentIndex = this.activeTutorial.steps.findIndex(s => s.id === this.activeTutorial!.activeStep.id);
     if (currentIndex <= 0) {
       return false; // No previous step or current step not found
     }
 
     let jump = 1;
-    if (this.activeTutorial.steps[currentIndex - 1].type === "solution"){
+    if (this.activeTutorial.steps[currentIndex - 1].type === "solution") {
       jump = 2;
     }
     return this.navigateToStep(currentIndex - jump);
@@ -250,14 +247,15 @@ export class TutorialService {
    * Toggle showing the solution
    */
   public async toggleSolution(show?: boolean): Promise<void> {
-    const newValue = show === undefined ? !this.isShowingSolution : show;
-    if (newValue === this.isShowingSolution) {
+    if(!this.activeTutorial) return;
+    const newValue = show === undefined ? !this.activeTutorial?.isShowingSolution : show;
+    if (newValue === this.activeTutorial?.isShowingSolution) {
       return;
     }
-    this.isShowingSolution = newValue;
-    if (this.isShowingSolution && this.activeTutorial && this.gitAdapter) {
+    this.activeTutorial.isShowingSolution = newValue;
+    /*if (this.isShowingSolution && this.activeTutorial && this.gitAdapter) {
       await this.showStepSolution();
-    }
+    }*/
   }
 
   /**
@@ -267,7 +265,6 @@ export class TutorialService {
     if (!this.activeTutorial) return;
     this.activeTutorial = null;
     this.gitAdapter = null;
-    this.currentStepHtmlContent = null;
     if (this.workspaceId) {
       await this.activeTutorialStateRepository.clearActiveTutorial(this.workspaceId);
     }
@@ -286,31 +283,31 @@ export class TutorialService {
       return;
     }
 
-    this.isShowingSolution = options.showSolution || false;
+    this.activeTutorial.isShowingSolution = options.showSolution || false;
 
     //TODO: This looks pretty much like navigation here...
     let targetStep;
-    if(options.initialStepCommitHash){
+    if (options.initialStepCommitHash) {
       targetStep = tutorial.steps.find(s => s.commitHash === options.initialStepCommitHash);
-    }else{
-      targetStep = tutorial.steps.find(s => s.id === tutorial.currentStepId);
+    } else {
+      targetStep = tutorial.steps.find(s => s.id === tutorial.activeStep.id);
     }
 
-    if(!targetStep){
+    if (!targetStep) {
       console.error("TutorialService: tutorial step couldnt be found")
       targetStep = tutorial.steps[0];
     }
 
     if (tutorial.steps.length > 0) {
-      tutorial.currentStepId = targetStep.id;
 
       if (this.gitAdapter) {
         try {
           await this.gitAdapter.checkout(targetStep.commitHash);
-          await this.loadAndPrepareDisplayContentForStep(targetStep);
-          if (this.isShowingSolution) {
+          const markdown = await this._loadMarkdown();
+          tutorial.activeStep = new ActiveStep({ ...targetStep, markdown });
+          /*if (this.isShowingSolution) {
             await this.showStepSolution();
-          }
+          }*/
         } catch (error) {
           console.error(`TutorialService: Error during initial checkout for tutorial ${tutorial.title}:`, error);
         }
@@ -321,112 +318,27 @@ export class TutorialService {
       console.warn(`TutorialService: Tutorial "${tutorial.title}" has no steps.`);
     }
 
-    if (this.workspaceId && tutorial.currentStepId) {
+    if (this.workspaceId && tutorial.activeStep.id) {
       const tabsToSave = options.initialOpenTabFsPaths || [];
       tutorial.lastPersistedOpenTabFsPaths = tabsToSave;
 
       await this.activeTutorialStateRepository.saveActiveTutorial(
         this.workspaceId,
         tutorial.id,
-        tutorial.currentStepId,
+        this.activeTutorial.activeStep.id,
         tabsToSave
       );
     }
   }
 
-  private async showStepSolution(): Promise<void> {
-    if (!this.activeTutorial || !this.gitAdapter || !this.activeTutorial.localPath) {
-      console.warn('TutorialService: Cannot show solution. Missing active tutorial, git adapter, or local path.');
-      return;
-    }
+  private async _loadMarkdown() {
+    if (!this.activeTutorial) throw new Error("_loadMarkdown - no active tutorial inside TutorialService")
 
-    const currentStepIdx = this.activeTutorial.steps.findIndex(s => s.id === this.activeTutorial!.currentStepId);
-    if (currentStepIdx === -1) {
-      console.warn('TutorialService: Current step not found by ID for showing solution.');
-      return;
-    }
-    const currentStep = this.activeTutorial.steps[currentStepIdx];
-    const nextStep = this.activeTutorial.steps[currentStepIdx + 1];
-
-    if (!nextStep) {
-      console.warn('TutorialService: At the last step, no next step to show solution from.');
-      return;
-    }
-
-    try {
-      const commitDiffPayloads: DiffFilePayload[] = await this.gitAdapter.getCommitDiff(nextStep.commitHash);
-
-      if (commitDiffPayloads.length === 0) {
-        return;
-      }
-
-      const excludedFileNames = ['readme.md', '.gitignore'];
-      const filteredDiffPayloads = commitDiffPayloads.filter(payload => {
-        const baseName = payload.relativeFilePath.substring(payload.relativeFilePath.lastIndexOf('/') + 1).toLowerCase();
-        if (excludedFileNames.includes(baseName)) {
-          return false;
-        }
-
-        // Check if the file in the *current step's state* (originalContent) had a "TODO:".
-        // payload.originalContent is from currentStep.commitHash because we called getCommitDiff(nextStep.commitHash).
-        if (payload.originalContent && payload.originalContent.includes("TODO:")) {
-          // This includes files Modified or Deleted in nextStep that had a TODO in currentStep.
-          return true;
-        }
-
-        // Files new in nextStep (payload.isNew = true) didn't exist in currentStep, so no prior TODO.
-        // Files modified/deleted whose originalContent (currentStep state) didn't have TODO are also excluded.
-        return false;
-      });
-
-      if (filteredDiffPayloads.length === 0) {
-        console.log(`TutorialService: No files with 'TODO:' in current step (after filtering) found in solution diff for step '${currentStep.title}'.`);
-        return;
-      }
-
-      const filesToDisplay: DiffFile[] = filteredDiffPayloads.map(payload => ({
-        leftContentProvider: async () => payload.originalContent || "",
-        rightContentProvider: async () => payload.modifiedContent || "",
-        relativePath: payload.relativeFilePath,
-        leftCommitId: currentStep.commitHash,
-        rightCommitId: nextStep.commitHash,
-        titleCommitId: nextStep.commitHash.slice(0, 7)
-      }));
-
-      await this.diffDisplayer.displayDiff(filesToDisplay);
-
-    } catch (error) {
-      console.error('Error showing step solution:', error);
-    }
+    const markdown = await this.stepContentRepository.getStepMarkdownContent(this.activeTutorial.localPath);
+    if (!markdown) throw new Error("Error occurred while processing markdown")
+    return markdown;
   }
 
-  /**
-   * Loads Markdown for a step, converts to HTML, and stores it.
-   * This should be called AFTER the corresponding commit is checked out.
-   */
-  private async loadAndPrepareDisplayContentForStep(step: Tutorial["steps"][0]): Promise<void> {
-    if (!this.activeTutorial || !this.activeTutorial.localPath) {
-      console.warn('TutorialService: Cannot load step display content. Missing active tutorial or local path.');
-      this.currentStepHtmlContent = null;
-      return;
-    }
-
-    try {
-      const markdownContent = await this.stepContentRepository.getStepMarkdownContent(this.activeTutorial);
-      if (markdownContent !== null) {
-        this.currentStepHtmlContent = this.markdownConverter.convertToHtml(markdownContent);
-      } else {
-        this.currentStepHtmlContent = this.markdownConverter.convertToHtml(
-          `> No specific content file found for step "${step.title}".\n\nExamine the code changes in the workspace.`
-        );
-      }
-    } catch (error) {
-      console.error(`Error loading or converting step content for step ${step.id}:`, error);
-      this.currentStepHtmlContent = this.markdownConverter.convertToHtml(
-        `> Error loading content for step "${step.title}".\n\nDetails: ${error instanceof Error ? error.message : String(error)}`
-      );
-    }
-  }
 
   /**
    * Gets the URIs of files that were open when the tutorial state was last persisted.
@@ -435,9 +347,9 @@ export class TutorialService {
    */
   public getRestoredOpenTabFsPaths(): string[] | undefined {
     if (this.activeTutorial && this.activeTutorial.lastPersistedOpenTabFsPaths) {
-        return this.activeTutorial.lastPersistedOpenTabFsPaths;
+      return this.activeTutorial.lastPersistedOpenTabFsPaths;
     }
-    return undefined; 
+    return undefined;
   }
 
   /**
@@ -445,14 +357,14 @@ export class TutorialService {
    * @param openTabFsPaths An array of fsPath strings representing the currently open tutorial files.
    */
   public async updatePersistedOpenTabs(openTabFsPaths: string[]): Promise<void> {
-    if (this.workspaceId && this.activeTutorial && this.activeTutorial.currentStepId) {
+    if (this.workspaceId && this.activeTutorial) {
       await this.activeTutorialStateRepository.saveActiveTutorial(
         this.workspaceId,
         this.activeTutorial.id,
-        this.activeTutorial.currentStepId,
+        this.activeTutorial.activeStep.id,
         openTabFsPaths
       );
-      if (this.activeTutorial) { 
+      if (this.activeTutorial) {
         this.activeTutorial.lastPersistedOpenTabFsPaths = openTabFsPaths;
       }
     } else {

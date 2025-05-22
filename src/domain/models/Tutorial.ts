@@ -10,15 +10,15 @@
 
 import { Step } from './Step';
 import { TutorialId } from '../../../shared/types/domain-primitives/TutorialId';
+import { ActiveStep } from './ActiveStep';
 
 export interface TutorialData {
     id: TutorialId;
     title: string;
-    currentStepId?: string;
-    repoUrl?: string; //Optional: A tutorial might be purely local
-    localPath?: string;
-    description?: string;
     steps: Step[];
+    activeStep: ActiveStep;
+    repoUrl?: string; //Optional: A tutorial might be purely local
+    localPath: string;
     workspaceFolder?: string;
     lastPersistedOpenTabFsPaths?: string[];
 }
@@ -29,13 +29,13 @@ export interface TutorialData {
 export class Tutorial {
     public readonly id: TutorialId;
     public readonly title: string;
-    public readonly steps: Step[];
+    public readonly steps: Array<Step | ActiveStep>;
+    public activeStep: ActiveStep;
     public readonly repoUrl?: string;
-    public readonly localPath?: string;
-    public readonly description?: string;
+    public readonly localPath: string;
     public readonly workspaceFolder?: string;
     public lastPersistedOpenTabFsPaths?: string[];
-    public currentStepId: string;
+    public isShowingSolution = false;
     
     constructor(data: TutorialData) {
         this.id = data.id;
@@ -43,9 +43,8 @@ export class Tutorial {
         this.steps = data.steps;
         this.repoUrl = data.repoUrl;
         this.localPath = data.localPath;
-        this.description = data.description;
         this.workspaceFolder = data.workspaceFolder;
-        this.currentStepId = data.currentStepId || data.steps[0].id;
+        this.activeStep = data.activeStep || data.steps[0].id;
         this.lastPersistedOpenTabFsPaths = data.lastPersistedOpenTabFsPaths;
     }
 }

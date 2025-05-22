@@ -28,7 +28,6 @@ export class GitService {
     this.gitAdapter = gitAdapter;
   }
 
-
   public async clone() {
     try {
       await this.gitAdapter.clone();
@@ -209,6 +208,13 @@ export class GitService {
 
   async getRepoName(): Promise<string> {
     return this.gitAdapter.getRepoName();
+  }
+  /**
+   * Fetches the remote URL
+  * @throws Error - when not found
+  */
+  async getRepoUrl(): Promise<string | null> {
+    return await this.gitAdapter.getRepoUrl();
   }
 
   async isGitRepository(): Promise<boolean> {

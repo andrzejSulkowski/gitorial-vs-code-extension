@@ -83,7 +83,7 @@ export class TutorialController {
    * If confirmed or autoOpen is true, it then calls `openTutorialFromPath` to load and activate it.
    * @param autoOpen If true, opens the tutorial without prompting if found.
    */
-  public async checkWorkspaceForTutorial(autoOpen: boolean = false): Promise<void> {
+  public async checkWorkspaceForTutorial(autoOpen: boolean = false, commitHash?: string): Promise<void> {
     console.log('TutorialController: Checking workspace for existing tutorial...');
     const workspaceFolders = vscode.workspace.workspaceFolders;
     if (workspaceFolders && workspaceFolders.length > 0) {
@@ -101,7 +101,7 @@ export class TutorialController {
           if (openTutorialChoice) {
             console.log(`TutorialController: Tutorial found in workspace. Proceeding to open from path: ${workspacePath}`);
             // Delegate to openTutorialFromPath for actual loading and activation
-            await this.openTutorialFromPath(workspacePath, { isNewClone: autoOpen });
+            await this.openTutorialFromPath(workspacePath, { isNewClone: autoOpen, initialStepCommitHash: commitHash });
           } else {
             console.log('TutorialController: User chose not to open the tutorial found in the workspace.');
           }
@@ -152,6 +152,7 @@ export class TutorialController {
 
     try {
       this.progressReporter.reportStart(`Cloning ${repoUrl}...`);
+      debugger;
       const tutorial = await this.tutorialService.cloneAndLoadTutorial(repoUrl, finalClonePath, { initialStepCommitHash: options?.commitHash });
       this.progressReporter.reportEnd();
 
@@ -160,7 +161,7 @@ export class TutorialController {
         return;
       }
 
-      await this._handlePostCloneActions(tutorial, finalClonePath, initialRepoUrl);
+      await this._handlePostCloneActions(tutorial, finalClonePath, { wasInitiatedProgrammatically: initialRepoUrl, commitHash: options?.commitHash });
 
     } catch (error) {
       this.progressReporter.reportEnd();
@@ -177,17 +178,17 @@ export class TutorialController {
    * @param clonedPath The file system path where the tutorial was cloned.
    * @param wasInitiatedProgrammatically Internal flag if repoUrl was provided (e.g. via deeplink)
    */
-  private async _handlePostCloneActions(tutorial: Tutorial, clonedPath: string, wasInitiatedProgrammatically?: string): Promise<void> {
+  private async _handlePostCloneActions(tutorial: Tutorial, clonedPath: string, options?: {wasInitiatedProgrammatically?: string, commitHash?: string}): Promise<void> {
     this.userInteraction.showInformationMessage(`Tutorial "${tutorial.title}" cloned to ${clonedPath}.`);
 
-    const openNowChoice = wasInitiatedProgrammatically ? true : await this.userInteraction.askConfirmation({
+    const openNowChoice = options?.wasInitiatedProgrammatically ? true : await this.userInteraction.askConfirmation({
       message: `Do you want to open the tutorial now?`,
       confirmActionTitle: 'Open Now',
       cancelActionTitle: 'Open Later'
     });
 
     if (openNowChoice) {
-      await this.autoOpenState.set({ tutorialId: tutorial.id, timestamp: Date.now() });
+      await this.autoOpenState.set({ tutorialId: tutorial.id, timestamp: Date.now(), commitHash: options?.commitHash });
       const folderUri = vscode.Uri.file(clonedPath);
       // This command opens the folder in the current window or a new one depending on user settings / current state.
       // For auto-open to work reliably if it opens in a new window, state is saved via autoOpenState.
@@ -297,6 +298,7 @@ export class TutorialController {
       // Auto Sync if the tutorial is already open in the current vs code instance
       // Note: to do so we need to somehow derive the id of the tutorial... I guess the easiest way would be through:
       // id: {provider}:{user}:{tutorial-name}
+      // this would make the same tutorial hosted on different platform have different ID's... thats shit
       let isTutorialOpen = false;
       const workspaceFolders = vscode.workspace.workspaceFolders;
       if (workspaceFolders && workspaceFolders.length > 0) {
@@ -306,11 +308,14 @@ export class TutorialController {
           const tutorial = await this.tutorialService.loadTutorialFromPath(workspacePath)
           if (tutorial?.repoUrl === options.repoUrl) {
             isTutorialOpen = true;
+            await this.openTutorialFromPath(workspacePath, { initialStepCommitHash: commitHash });
+            return;
           }
         }
       }
 
-      const cloneConfirmation = isTutorialOpen ? true : await this.userInteraction.askConfirmation({
+
+      const cloneConfirmation = await this.userInteraction.askConfirmation({
         message: `Gitorial from "${repoUrl}".\nWould you like to clone it?`,
         confirmActionTitle: 'Clone and Sync',
         cancelActionTitle: 'Open Local Instead'
@@ -336,6 +341,7 @@ export class TutorialController {
    */
   private async _handleOpenLocalForExternalRequest(repoUrl: string, commitHash?: string): Promise<void> {
 
+    debugger;
     const dirAbsPathResult = await this.userInteraction.showOpenDialog({
       canSelectFolders: true,
       canSelectFiles: false,

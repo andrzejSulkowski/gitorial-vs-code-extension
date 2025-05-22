@@ -31,9 +31,17 @@ export class TutorialBuilder {
     gitService: GitService
   ): Promise<Tutorial | null> {
     try {
-      //TODO: this gets the repo name not the url
-      const repoUrl = await gitService.getRepoName();
-      const id = this.generateTutorialId(repoUrl);
+      const repoUrl = await gitService.getRepoUrl();
+      if(!repoUrl) {
+        throw new Error("For now a gitorial needs to be linked to a remote origin\nOtherwise we can not derive the Gitorials Identifier")
+      }
+      const details = this.extractRepoDetails(repoUrl);
+
+      if(!details) {
+        throw new Error("Could not get repo details out of remote url: " + repoUrl);
+      }
+
+      const id = this.generateTutorialId(details.owner, details.repo);
       const title = path.basename(repoPath);
       
       const domainCommits = await gitService.getCommitHistory();
@@ -58,25 +66,11 @@ export class TutorialBuilder {
   }
   
   /**
-   * Extract a step title from a commit message
-   */
-  private static extractStepTitle(message: string, fallbackIndex: number): string {
-    // Get the first line of the commit message
-    const firstLine = message.split('\n')[0].trim();
-    
-    if (firstLine) {
-      return firstLine;
-    }
-    
-    // Fallback to a generic step title
-    return `Step ${fallbackIndex + 1}`;
-  }
-  
-  /**
    * Generate a tutorial ID from a repository URL
    */
-  public static generateTutorialId(repoUrl: string): TutorialId {
-    return crypto.createHash('md5').update(repoUrl).digest('hex') as TutorialId;
+  public static generateTutorialId(owner: string, repo:string): TutorialId {
+    const identifier = `${owner}/${repo}`;
+    return identifier as TutorialId;
   }
   
   /**

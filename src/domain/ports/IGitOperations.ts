@@ -195,6 +195,7 @@ export declare type OptionFlags<FLAGS extends string, VALUE = null> = Partial<Re
  * `git show`, `git log`, etc.
  */
 export interface IGitOperations {
+  getRepoUrl(): Promise<string>;
   /**
    * Clone a repository into the local filesystem.
    * @returns A promise that resolves once cloning is complete.

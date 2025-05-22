@@ -5,6 +5,7 @@ import { GlobalState, IDB } from './GlobalState';
 interface AutoOpenStateData {
   timestamp: number;
   tutorialId: TutorialId;
+  commitHash?: string;
 }
 
 

@@ -269,9 +269,30 @@ export class GitAdapter implements IGitOperations {
     return path.join(this.repoPath, relativePath);
   }
 
-  async getRepoName(): Promise<string> {
-    // In a real implementation, parse from remote URL or other git data
+  public async getRepoName(): Promise<string> {
     return path.basename(this.repoPath);
+  }
+
+  public async getRemoteUrl(): Promise<string | null> {
+    const remotes = await this.git.getRemotes(true);
+    const originRemote = remotes.find(remote => remote.name === 'origin');
+
+    if (originRemote && originRemote.refs && originRemote.refs.fetch) {
+      return originRemote.refs.fetch;
+    } else {
+      // Fallback or attempt to find another remote if 'origin' is not standard
+      const remoteDetails = await this.git.remote(['-v']);
+      if (typeof remoteDetails === 'string' && remoteDetails.includes('origin')) {
+        const lines = remoteDetails.split('\n');
+        const originFetchLine = lines.find(line => line.startsWith('origin') && line.endsWith('(fetch)'));
+        if (originFetchLine) {
+          // Example line: 'origin\thttps://github.com/owner/repo.git (fetch)'
+          // Split on tab to separate remote name from URL, then split URL on space to remove '(fetch)'
+          return originFetchLine.split('\t')[1].split(' ')[0];
+        }
+      }
+      return null
+    }
   }
 
   async getCommits(branch?: string): Promise<Array<DefaultLogFields & ListLogLine>> {

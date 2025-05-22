@@ -6,7 +6,7 @@
 
 import { Tutorial } from '../models/Tutorial';
 import { ITutorialRepository } from '../repositories/ITutorialRepository';
-import { IGitAdapterFactory } from '../ports/IGitOperationsFactory';
+import { IGitOperationsFactory } from '../ports/IGitOperationsFactory';
 import { IGitOperations } from '../ports/IGitOperations';
 import { IStepContentRepository } from '../ports/IStepContentRepository';
 import { IActiveTutorialStateRepository, StoredTutorialState } from "../repositories/IActiveTutorialStateRepository";
@@ -37,7 +37,7 @@ export interface LoadTutorialOptions {
  */
 export class TutorialService {
   private activeTutorial: Tutorial | null = null;
-  private gitAdapter: IGitOperations | null = null;
+  private gitOperations: IGitOperations | null = null;
   private readonly workspaceId: string | undefined;
 
   /**
@@ -45,7 +45,7 @@ export class TutorialService {
    */
   constructor(
     private readonly repository: ITutorialRepository,
-    private readonly gitAdapterFactory: IGitAdapterFactory,
+    private readonly gitOperationsFactory: IGitOperationsFactory,
     private readonly stepContentRepository: IStepContentRepository,
     private readonly activeTutorialStateRepository: IActiveTutorialStateRepository,
     workspaceId?: string
@@ -77,15 +77,15 @@ export class TutorialService {
       persistedState = await this.activeTutorialStateRepository.getActiveTutorial(this.workspaceId);
     }
 
-    this.gitAdapter = this.gitAdapterFactory.createFromPath(localPath);
+    this.gitOperations = this.gitOperationsFactory.createFromPath(localPath);
     try {
-      await this.gitAdapter.ensureGitorialBranch();
+      await this.gitOperations.ensureGitorialBranch();
     } catch (error) {
       console.error(`TutorialService: Failed to ensure gitorial branch for ${localPath}:`, error);
       if (this.workspaceId) {
         await this.activeTutorialStateRepository.clearActiveTutorial(this.workspaceId);
       }
-      this.gitAdapter = null;
+      this.gitOperations = null;
       return null;
     }
 
@@ -117,15 +117,15 @@ export class TutorialService {
    */
   public async cloneAndLoadTutorial(repoUrl: string, targetPath: string, options: LoadTutorialOptions = {}): Promise<Tutorial | null> {
     try {
-      this.gitAdapter = await this.gitAdapterFactory.createFromClone(repoUrl, targetPath);
+      this.gitOperations = await this.gitOperationsFactory.createFromClone(repoUrl, targetPath);
       try {
-        await this.gitAdapter.ensureGitorialBranch();
+        await this.gitOperations.ensureGitorialBranch();
       } catch (error) {
         console.error(`TutorialService: Failed to ensure gitorial branch for cloned repo ${targetPath}:`, error);
         if (this.workspaceId) {
           await this.activeTutorialStateRepository.clearActiveTutorial(this.workspaceId);
         }
-        this.gitAdapter = null;
+        this.gitOperations = null;
         return null;
       }
       const tutorial = await this.repository.findByPath(targetPath);
@@ -151,8 +151,8 @@ export class TutorialService {
   /**
    * Get the active git adapter
    */
-  public getActiveGitAdapter(): IGitOperations | null {
-    return this.gitAdapter;
+  public getActiveGitOperations(): IGitOperations | null {
+    return this.gitOperations;
   }
 
   public getIsShowingSolution(): boolean {
@@ -167,8 +167,8 @@ export class TutorialService {
    * Navigate to a specific step
    */
   public async navigateToStep(stepIndex: number): Promise<boolean> {
-    if (!this.activeTutorial || !this.gitAdapter || stepIndex < 0 || stepIndex >= this.activeTutorial.steps.length) {
-      console.warn('TutorialService: Invalid step index, no active tutorial, or no git adapter for navigateToStep.');
+    if (!this.activeTutorial || !this.gitOperations || stepIndex < 0 || stepIndex >= this.activeTutorial.steps.length) {
+      console.warn('TutorialService: Invalid step index, no active tutorial, or no git operations for navigateToStep.');
       return false;
     }
 
@@ -186,7 +186,7 @@ export class TutorialService {
     }
 
     try {
-      await this.gitAdapter.checkout(targetStep.commitHash);
+      await this.gitOperations.checkout(targetStep.commitHash);
       const markdown = await this._loadMarkdown();
       this.activeTutorial.activeStep = new ActiveStep({ ...targetStep, markdown });
 
@@ -213,7 +213,7 @@ export class TutorialService {
    * Navigate to the next step
    */
   public async navigateToNextStep(): Promise<boolean> {
-    if (!this.activeTutorial || !this.gitAdapter) return false;
+    if (!this.activeTutorial || !this.gitOperations) return false;
     const currentIndex = this.activeTutorial.steps.findIndex(s => s.id === this.activeTutorial!.activeStep.id);
     if (currentIndex === -1 || currentIndex >= this.activeTutorial.steps.length - 1) {
       return false; // No next step or current step not found
@@ -230,7 +230,7 @@ export class TutorialService {
    * Navigate to the previous step
    */
   public async navigateToPreviousStep(): Promise<boolean> {
-    if (!this.activeTutorial || !this.gitAdapter) return false;
+    if (!this.activeTutorial || !this.gitOperations) return false;
     const currentIndex = this.activeTutorial.steps.findIndex(s => s.id === this.activeTutorial!.activeStep.id);
     if (currentIndex <= 0) {
       return false; // No previous step or current step not found
@@ -264,7 +264,7 @@ export class TutorialService {
   public async closeTutorial(): Promise<void> {
     if (!this.activeTutorial) return;
     this.activeTutorial = null;
-    this.gitAdapter = null;
+    this.gitOperations = null;
     if (this.workspaceId) {
       await this.activeTutorialStateRepository.clearActiveTutorial(this.workspaceId);
     }
@@ -300,9 +300,9 @@ export class TutorialService {
 
     if (tutorial.steps.length > 0) {
 
-      if (this.gitAdapter) {
+      if (this.gitOperations) {
         try {
-          await this.gitAdapter.checkout(targetStep.commitHash);
+          await this.gitOperations.checkout(targetStep.commitHash);
           const markdown = await this._loadMarkdown();
           tutorial.activeStep = new ActiveStep({ ...targetStep, markdown });
           /*if (this.isShowingSolution) {

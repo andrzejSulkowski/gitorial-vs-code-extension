@@ -4,20 +4,29 @@ import { Step } from 'src/domain/models/Step';
 import * as path from 'path'; // TODO: Extend IFileSystem with needed functionality to replace 'path'
 import { Tutorial } from 'src/domain/models/Tutorial';
 import { IMarkdownConverter } from '../ports/IMarkdownConverter';
-import { Markdown } from 'src/domain/models/Markdown';
-import { HTML } from '@shared/types/viewmodels/HTML';
 import { TutorialViewModel } from '@shared/types/viewmodels/TutorialViewModel';
 import { TutorialStepViewModel } from '@shared/types/viewmodels/TutorialStepViewModel';
 import { ActiveStep } from 'src/domain/models/ActiveStep';
 import { TutorialPanelManager } from '../panels/TutorialPanelManager';
 import { WebviewMessageHandler } from '../panels/WebviewMessageHandler';
+import { DiffViewService } from './DiffViewService';
+import { IGitChanges } from '../ports/IGitChanges';
+import { IGitChangesFactory } from '../ports/IGitChangesFactory';
 
 export class TutorialViewService {
-  constructor(private readonly fs: IFileSystem, private readonly markdownConverter: IMarkdownConverter) { }
+  private _gitAdapter: IGitChanges | null = null;
 
+  constructor(private readonly fs: IFileSystem, private readonly markdownConverter: IMarkdownConverter, private readonly diffViewService: DiffViewService, private readonly gitAdapterFactory: IGitChangesFactory) { }
 
-  public async display(_tutorial: Tutorial) {
-    throw new Error("todo");
+  public async display(tutorial: Tutorial) {
+    if(!this._gitAdapter) {
+      this._gitAdapter = this.gitAdapterFactory.createFromPath(tutorial.localPath);
+    }
+    const tutorialViewModel = this._tutorialViewModel(tutorial);
+
+    if(tutorialViewModel?.isShowingSolution) {
+      this.diffViewService.showStepSolution(tutorial, this._gitAdapter);
+    }
   }
 
   /**
@@ -25,7 +34,7 @@ export class TutorialViewService {
    * This is used to populate and update the tutorial panel UI.
    * Returns null if no tutorial is active.
    */
-  tutorialViewModel(tutorial: Tutorial): TutorialViewModel | null {
+  private _tutorialViewModel(tutorial: Tutorial): TutorialViewModel | null {
       const currentStepIdInService = tutorial.activeStep.id;
       const actualCurrentStepId = currentStepIdInService;
 
@@ -58,8 +67,8 @@ export class TutorialViewService {
    * Updates the tutorial panel UI by creating or showing it with the latest view model.
    * If no tutorial is active, it disposes of any existing panel.
    */
-  public async updateTutorialPanel(extensionUri: vscode.Uri, tutorial: Tutorial, messageHandler: WebviewMessageHandler): Promise<void> {
-    const tutorialViewModel = this.tutorialViewModel(tutorial);
+  private async _updateTutorialPanel(extensionUri: vscode.Uri, tutorial: Tutorial, messageHandler: WebviewMessageHandler): Promise<void> {
+    const tutorialViewModel = this._tutorialViewModel(tutorial);
     if (tutorialViewModel) {
       TutorialPanelManager.createOrShow(extensionUri, tutorialViewModel, messageHandler);
     } else {
@@ -67,20 +76,13 @@ export class TutorialViewService {
     }
   }
 
-  /**
-   * Loads Markdown for a step, converts to HTML, and stores it.
-   * This should be called AFTER the corresponding commit is checked out.
-   */
-  private async getStepHTML(markdown: Markdown): Promise<HTML> {
-    return this.markdownConverter.render(markdown);
-  }
 
   /**
    * Gets all tabs in a specific editor group.
    * @param viewColumn The view column of the editor group.
    * @returns An array of tabs in the specified group.
    */
-  public getTabsInGroup(viewColumn: vscode.ViewColumn): vscode.Tab[] {
+  private _getTabsInGroup(viewColumn: vscode.ViewColumn): vscode.Tab[] {
     const group = vscode.window.tabGroups.all.find(tg => tg.viewColumn === viewColumn);
     return group ? [...group.tabs] : [];
   }
@@ -101,7 +103,7 @@ export class TutorialViewService {
    * @param changedFilePaths Relative paths of files changed in this step.
    * @param tutorialLocalPath The local file system path of the active tutorial.
    */
-  public async updateSidePanelFiles(step: Step, changedFilePaths: string[], tutorialLocalPath: string): Promise<void> {
+  private async _updateSidePanelFiles(step: Step, changedFilePaths: string[], tutorialLocalPath: string): Promise<void> {
     if (!tutorialLocalPath) {
       console.warn("TutorialViewService: Cannot update side panel files, tutorialLocalPath missing.");
       return;
@@ -113,7 +115,7 @@ export class TutorialViewService {
 
     // Close all tabs in group two if it's a section step
     if (step.type === 'section') {
-      const groupTwoTabs = this.getTabsInGroup(vscode.ViewColumn.Two);
+      const groupTwoTabs = this._getTabsInGroup(vscode.ViewColumn.Two);
       if (groupTwoTabs.length > 0) {
         await vscode.window.tabGroups.close(groupTwoTabs, false);
         console.log("TutorialViewService: Closed all tabs in group two for section step.");
@@ -139,7 +141,7 @@ export class TutorialViewService {
       }
     }
 
-    const currentTabsInGroupTwo = this.getTabsInGroup(vscode.ViewColumn.Two);
+    const currentTabsInGroupTwo = this._getTabsInGroup(vscode.ViewColumn.Two);
     const targetUriStrings = targetUris.map(u => u.toString());
 
     const tabsToClose: vscode.Tab[] = [];
@@ -199,10 +201,10 @@ export class TutorialViewService {
    * @param changedFilePathsForCurrentStep File paths relevant to the current step (if solution is being hidden).
    * @param tutorialLocalPath The local path of the tutorial (if solution is being hidden).
    */
-  public async handleSolutionToggleUI(showing: boolean, currentStep?: Step, changedFilePathsForCurrentStep?: string[], tutorialLocalPath?: string): Promise<void> {
+  private async _handleSolutionToggleUI(showing: boolean, currentStep?: Step, changedFilePathsForCurrentStep?: string[], tutorialLocalPath?: string): Promise<void> {
     if (showing) {
       await vscode.commands.executeCommand('workbench.action.focusSecondEditorGroup');
-      const groupTwoTabs = this.getTabsInGroup(vscode.ViewColumn.Two);
+      const groupTwoTabs = this._getTabsInGroup(vscode.ViewColumn.Two);
       const regularFileTabsToClose: vscode.Tab[] = [];
       for (const tab of groupTwoTabs) {
         const input = tab.input as any;
@@ -222,11 +224,11 @@ export class TutorialViewService {
       // Solution is being hidden.
       // 1. Re-evaluate and open side panel files for the current step first.
       if (currentStep && changedFilePathsForCurrentStep && tutorialLocalPath) {
-        await this.updateSidePanelFiles(currentStep, changedFilePathsForCurrentStep, tutorialLocalPath);
+        await this._updateSidePanelFiles(currentStep, changedFilePathsForCurrentStep, tutorialLocalPath);
       }
 
       // 2. Then, explicitly close all diff tabs in group two.
-      const groupTwoTabs = this.getTabsInGroup(vscode.ViewColumn.Two);
+      const groupTwoTabs = this._getTabsInGroup(vscode.ViewColumn.Two);
       const diffTabsToClose: vscode.Tab[] = [];
       for (const tab of groupTwoTabs) {
         const input = tab.input as any;
@@ -293,6 +295,4 @@ export class TutorialViewService {
       }
     }
   }
-
-  // Further methods for UI orchestration will be added here.
 } 

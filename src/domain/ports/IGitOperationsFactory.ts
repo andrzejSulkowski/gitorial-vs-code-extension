@@ -6,7 +6,7 @@ import { IGitOperations } from "./IGitOperations";
  * This allows for different implementations of Git operations (e.g., for local repositories or cloned ones)
  * to be created in a consistent way.
  */
-export interface IGitAdapterFactory {
+export interface IGitOperationsFactory {
     /**
      * Creates an IGitOperations instance for an existing local repository.
      * @param repoPath The file system path to the local repository.

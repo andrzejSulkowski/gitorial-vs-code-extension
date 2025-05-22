@@ -8,7 +8,6 @@ import { IFileSystem } from 'src/domain/ports/IFileSystem';
 import { TutorialService } from '../../domain/services/TutorialService';
 import { TutorialViewService } from '../services/TutorialViewService';
 import { AutoOpenState } from 'src/infrastructure/state/AutoOpenState';
-import { WebviewMessageHandler } from '../panels/WebviewMessageHandler';
 
 /**
  * Controller responsible for orchestrating tutorial-related UI interactions and actions.
@@ -47,8 +46,7 @@ export class TutorialController {
       return;
     }
     await this.tutorialService.toggleSolution(true);
-    await this.tutorialViewService.handleSolutionToggleUI(true);
-    await this.tutorialViewService.updateTutorialPanel(this.extensionUri, activeTutorial, new WebviewMessageHandler(this)) //TODO: refactor to remove always new creation of handler
+    await this.tutorialViewService.display(activeTutorial);
   }
 
   /**
@@ -64,17 +62,16 @@ export class TutorialController {
     let currentStep: Step | undefined;
     let changedFilePaths: string[] = [];
     let tutorialLocalPath: string | undefined;
-    const activeGitAdapter = this.tutorialService.getActiveGitAdapter();
+    const activeGitOperations = this.tutorialService.getActiveGitOperations();
 
     if (activeTutorial.activeStep.id) {
       currentStep = activeTutorial.steps.find(s => s.id === activeTutorial!.activeStep.id);
-      if (currentStep && activeGitAdapter && activeTutorial.localPath) {
-        changedFilePaths = await activeGitAdapter.getChangesInCommit(currentStep.commitHash);
+      if (currentStep && activeGitOperations && activeTutorial.localPath) {
+        changedFilePaths = await activeGitOperations.getChangesInCommit(currentStep.commitHash);
         tutorialLocalPath = activeTutorial.localPath;
       }
     }
-    await this.tutorialViewService.handleSolutionToggleUI(false, currentStep, changedFilePaths, tutorialLocalPath);
-    await this.tutorialViewService.updateTutorialPanel(this.extensionUri, activeTutorial, new WebviewMessageHandler(this)) //TODO: refactor to remove always new creation of handler
+    await this.tutorialViewService.display(activeTutorial);
   }
 
   /**
@@ -250,9 +247,9 @@ export class TutorialController {
    * @param initialStepId Optional ID of the step to activate initially.
    */
   private async _processLoadedTutorial(tutorial: Tutorial, initialStepCommitHash?: string): Promise<void> {
-    const activeGitAdapter = this.tutorialService.getActiveGitAdapter();
-    if (!activeGitAdapter) {
-      console.error("TutorialController: GitAdapter is null after loading tutorial from service.");
+    const activeGitOperations = this.tutorialService.getActiveGitOperations();
+    if (!activeGitOperations) {
+      console.error("TutorialController: GitOperations is null after loading tutorial from service.");
       this.userInteraction.showErrorMessage("Failed to initialize Git operations for the tutorial.");
       this.clearActiveTutorialState();
       return;
@@ -366,10 +363,10 @@ export class TutorialController {
    */
   public async selectStep(step: Step | string): Promise<void> {
     const activeTutorial = this.tutorialService.getActiveTutorial();
-    const activeGitAdapter = this.tutorialService.getActiveGitAdapter();
+    const activeGitOperations = this.tutorialService.getActiveGitOperations();
 
-    if (!activeTutorial || !activeGitAdapter) {
-      this.userInteraction.showWarningMessage('No active tutorial or Git adapter to select a step from.');
+    if (!activeTutorial || !activeGitOperations) {
+      this.userInteraction.showWarningMessage('No active tutorial or Git operations to select a step from.');
       return;
     }
 
@@ -391,7 +388,8 @@ export class TutorialController {
 
     if (activeTutorial.activeStep.id === targetStepId) {
       console.log(`TutorialController: Step '${targetStep.title}' is already active and content loaded.`);
-      await this.tutorialViewService.updateTutorialPanel(this.extensionUri, activeTutorial, new WebviewMessageHandler(this))
+      await this.tutorialViewService.display(activeTutorial);
+      //await this.tutorialViewService.updateTutorialPanel(this.extensionUri, activeTutorial, new WebviewMessageHandler(this));
       return;
     }
 
@@ -412,9 +410,10 @@ export class TutorialController {
         const updatedTutorial = this.tutorialService.getActiveTutorial();
         const currentActiveStep = updatedTutorial?.steps.find(s => s.id === updatedTutorial.activeStep.id);
 
-        if (updatedTutorial && currentActiveStep && updatedTutorial.localPath && activeGitAdapter) {
-          const changedFilePaths = await activeGitAdapter.getChangesInCommit(currentActiveStep.commitHash);
-          await this.tutorialViewService.updateSidePanelFiles(currentActiveStep, changedFilePaths, updatedTutorial.localPath);
+        if (updatedTutorial && currentActiveStep && updatedTutorial.localPath && activeGitOperations) {
+          const changedFilePaths = await activeGitOperations.getChangesInCommit(currentActiveStep.commitHash);
+          //await this.tutorialViewService.updateSidePanelFiles(currentActiveStep, changedFilePaths, updatedTutorial.localPath);
+          await this.tutorialViewService.display(updatedTutorial);
 
           // After step navigation and side panel update, persist open tabs
           const openTabs = this.tutorialViewService.getTutorialOpenTabFsPaths(updatedTutorial.localPath);
@@ -425,12 +424,14 @@ export class TutorialController {
       } else {
         this.userInteraction.showErrorMessage(`Failed to switch to step '${targetStep.title}'.`);
       }
-      await this.tutorialViewService.updateTutorialPanel(this.extensionUri, activeTutorial, new WebviewMessageHandler(this)) //TODO: refactor to remove always new creation of handler
+      //await this.tutorialViewService.updateTutorialPanel(this.extensionUri, activeTutorial, new WebviewMessageHandler(this)) //TODO: refactor to remove always new creation of handler
+      await this.tutorialViewService.display(activeTutorial);
     } catch (error) {
       this.progressReporter.reportEnd();
       console.error(`TutorialController: Error selecting step '${targetStep.title}':`, error);
       this.userInteraction.showErrorMessage(`Failed to switch to step '${targetStep.title}': ${error instanceof Error ? error.message : String(error)}`);
-      await this.tutorialViewService.updateTutorialPanel(this.extensionUri, activeTutorial, new WebviewMessageHandler(this)) //TODO: refactor to remove always new creation of handler
+      //await this.tutorialViewService.updateTutorialPanel(this.extensionUri, activeTutorial, new WebviewMessageHandler(this)) //TODO: refactor to remove always new creation of handler
+      await this.tutorialViewService.display(activeTutorial);
     }
   }
 
@@ -481,10 +482,11 @@ export class TutorialController {
     if (success) {
       const updatedTutorial = this.tutorialService.getActiveTutorial();
       const nextStep = updatedTutorial?.steps.find(s => s.id === updatedTutorial.activeStep.id);
-      const activeGitAdapter = this.tutorialService.getActiveGitAdapter();
-      if (updatedTutorial && nextStep && updatedTutorial.localPath && activeGitAdapter) {
-        const changedFilePaths = await activeGitAdapter.getChangesInCommit(nextStep.commitHash);
-        await this.tutorialViewService.updateSidePanelFiles(nextStep, changedFilePaths, updatedTutorial.localPath);
+      const activeGitOperations = this.tutorialService.getActiveGitOperations();
+      if (updatedTutorial && nextStep && updatedTutorial.localPath && activeGitOperations) {
+        const changedFilePaths = await activeGitOperations.getChangesInCommit(nextStep.commitHash);
+        //await this.tutorialViewService.updateSidePanelFiles(nextStep, changedFilePaths, updatedTutorial.localPath);
+        await this.tutorialViewService.display(updatedTutorial);
 
         // After step navigation and side panel update, persist open tabs
         const openTabs = this.tutorialViewService.getTutorialOpenTabFsPaths(updatedTutorial.localPath);
@@ -494,7 +496,8 @@ export class TutorialController {
     } else {
       this.userInteraction.showInformationMessage("You are already on the last step.");
     }
-    await this.tutorialViewService.updateTutorialPanel(this.extensionUri, activeTutorial, new WebviewMessageHandler(this)) //TODO: refactor to remove always new creation of handler
+    await this.tutorialViewService.display(activeTutorial);
+    //await this.tutorialViewService.updateTutorialPanel(this.extensionUri, activeTutorial, new WebviewMessageHandler(this)) //TODO: refactor to remove always new creation of handler
   }
 
   /**
@@ -509,10 +512,11 @@ export class TutorialController {
     if (success) {
       const updatedTutorial = this.tutorialService.getActiveTutorial();
       const prevStep = updatedTutorial?.steps.find(s => s.id === updatedTutorial.activeStep.id);
-      const activeGitAdapter = this.tutorialService.getActiveGitAdapter();
-      if (updatedTutorial && prevStep && updatedTutorial.localPath && activeGitAdapter) {
-        const changedFilePaths = await activeGitAdapter.getChangesInCommit(prevStep.commitHash);
-        await this.tutorialViewService.updateSidePanelFiles(prevStep, changedFilePaths, updatedTutorial.localPath);
+      const activeGitOperations = this.tutorialService.getActiveGitOperations();
+      if (updatedTutorial && prevStep && updatedTutorial.localPath && activeGitOperations) {
+        //const changedFilePaths = await activeGitOperations.getChangesInCommit(prevStep.commitHash);
+        //await this.tutorialViewService.updateSidePanelFiles(prevStep, changedFilePaths, updatedTutorial.localPath);
+        await this.tutorialViewService.display(updatedTutorial);
 
         // After step navigation and side panel update, persist open tabs
         const openTabs = this.tutorialViewService.getTutorialOpenTabFsPaths(updatedTutorial.localPath);
@@ -522,7 +526,8 @@ export class TutorialController {
     } else {
       this.userInteraction.showInformationMessage("You are already on the first step.");
     }
-    await this.tutorialViewService.updateTutorialPanel(this.extensionUri, activeTutorial, new WebviewMessageHandler(this)) //TODO: refactor to remove always new creation of handler
+    await this.tutorialViewService.display(activeTutorial);
+    //await this.tutorialViewService.updateTutorialPanel(this.extensionUri, activeTutorial, new WebviewMessageHandler(this)) //TODO: refactor to remove always new creation of handler
   }
 
 

@@ -12,7 +12,6 @@ export class TutorialPanelManager {
 
   public static createOrShow(extensionUri: vscode.Uri, tutorial: TutorialViewModel, messageHandler: WebviewMessageHandler): void {
     if (TutorialPanelManager.currentPanelInstance) {
-      TutorialPanelManager.currentPanelInstance.reveal(vscode.ViewColumn.One);
       TutorialPanelManager.currentPanelInstance.updateTutorial(tutorial);
       return;
     }

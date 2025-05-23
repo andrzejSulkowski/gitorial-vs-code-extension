@@ -12,7 +12,6 @@ import { IActiveTutorialStateRepository, StoredTutorialState } from "../reposito
 import { EnrichedStep } from '../models/EnrichedStep';
 import { Step } from '../models/Step';
 import { IStepContentRepository } from '../ports/IStepContentRepository';
-import { TutorialId } from '@shared/types';
 
 /**
  * Options for loading a tutorial
@@ -248,6 +247,11 @@ export class TutorialService {
 
   private async _afterStepChange(oldIndex: number): Promise<void> {
     try {
+      if(this._tutorial && this._gitOperations){
+        await this._gitOperations.checkout(this._tutorial.activeStep.commitHash);
+      }else {
+        throw new Error('TutorialService: no active tutorial, or no git operations for _afterStepChange.');
+      }
       await this._enrichActiveStep();
       await this._saveActiveTutorialState();
     } catch (error) {
@@ -267,7 +271,6 @@ export class TutorialService {
       return;
     } else {
       try {
-        await this._gitOperations.checkout(targetStep.commitHash);
         const markdown = await this._loadMarkdown();
         this._tutorial.enrichStep(targetStep.index, markdown);
       } catch (error) {

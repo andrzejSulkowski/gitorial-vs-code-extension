@@ -101,11 +101,11 @@ export class DiffModel {
  */
 export enum DiffChangeType {
   /** File was added */
-  ADDED = 'added',
+  ADDED = 'Added',
   
   /** File was modified */
-  MODIFIED = 'modified',
+  MODIFIED = 'Modified',
   
   /** File was deleted */
-  DELETED = 'deleted'
+  DELETED = 'Deleted'
 }

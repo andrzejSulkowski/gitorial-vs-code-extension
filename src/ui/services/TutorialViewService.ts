@@ -16,9 +16,10 @@ import { TutorialController } from '../controllers/TutorialController';
 
 
 enum TutorialViewChangeType {
-  StepChange = 'stepChange',
-  SolutionToggle = 'solutionToggle',
-  None = 'none'
+  StepChange = 'StepChange',
+  SolutionToggle = 'SolutionToggle',
+  StepSolutionChange = 'StepSolutionChange',
+  None = 'None'
 }
 
 export class TutorialViewService {
@@ -54,21 +55,38 @@ export class TutorialViewService {
     } else {
       const changeType = this._getTutorialViewChangeType(tutorialViewModel, this._oldTutorialViewModel);
       switch (changeType) {
-        case TutorialViewChangeType.SolutionToggle:
+        case TutorialViewChangeType.SolutionToggle: {
           await this._solutionToggle(tutorial);
           break;
-        case TutorialViewChangeType.StepChange:
+        }
+        case TutorialViewChangeType.StepChange: {
           const changedFiles = await this.diffViewService.getDiffModelsForParent(tutorial, this._gitAdapter!);
           await this._updateSidePanelFiles(tutorial.activeStep, changedFiles.map(f => f.relativePath), tutorial.localPath);
-          //await this._closeDiffTabsInGroupTwo(); //I guess this can be removed here //After trying it, it seems no needed
           break;
+        }
+        case TutorialViewChangeType.StepSolutionChange: {
+          await this._solutionToggle(tutorial);
+          const changedFiles = await this.diffViewService.getDiffModelsForParent(tutorial, this._gitAdapter!);
+          await this._updateSidePanelFiles(tutorial.activeStep, changedFiles.map(f => f.relativePath), tutorial.localPath);
+          break;
+        }
         default:
           break;
       }
     }
 
-
     await this._updateTutorialPanel(this.extensionUri, tutorialViewModel, this._webviewMessageHandler!);
+
+    const groupTwoTabs = this._getTabsInGroup(vscode.ViewColumn.Two);
+    const isShowingSolutionInGroupTwo = tutorial.isShowingSolution && groupTwoTabs.some(tab => {
+      const input = tab.input as any;
+      return input && input.original && input.modified;
+    });
+
+    if (groupTwoTabs.length > 0 || isShowingSolutionInGroupTwo) {
+      await vscode.commands.executeCommand('workbench.action.focusSecondEditorGroup');
+    }
+
     this._oldTutorialViewModel = tutorialViewModel;
   }
 
@@ -96,12 +114,20 @@ export class TutorialViewService {
   }
 
   private _getTutorialViewChangeType(newTutorialViewModel: TutorialViewModel, oldTutorialViewModel: TutorialViewModel | null): TutorialViewChangeType {
+    let changeType = TutorialViewChangeType.None;
+
     if (newTutorialViewModel.isShowingSolution !== oldTutorialViewModel?.isShowingSolution) {
-      return TutorialViewChangeType.SolutionToggle;
-    } else if (newTutorialViewModel.currentStepId !== oldTutorialViewModel?.currentStepId) {
-      return TutorialViewChangeType.StepChange;
+      changeType = TutorialViewChangeType.SolutionToggle;
     }
-    return TutorialViewChangeType.None;
+
+    if (newTutorialViewModel.currentStepId !== oldTutorialViewModel?.currentStepId) {
+      if (changeType === TutorialViewChangeType.SolutionToggle) {
+        changeType = TutorialViewChangeType.StepSolutionChange;
+      } else {
+        changeType = TutorialViewChangeType.StepChange;
+      }
+    }
+    return changeType;
   }
 
   /**
@@ -182,11 +208,9 @@ export class TutorialViewService {
       return;
     }
 
-    // Define excluded file extensions and names
     const excludedExtensions = ['.md', '.toml', '.lock'];
     const excludedFileNames = ['.gitignore'];
 
-    // Close all tabs in group two if it's a section step
     if (step.type === 'section') {
       const groupTwoTabs = this._getTabsInGroup(vscode.ViewColumn.Two);
       if (groupTwoTabs.length > 0) {
@@ -237,12 +261,16 @@ export class TutorialViewService {
       }
     }
 
-    for (const uri of targetUris) {
-      if (!currentTabsInGroupTwo.find(tab => (tab.input as any)?.uri?.toString() === uri.toString())) {
+    const urisToActuallyOpen = targetUris.filter(uri => !currentTabsInGroupTwo.find(tab => (tab.input as any)?.uri?.toString() === uri.toString()));
+    if (urisToActuallyOpen.length > 0) {
+      for (let i = 0; i < urisToActuallyOpen.length; i++) {
+        const uriToOpen = urisToActuallyOpen[i];
         try {
-          await vscode.window.showTextDocument(uri, { viewColumn: vscode.ViewColumn.Two, preview: false, preserveFocus: true });
+          // Focus the last document that is opened in the loop
+          const shouldPreserveFocus = i < urisToActuallyOpen.length - 1;
+          await vscode.window.showTextDocument(uriToOpen, { viewColumn: vscode.ViewColumn.Two, preview: false, preserveFocus: shouldPreserveFocus });
         } catch (error) {
-          console.error(`TutorialViewService: Error opening file ${uri.fsPath} in group two:`, error);
+          console.error(`TutorialViewService: Error opening file ${uriToOpen.fsPath} in group two:`, error);
         }
       }
     }
@@ -254,7 +282,9 @@ export class TutorialViewService {
         console.error("TutorialViewService: Error closing tabs in group two:", error);
       }
     }
-    if (targetUris.length > 0 || currentTabsInGroupTwo.length > 0) {
+
+    const finalTabsInGroupTwo = this._getTabsInGroup(vscode.ViewColumn.Two);
+    if (finalTabsInGroupTwo.length > 0) {
       await vscode.commands.executeCommand('workbench.action.focusSecondEditorGroup');
     }
 
@@ -382,15 +412,15 @@ export class TutorialViewService {
 
     for (let i = 0; i < uris.length; i++) {
       try {
-        // Open all tabs, making sure they are not in preview mode.
-        // Preserve focus for all but the last one, or if there is only one, focus it.
         const preserveFocus = i < uris.length - 1;
         await vscode.window.showTextDocument(uris[i], { preview: false, preserveFocus, viewColumn: vscode.ViewColumn.Two });
       } catch (error) {
         console.error(`TutorialViewService: Error opening document ${uris[i].fsPath}:`, error);
-        // Optionally, inform the user if a specific file failed to open
-        // vscode.window.showWarningMessage(`Could not open file: ${path.basename(uris[i].fsPath)}`);
       }
+    }
+    // After loop, if uris were opened, the last one should have focus. Ensure group is focused.
+    if (uris.length > 0) {
+      await vscode.commands.executeCommand('workbench.action.focusSecondEditorGroup');
     }
   }
 } 

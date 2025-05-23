@@ -2,7 +2,6 @@
 import { Tutorial } from "src/domain/models/Tutorial";
 import { DiffModel, DiffChangeType } from "../viewmodels/DiffModel";
 import { IGitChanges, DiffFilePayload } from "../ports/IGitChanges";
-import { EnrichedStep } from "src/domain/models/EnrichedStep";
 import { IDiffDisplayer, DiffFile } from 'src/ui/ports/IDiffDisplayer';
 
 
@@ -13,8 +12,8 @@ export class DiffViewService {
   /**
    * Get the diff models for changes between the current commit and its parent
    */
-  public async getDiffModelsForParent(tutorial: Tutorial, activeStep: EnrichedStep, gitAdapter: IGitChanges): Promise<DiffModel[]> {
-    const currentCommitHash = activeStep.commitHash;
+  public async getDiffModelsForParent(tutorial: Readonly<Tutorial>, gitAdapter: IGitChanges): Promise<DiffModel[]> {
+    const currentCommitHash = tutorial.activeStep.commitHash;
     const commitHashHistory = tutorial.steps.map(s => s.commitHash);
 
     const currentCommitIdx = commitHashHistory.findIndex(h => h === currentCommitHash);
@@ -51,12 +50,12 @@ export class DiffViewService {
   }
 
   public async showStepSolution(tutorial: Readonly<Tutorial>, gitAdapter: IGitChanges): Promise<void> {
-    const currentStepIdx = tutorial.steps.findIndex(s => s.id === tutorial.activeStep.id);
+    const currentStepIdx = tutorial.activeStepIndex;
     if (currentStepIdx === -1) {
       console.warn('TutorialService: Current step not found by ID for showing solution.');
       return;
     }
-    const currentStep = tutorial.steps[currentStepIdx];
+    const currentStep = tutorial.activeStep;
     const nextStep = tutorial.steps[currentStepIdx + 1];
 
     if (!nextStep) {
@@ -105,7 +104,6 @@ export class DiffViewService {
       }));
 
       await this.diffView.displayDiff(filesToDisplay);
-
     } catch (error) {
       console.error('Error showing step solution:', error);
     }

@@ -15,35 +15,93 @@ import { IGitChangesFactory } from '../ports/IGitChangesFactory';
 import { TutorialController } from '../controllers/TutorialController';
 
 
+enum TutorialViewChangeType {
+  StepChange = 'stepChange',
+  SolutionToggle = 'solutionToggle',
+  None = 'none'
+}
+
 export class TutorialViewService {
   private _gitAdapter: IGitChanges | null = null;
   private _webviewMessageHandler: WebviewMessageHandler | null = null;
+  private _oldTutorialViewModel: TutorialViewModel | null = null;
 
   constructor(
-    private readonly fs: IFileSystem, 
-    private readonly markdownConverter: IMarkdownConverter, 
-    private readonly diffViewService: DiffViewService, 
+    private readonly fs: IFileSystem,
+    private readonly markdownConverter: IMarkdownConverter,
+    private readonly diffViewService: DiffViewService,
     private readonly gitAdapterFactory: IGitChangesFactory,
     private readonly extensionUri: vscode.Uri
-  ) {}
+  ) { }
 
+
+  // Here can be effectivly two different things going on here:
+  // 1. The user has changed steps
+  // 2. The user has toggled the solution
   public async display(tutorial: Readonly<Tutorial>, controller: TutorialController) {
+    this._initializeTutorialView(tutorial, controller);
+
+    const tutorialViewModel = this._tutorialViewModel(tutorial);
+
+    if (!tutorialViewModel) {
+      throw new Error('TutorialViewModel is null');
+    }
+
+    if (!this._oldTutorialViewModel) {
+      //Initial render
+      const changedFiles = await this.diffViewService.getDiffModelsForParent(tutorial, this._gitAdapter!);
+      await this._updateSidePanelFiles(tutorial.activeStep, changedFiles.map(f => f.relativePath), tutorial.localPath);
+    } else {
+      const changeType = this._getTutorialViewChangeType(tutorialViewModel, this._oldTutorialViewModel);
+      switch (changeType) {
+        case TutorialViewChangeType.SolutionToggle:
+          await this._solutionToggle(tutorial);
+          break;
+        case TutorialViewChangeType.StepChange:
+          const changedFiles = await this.diffViewService.getDiffModelsForParent(tutorial, this._gitAdapter!);
+          await this._updateSidePanelFiles(tutorial.activeStep, changedFiles.map(f => f.relativePath), tutorial.localPath);
+          //await this._closeDiffTabsInGroupTwo(); //I guess this can be removed here //After trying it, it seems no needed
+          break;
+        default:
+          break;
+      }
+    }
+
+
+    await this._updateTutorialPanel(this.extensionUri, tutorialViewModel, this._webviewMessageHandler!);
+    this._oldTutorialViewModel = tutorialViewModel;
+  }
+
+  private async _solutionToggle(tutorial: Readonly<Tutorial>) {
+    //show -> hide
+    if (tutorial.isShowingSolution) {
+      await this.diffViewService.showStepSolution(tutorial, this._gitAdapter!);
+      await this._closeNonDiffTabsInGroupTwo();
+    } else {
+      //hide -> show
+      const changedFiles = await this.diffViewService.getDiffModelsForParent(tutorial, this._gitAdapter!);
+      await this._updateSidePanelFiles(tutorial.activeStep, changedFiles.map(f => f.relativePath), tutorial.localPath);
+      await this._closeDiffTabsInGroupTwo();
+    }
+    await vscode.commands.executeCommand('workbench.action.focusSecondEditorGroup');
+  }
+
+  private _initializeTutorialView(tutorial: Readonly<Tutorial>, controller: TutorialController) {
     if (!this._webviewMessageHandler) {
       this._webviewMessageHandler = new WebviewMessageHandler(controller);
     }
-
     if (!this._gitAdapter) {
       this._gitAdapter = this.gitAdapterFactory.createFromPath(tutorial.localPath);
     }
-    const tutorialViewModel = this._tutorialViewModel(tutorial);
+  }
 
-    if (tutorialViewModel?.isShowingSolution) {
-      this.diffViewService.showStepSolution(tutorial, this._gitAdapter);
+  private _getTutorialViewChangeType(newTutorialViewModel: TutorialViewModel, oldTutorialViewModel: TutorialViewModel | null): TutorialViewChangeType {
+    if (newTutorialViewModel.isShowingSolution !== oldTutorialViewModel?.isShowingSolution) {
+      return TutorialViewChangeType.SolutionToggle;
+    } else if (newTutorialViewModel.currentStepId !== oldTutorialViewModel?.currentStepId) {
+      return TutorialViewChangeType.StepChange;
     }
-
-    if (tutorialViewModel) {
-      this._updateTutorialPanel(this.extensionUri, tutorialViewModel, this._webviewMessageHandler);
-    }
+    return TutorialViewChangeType.None;
   }
 
   /**
@@ -161,8 +219,8 @@ export class TutorialViewService {
 
     const tabsToClose: vscode.Tab[] = [];
     for (const tab of currentTabsInGroupTwo) {
-      const input = tab.input as any; // Type assertion to access properties
-      if (input && input.original && input.modified) { // It's a diff view
+      const input = tab.input as any;
+      if (input && input.original && input.modified) {
         tabsToClose.push(tab);
         continue;
       }
@@ -196,12 +254,8 @@ export class TutorialViewService {
         console.error("TutorialViewService: Error closing tabs in group two:", error);
       }
     }
-
-    if (targetUris.length > 0 && vscode.window.tabGroups.activeTabGroup?.viewColumn === vscode.ViewColumn.Two) {
-      // If we opened files and group two is active, maybe focus group one?
-      // Or let user manage focus unless it was a diff view previously.
-    } else if (targetUris.length === 0 && currentTabsInGroupTwo.length > 0 && tabsToClose.length === currentTabsInGroupTwo.length) {
-      await vscode.commands.executeCommand('workbench.action.focusFirstEditorGroup');
+    if (targetUris.length > 0 || currentTabsInGroupTwo.length > 0) {
+      await vscode.commands.executeCommand('workbench.action.focusSecondEditorGroup');
     }
 
     console.log("TutorialViewService: Side panel files updated for step:", step.title);
@@ -219,22 +273,7 @@ export class TutorialViewService {
   private async _handleSolutionToggleUI(showing: boolean, currentStep?: Step, changedFilePathsForCurrentStep?: string[], tutorialLocalPath?: string): Promise<void> {
     if (showing) {
       await vscode.commands.executeCommand('workbench.action.focusSecondEditorGroup');
-      const groupTwoTabs = this._getTabsInGroup(vscode.ViewColumn.Two);
-      const regularFileTabsToClose: vscode.Tab[] = [];
-      for (const tab of groupTwoTabs) {
-        const input = tab.input as any;
-        if (!(input && input.original && input.modified)) {
-          regularFileTabsToClose.push(tab);
-        }
-      }
-      if (regularFileTabsToClose.length > 0) {
-        try {
-          await vscode.window.tabGroups.close(regularFileTabsToClose, false);
-          console.log("TutorialViewService: Closed regular files in group two as solution is being shown.");
-        } catch (error) {
-          console.error("TutorialViewService: Error closing regular files for solution view:", error);
-        }
-      }
+      await this._closeNonDiffTabsInGroupTwo();
     } else {
       // Solution is being hidden.
       // 1. Re-evaluate and open side panel files for the current step first.
@@ -258,6 +297,50 @@ export class TutorialViewService {
         } catch (error) {
           console.error("TutorialViewService: Error closing diff tabs for hiding solution:", error);
         }
+      }
+    }
+  }
+
+  /**
+   * Closes all tabs in the second editor group that are not diff views.
+   */
+  private async _closeNonDiffTabsInGroupTwo(): Promise<void> {
+    const groupTwoTabs = this._getTabsInGroup(vscode.ViewColumn.Two);
+    const regularFileTabsToClose: vscode.Tab[] = [];
+    for (const tab of groupTwoTabs) {
+      const input = tab.input as any;
+      if (!(input && input.original && input.modified)) { // Not a diff view
+        regularFileTabsToClose.push(tab);
+      }
+    }
+    if (regularFileTabsToClose.length > 0) {
+      try {
+        await vscode.window.tabGroups.close(regularFileTabsToClose, false);
+        console.log("TutorialViewService: Closed regular files in group two.");
+      } catch (error) {
+        console.error("TutorialViewService: Error closing regular files in group two:", error);
+      }
+    }
+  }
+
+  /**
+   * Closes all diff tabs in the second editor group.
+   */
+  private async _closeDiffTabsInGroupTwo(): Promise<void> {
+    const groupTwoTabs = this._getTabsInGroup(vscode.ViewColumn.Two);
+    const diffTabsToClose: vscode.Tab[] = [];
+    for (const tab of groupTwoTabs) {
+      const input = tab.input as any;
+      if (input && input.original && input.modified) { // It's a diff view
+        diffTabsToClose.push(tab);
+      }
+    }
+    if (diffTabsToClose.length > 0) {
+      try {
+        await vscode.window.tabGroups.close(diffTabsToClose, false);
+        console.log("TutorialViewService: Closed diff tabs in group two.");
+      } catch (error) {
+        console.error("TutorialViewService: Error closing diff tabs in group two:", error);
       }
     }
   }

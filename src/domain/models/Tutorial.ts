@@ -59,6 +59,7 @@ export class Tutorial {
             throw new Error("Invalid step index");
         }
         this._activeStepIndex = index;
+        this.isShowingSolution = false;
     }
 
     public next(): boolean{
@@ -67,6 +68,7 @@ export class Tutorial {
         }
         this._activeStepIndex++;
         if(this.activeStep.type === "solution") return this.next();
+        this.isShowingSolution = false;
         return true;
     }
 
@@ -76,6 +78,7 @@ export class Tutorial {
         }
         this._activeStepIndex--;
         if(this.activeStep.type === "solution") return this.prev();
+        this.isShowingSolution = false;
         return true;
     }
 

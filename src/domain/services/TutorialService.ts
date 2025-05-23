@@ -164,69 +164,58 @@ export class TutorialService {
   /**
    * Force navigation to a specific step
    * @param stepIndex - The index of the step to navigate to
-   * @returns True if the navigation was successful, false otherwise
    */
-  public async forceStepIndex(stepIndex: number): Promise<boolean> {
+  public async forceStepIndex(stepIndex: number): Promise<void> {
     if (!this._tutorial || !this._gitOperations) {
-      console.warn('TutorialService: no active tutorial, or no git operations for navigateToStep.');
-      return false;
+      throw new Error('TutorialService: no active tutorial, or no git operations for navigateToStep.');
     }
 
     const targetStep = this._tutorial.steps.at(stepIndex);
     if (!targetStep) {
-      console.warn('TutorialService: Invalid step index');
-      return false;
+      throw new Error(`TutorialService: Invalid step index: ${stepIndex}`);
     }
     if (this._tutorial.activeStep.id === targetStep.id) {
-      console.log('TutorialService: already on step', targetStep.id);
-      return true;
+      throw new Error(`TutorialService: already on step: ${targetStep.id}`);
     } else {
       const oldStepIndex = this._tutorial.activeStepIndex;
       this._tutorial.goTo(stepIndex);
       await this._afterStepChange(oldStepIndex);
-      return true;
     }
   }
 
   /**
    * Force navigation to a specific step by commit hash
    * @param commitHash - The commit hash to navigate to
-   * @returns True if the navigation was successful, false otherwise
+   * @throws Error if the step is not found
    */
-  public async forceStepCommitHash(commitHash: string): Promise<boolean> {
+  public async forceStepCommitHash(commitHash: string): Promise<void> {
     if (!this._tutorial || !this._gitOperations) {
-      console.warn('TutorialService: no active tutorial, or no git operations for forceStepCommitHash.');
-      return false;
+      throw new Error('TutorialService: no active tutorial, or no git operations for forceStepCommitHash.');
     }
     const oldStepIndex = this._tutorial.activeStepIndex;
     const targetStep = this._tutorial.steps.find(s => s.commitHash === commitHash);
     if (!targetStep) {
-      console.warn('TutorialService: Invalid step commit hash');
-      return false;
+      throw new Error(`TutorialService: Invalid step commit hash: ${commitHash}`);
     }
     this._tutorial.goTo(targetStep.index);
     await this._afterStepChange(oldStepIndex);
-    return true;
   }
 
   /**
    * Force navigation to a specific step by step ID
    * @param stepId 
    */
-  public async forceStepId(stepId: string): Promise<boolean> {
+  public async forceStepId(stepId: string): Promise<void> {
     if (!this._tutorial || !this._gitOperations) {
-      console.warn('TutorialService: no active tutorial, or no git operations for forceStepId.');
-      return false;
+      throw new Error('TutorialService: no active tutorial, or no git operations for forceStepId.');
     }
     const oldStepIndex = this._tutorial.activeStepIndex;
     const targetStep = this._tutorial.steps.find(s => s.id === stepId);
     if (!targetStep) {
-      console.warn('TutorialService: Invalid step commit hash');
-      return false;
+      throw new Error(`TutorialService: Invalid step id: ${stepId}`);
     }
     this._tutorial.goTo(targetStep.index);
     await this._afterStepChange(oldStepIndex);
-    return true;
   }
 
   /**

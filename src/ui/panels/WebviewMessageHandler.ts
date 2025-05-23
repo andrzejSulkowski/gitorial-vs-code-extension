@@ -17,11 +17,6 @@ export class WebviewMessageHandler {
    */
   public handleMessage(message: any): void {
     switch (message.command) {
-      case 'stepSelected':
-        if (message.stepId) {
-          this.tutorialController.selectStep(message.stepId);
-        }
-        return;
       case 'nextStep':
         this.tutorialController.requestNextStep();
         return;

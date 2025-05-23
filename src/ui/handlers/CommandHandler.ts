@@ -15,7 +15,7 @@ export class CommandHandler {
    */
   public async handleOpenLocalTutorial(): Promise<void> {
     console.log('CommandHandler: handleOpenLocalTutorial called');
-    await this.tutorialController.initiateOpenLocalTutorial();
+    await this.tutorialController.openLocalTutorial();
   }
 
   /**
@@ -24,7 +24,7 @@ export class CommandHandler {
    */
   public async handleCloneTutorial(): Promise<void> {
     console.log('CommandHandler: handleCloneTutorial called');
-    await this.tutorialController.initiateCloneTutorial();
+    await this.tutorialController.cloneTutorial();
   }
 
   /**
@@ -45,15 +45,6 @@ export class CommandHandler {
       })
     );
     
-    // Example: Registering a command that might be called from the TreeView
-    context.subscriptions.push(
-      vscode.commands.registerCommand('gitorial.goToStep', (stepId: string) => {
-        if (stepId) {
-          this.tutorialController.selectStep(stepId);
-        }
-      })
-    );
-
     context.subscriptions.push(
       vscode.commands.registerCommand('gitorial.debug', () => {
         tempTestExternalUri(this.tutorialController);

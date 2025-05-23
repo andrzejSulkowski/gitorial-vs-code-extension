@@ -50,7 +50,7 @@ export class DiffViewService {
     }
   }
 
-  public async showStepSolution(tutorial: Tutorial, gitAdapter: IGitChanges): Promise<void> {
+  public async showStepSolution(tutorial: Readonly<Tutorial>, gitAdapter: IGitChanges): Promise<void> {
     const currentStepIdx = tutorial.steps.findIndex(s => s.id === tutorial.activeStep.id);
     if (currentStepIdx === -1) {
       console.warn('TutorialService: Current step not found by ID for showing solution.');

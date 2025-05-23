@@ -27,7 +27,7 @@ export class TutorialViewService {
     private readonly extensionUri: vscode.Uri
   ) {}
 
-  public async display(tutorial: Tutorial, controller: TutorialController) {
+  public async display(tutorial: Readonly<Tutorial>, controller: TutorialController) {
     if (!this._webviewMessageHandler) {
       this._webviewMessageHandler = new WebviewMessageHandler(controller);
     }
@@ -35,7 +35,6 @@ export class TutorialViewService {
     if (!this._gitAdapter) {
       this._gitAdapter = this.gitAdapterFactory.createFromPath(tutorial.localPath);
     }
-    debugger;
     const tutorialViewModel = this._tutorialViewModel(tutorial);
 
     if (tutorialViewModel?.isShowingSolution) {
@@ -52,7 +51,7 @@ export class TutorialViewService {
    * This is used to populate and update the tutorial panel UI.
    * Returns null if no tutorial is active.
    */
-  private _tutorialViewModel(tutorial: Tutorial): TutorialViewModel | null {
+  private _tutorialViewModel(tutorial: Readonly<Tutorial>): TutorialViewModel | null {
     const actualCurrentStepId = tutorial.activeStep.id;
 
     const stepsViewModel: TutorialStepViewModel[] = tutorial.steps.map(step => {

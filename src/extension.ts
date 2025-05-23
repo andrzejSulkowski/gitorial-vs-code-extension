@@ -172,6 +172,7 @@ async function handleApplicationStartup(
     if (now - savedTime < 5_000) { // less than 5 seconds
       console.log("Gitorial: Recent pending auto-open found. Attempting to open tutorial in current workspace via checkWorkspaceForTutorial(true).");
       try {
+        await tutorialController.tryAutoOpenWorkspace({ commitHash, tutorialId: pendingAutoOpen.tutorialId });
         await tutorialController.checkWorkspaceForTutorial(true, commitHash);
       } catch (error) {
         console.error("Gitorial: Error during auto-open via checkWorkspaceForTutorial:", error);

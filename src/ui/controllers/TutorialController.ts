@@ -35,6 +35,16 @@ export class TutorialController {
     private readonly autoOpenState: AutoOpenState
   ) { }
 
+
+  //   _    _                          _____ _____ _     
+  //  | |  | |                   /\   |  __ \_   _( )    
+  //  | |  | |___  ___ _ __     /  \  | |__) || | |/ ___ 
+  //  | |  | / __|/ _ \ '__|   / /\ \ |  ___/ | |   / __|
+  //  | |__| \__ \  __/ |     / ____ \| |    _| |_  \__ \
+  //   \____/|___/\___|_|    /_/    \_\_|   |_____| |___/
+  //                                                     
+  //                                                     
+
   /**
    * Handles the user request to show the solution for the current step.
    * It delegates to TutorialService to toggle the solution state and updates the UI.
@@ -59,18 +69,6 @@ export class TutorialController {
       return;
     }
     await this.tutorialService.toggleSolution(false);
-    let currentStep;
-    let changedFilePaths: string[] = [];
-    let tutorialLocalPath: string | undefined;
-    const activeGitOperations = this.tutorialService.gitOperations;
-
-    if (activeTutorial.activeStep.id) {
-      currentStep = activeTutorial.steps.find(s => s.id === activeTutorial!.activeStep.id);
-      if (currentStep && activeGitOperations && activeTutorial.localPath) {
-        changedFilePaths = await activeGitOperations.getChangesInCommit(currentStep.commitHash);
-        tutorialLocalPath = activeTutorial.localPath;
-      }
-    }
     await this.tutorialViewService.display(activeTutorial, this);
   }
 
@@ -110,6 +108,38 @@ export class TutorialController {
         this.userInteraction.showErrorMessage(`Error checking for tutorial: ${error instanceof Error ? error.message : String(error)}`);
         // Consider if clearActiveTutorialState is always appropriate here or if it depends on the error
         this.clearActiveTutorialState();
+      }
+    }
+  }
+
+  //CHECK: maybe this should be handled by checkWorkspaceForTutorial. 
+  public async tryAutoOpenWorkspace(options: { tutorialId: string, commitHash?: string }): Promise<void> {
+    console.log('TutorialController: Checking workspace for existing tutorial...');
+    const workspaceFolders = vscode.workspace.workspaceFolders;
+    if (workspaceFolders && workspaceFolders.length > 0) {
+      const workspacePath = workspaceFolders[0].uri.fsPath;
+      try {
+        const isCorrectTutorial = await this.tutorialService.isTutorialInPath(workspacePath, { tutorialId: options.tutorialId });
+        if (isCorrectTutorial) {
+          console.log(`TutorialController: Tutorial found in workspace. Proceeding to open from path: ${workspacePath}`);
+          await this.openTutorialFromPath(workspacePath, { initialStepCommitHash: options.commitHash } );
+        } else {
+          const isOtherTutorial = await this.tutorialService.isTutorialInPath(workspacePath);
+          const openTutorialChoice = await this.userInteraction.askConfirmation({
+            message: `Gitorial tutorial found in the current workspace. Do you want to open it?`,
+            confirmActionTitle: 'Open Now',
+            cancelActionTitle: 'No Thanks'
+          }); 
+            await this.openTutorialFromPath(workspacePath, { initialStepCommitHash: options.commitHash });
+
+
+          if (openTutorialChoice) {
+            console.log('TutorialController: No Gitorial tutorial found in the current workspace.');
+          }
+        }
+      } catch (error) {
+        this.clearActiveTutorialState();
+        throw error;
       }
     }
   }

@@ -12,6 +12,7 @@ import { IActiveTutorialStateRepository, StoredTutorialState } from "../reposito
 import { EnrichedStep } from '../models/EnrichedStep';
 import { Step } from '../models/Step';
 import { IStepContentRepository } from '../ports/IStepContentRepository';
+import { TutorialId } from '@shared/types';
 
 /**
  * Options for loading a tutorial
@@ -47,7 +48,6 @@ export class TutorialService {
   constructor(
     private readonly repository: ITutorialRepository,
     private readonly gitOperationsFactory: IGitOperationsFactory,
-    //TODO: look into how to remove stepContentRepository and _loadMarkdown and move it to the TutorialViewService
     private readonly stepContentRepository: IStepContentRepository,
     private readonly activeTutorialStateRepository: IActiveTutorialStateRepository,
     workspaceId?: string
@@ -82,7 +82,6 @@ export class TutorialService {
     }
 
     this._gitOperations = this.gitOperationsFactory.fromPath(localPath);
-
     try {
       await this._gitOperations.ensureGitorialBranch();
     } catch (error) {
@@ -99,6 +98,7 @@ export class TutorialService {
     }
 
     await this._activateTutorial(tutorial, options);
+
     return tutorial;
   }
 
@@ -123,14 +123,6 @@ export class TutorialService {
 
       await this._activateTutorial(tutorial, options);
 
-      const persistedState: StoredTutorialState | undefined = await this.activeTutorialStateRepository.getActiveTutorial();
-      let effectiveInitialTabs: string[] = options.initialOpenTabFsPaths ?? [];
-      if (options.initialOpenTabFsPaths) {
-        effectiveInitialTabs = options.initialOpenTabFsPaths;
-      } else if (persistedState?.openFileUris) {
-        effectiveInitialTabs = persistedState.openFileUris;
-      }
-
       return tutorial;
     } catch (error) {
       console.error(`Error cloning tutorial from ${repoUrl}:`, error);
@@ -147,7 +139,7 @@ export class TutorialService {
   //                                    
   //                                    
 
-  public get tutorial(): Tutorial | null {
+  public get tutorial(): Readonly<Tutorial> | null {
     return this._tutorial;
   }
   public get gitOperations(): IGitOperations | null {
@@ -311,14 +303,7 @@ export class TutorialService {
    */
   public async toggleSolution(show?: boolean): Promise<void> {
     if (!this._tutorial) return;
-    const newValue = show === undefined ? !this._tutorial?.isShowingSolution : show;
-    if (newValue === this._tutorial?.isShowingSolution) {
-      return;
-    }
-    this._tutorial.isShowingSolution = newValue;
-    /*if (this.isShowingSolution && this.activeTutorial && this.gitAdapter) {
-      await this.showStepSolution();
-    }*/
+    this._tutorial.isShowingSolution = show ?? !this._tutorial.isShowingSolution;
   }
 
   /**
@@ -401,9 +386,16 @@ export class TutorialService {
   }
   /**
    * Check if a tutorial exists in a given local path
+   * @param localPath - The local path to check
+   * @param options - Optional options
+   * @param options.tutorialId - The tutorial ID to check against
+   * @returns True if a tutorial exists in the given local path, false otherwise
    */
-  public async isTutorialInPath(localPath: string): Promise<boolean> {
+  public async isTutorialInPath(localPath: string, options? :{ tutorialId?: string }): Promise<boolean> {
     const tutorial = await this.repository.findByPath(localPath);
+    if (options?.tutorialId) {
+      return tutorial?.id === options.tutorialId;
+    }
     return tutorial !== null;
   }
 }

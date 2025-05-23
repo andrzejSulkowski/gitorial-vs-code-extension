@@ -149,7 +149,7 @@ export class TutorialBuilder {
     relevantCommits.forEach((commit, index) => {
       const message = commit.message.trim();
       const colonIndex = message.indexOf(":");
-      let stepType: StepType | undefined = undefined; // Initialize to undefined
+      let stepType: StepType;
       let stepTitle = message;
 
       if (colonIndex > 0) {
@@ -161,20 +161,14 @@ export class TutorialBuilder {
           throw new Error(`TutorialBuilder: Invalid step type "${parsedType}" in commit message: "${message}".`);
         }
       } else {
-        // If no colon, it could be a simple message; decide on a default type or throw.
-        // For now, let's assume it's an error as per original logic, but this could be relaxed.
-        // Or, default to a type like 'section' and use the whole message as title.
-        // throw new Error(`TutorialBuilder: Commit message "${message}" missing type prefix.`);
-        console.warn(`TutorialBuilder: Commit message "${message}" missing type prefix. Defaulting to type 'section'.`);
-        stepType = 'section';
-        stepTitle = message; // Use full message as title
+        throw new Error(`TutorialBuilder: Commit message "${message}" missing type prefix.`);
       }
 
       const stepData: StepData = {
         id: `${tutorialId}-step-${index + 1}-${commit.hash.substring(0, 7)}`,
         title: stepTitle || 'Unnamed Step',
         commitHash: commit.hash,
-        type: stepType!,
+        type: stepType,
         index: index,
       };
       steps.push(new Step(stepData));

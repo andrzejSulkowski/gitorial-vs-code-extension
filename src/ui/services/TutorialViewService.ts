@@ -18,6 +18,7 @@ import { TutorialController } from '../controllers/TutorialController';
 enum TutorialViewChangeType {
   StepChange = 'StepChange',
   SolutionToggle = 'SolutionToggle',
+  // Case where the user has a solution open, and then moves to a new step
   StepSolutionChange = 'StepSolutionChange',
   None = 'None'
 }
@@ -289,46 +290,6 @@ export class TutorialViewService {
     }
 
     console.log("TutorialViewService: Side panel files updated for step:", step.title);
-  }
-
-  /**
-   * Handles the UI changes when a solution is toggled (shown or hidden).
-   * If showing, focuses the second editor group and cleans up non-diff tabs.
-   * If hiding, reopens current step files and closes diff tabs.
-   * @param showing Whether the solution is being shown or hidden.
-   * @param currentStep The current tutorial step (needed if solution is being hidden).
-   * @param changedFilePathsForCurrentStep File paths relevant to the current step (if solution is being hidden).
-   * @param tutorialLocalPath The local path of the tutorial (if solution is being hidden).
-   */
-  private async _handleSolutionToggleUI(showing: boolean, currentStep?: Step, changedFilePathsForCurrentStep?: string[], tutorialLocalPath?: string): Promise<void> {
-    if (showing) {
-      await vscode.commands.executeCommand('workbench.action.focusSecondEditorGroup');
-      await this._closeNonDiffTabsInGroupTwo();
-    } else {
-      // Solution is being hidden.
-      // 1. Re-evaluate and open side panel files for the current step first.
-      if (currentStep && changedFilePathsForCurrentStep && tutorialLocalPath) {
-        await this._updateSidePanelFiles(currentStep, changedFilePathsForCurrentStep, tutorialLocalPath);
-      }
-
-      // 2. Then, explicitly close all diff tabs in group two.
-      const groupTwoTabs = this._getTabsInGroup(vscode.ViewColumn.Two);
-      const diffTabsToClose: vscode.Tab[] = [];
-      for (const tab of groupTwoTabs) {
-        const input = tab.input as any;
-        if (input && input.original && input.modified) { // It's a diff view
-          diffTabsToClose.push(tab);
-        }
-      }
-      if (diffTabsToClose.length > 0) {
-        try {
-          await vscode.window.tabGroups.close(diffTabsToClose, false);
-          console.log("TutorialViewService: Closed diff tabs in group two after restoring step files.");
-        } catch (error) {
-          console.error("TutorialViewService: Error closing diff tabs for hiding solution:", error);
-        }
-      }
-    }
   }
 
   /**

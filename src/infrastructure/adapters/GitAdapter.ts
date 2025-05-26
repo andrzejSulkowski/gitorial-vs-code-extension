@@ -255,7 +255,7 @@ export class GitAdapter implements IGitOperations, IGitChanges {
           return originFetchLine.split('\t')[1].split(' ')[0];
         }
       }
-      return null
+      return null;
     }
   }
 

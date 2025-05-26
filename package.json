@@ -22,8 +22,6 @@
     "compile:webview": "cd webview-ui && npm run build && cd ..",
     "compile:extension": "node ./esbuild.config.mjs",
     "post-build": "node scripts/post-build.js",
-    "watch:extension": "node ./esbuild.config.mjs --watch",
-    "watch": "npm run watch:extension",
     "pretest": "npm run compile && npm run lint",
     "lint": "eslint src",
     "test": "vscode-test",

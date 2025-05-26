@@ -57,6 +57,7 @@ export class CommandHandler {
 
 async function tempTestExternalUri(controller: TutorialController) {
   const uri = vscode.Uri.parse("cursor://AndrzejSulkowski.gitorial/sync?platform=github&creator=shawntabrizi&repo=rust-state-machine&commitHash=b74e58d9b3165a2e18f11f0fead411a754386c75");
+  // codium://AndrzejSulkowski.gitorial/sync?platform=github&creator=shawntabrizi&repo=rust-state-machine&commitHash=b74e58d9b3165a2e18f11f0fead411a754386c75
   const uriHandler = new TutorialUriHandler(controller);
   await uriHandler.handleUri(uri);
 }

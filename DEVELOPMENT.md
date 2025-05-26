@@ -1,148 +1,344 @@
 # Gitorial Development Guide
 
-This guide provides information for developers looking to contribute to or understand the Gitorial VS Code extension.
+This comprehensive guide provides information for developers looking to contribute to or understand the Gitorial VS Code extension.
+
+## Table of Contents
+
+- [Prerequisites](#prerequisites)
+- [Quick Start](#quick-start)
+- [Development Workflow](#development-workflow)
+- [Architecture Overview](#architecture-overview)
+- [Project Structure](#project-structure)
+- [Data Flow Examples](#data-flow-examples)
+- [Testing](#testing)
+- [Debugging](#debugging)
+- [Building and Packaging](#building-and-packaging)
+- [Contributing Guidelines](#contributing-guidelines)
+- [Troubleshooting](#troubleshooting)
 
 ## Prerequisites
 
-- Node.js and npm
-- VS Code
+- **Node.js** (v18 or higher) and **npm**
+- **VS Code** (v1.87.0 or higher)
+- **Git** (for cloning and testing with tutorial repositories)
+- Basic understanding of TypeScript, VS Code extensions, and Clean Architecture
 
-## Setup
+## Quick Start
 
-1. Clone this repository.
-2. Run `npm install` to install dependencies.
-3. Run `npm run compile` to transpile the code (or `npm run watch` for continuous compilation during development).
-4. Open the project in VS Code.
-5. Press `F5` (or open via command palette: `Debug: Start Debugging`) to run the extension in a new Extension Development Host window.
+```bash
+# 1. Clone the repository
+git clone https://github.com/andrzejSulkowski/gitorial-vs-code-plugin.git
+cd gitorial-vs-code-plugin/project
 
-## How It Works (Architecture Overview)
+# 2. Install dependencies (both root and webview-ui)
+npm install
 
-The extension follows a Clean Architecture pattern, broadly separated into UI, Domain, and Infrastructure layers.
+# 3. Compile the extension
+npm run compile
 
-1.  **Extension Activation (`extension.ts`)**: 
-    *   This is the main entry point when the extension is activated by VS Code.
-    *   It's responsible for the initial setup (Composition Root): instantiating controllers, domain services, infrastructure adapters, and repositories.
-    *   It registers VS Code commands and associates them with controller actions.
+# 4. Open in VS Code
+code .
 
-2.  **UI Layer (`src/ui/`, `webview-ui/`)**:
-    *   **`TutorialController.ts`**: Orchestrates UI-related logic, user interactions (prompts, diffs), and prepares data (ViewModels) for the views. It receives actions from VS Code commands or the webview.
-    *   **`TutorialPanelManager.ts` & `TutorialPanel.ts`**: Manage the lifecycle of the tutorial webview panel. `TutorialPanelManager` ensures only one panel is active and `TutorialPanel` handles the specific webview instance, its content, and basic message passing.
-    *   **`WebviewMessageHandler.ts`**: Processes messages received *from* the webview and translates them into calls on the `TutorialController`.
-    *   **`webview-ui/`**: Contains the Svelte application that renders the actual tutorial content and navigation controls within the webview panel.
+# 5. Press F5 to run in Extension Development Host
+# This opens a new VS Code window with the extension loaded
+```
 
-3.  **Domain Layer (`src/domain/`)**:
-    *   **Models (`Tutorial.ts`, `Step.ts`, `StepState.ts`)**: Represent the core entities and their state. They are plain objects with no knowledge of UI or infrastructure.
-    *   **Services (`TutorialService.ts`, `StepProgressService.ts`, `TutorialBuilder.ts`)**: Encapsulate the core business logic, rules, and use cases of the application (e.g., loading tutorial data, managing step progression). They operate on domain models and use ports to interact with external concerns.
-    *   **Repositories (Interfaces/Ports like `ITutorialRepository.ts`, `IStepStateRepository.ts`)**: Define contracts for data persistence. Implementations are in the Infrastructure layer.
-    *   **Ports (Interfaces like `IGitOperations.ts`, `IDiffDisplayer.ts`, `IUserInteraction.ts`, `IFileSystem.ts`)**: Define contracts for external operations (Git, showing diffs, user prompts, file system access). Implementations are in the Infrastructure layer.
+## Development Workflow
 
-4.  **Infrastructure Layer (`src/infrastructure/`)**:
-    *   **Adapters**: Concrete implementations of the domain ports. For example:
-        *   `GitAdapter.ts` (implementing `IGitOperations`) would use a library like `simple-git`.
-        *   VS Code specific adapters for `IUserInteraction`, `IDiffDisplayer`, etc., using `vscode` API.
-    *   **Factories (`GitAdapterFactory.ts`)**: Used to create instances of adapters, potentially based on context (e.g., workspace path).
-    *   **Repositories**: Concrete implementations of the domain repositories.
-        *   `TutorialRepositoryImpl.ts` (implementing `ITutorialRepository`)
+### Available Scripts
 
-### Data Flow Example 1: User selects a step in the webview
+| Script | Description |
+|--------|-------------|
+| `npm run compile` | Full build: typecheck + webview + extension + post-build |
+| `npm run typecheck` | TypeScript type checking without compilation |
+| `npm run compile:webview` | Build the Svelte webview UI |
+| `npm run compile:extension` | Build the extension backend using esbuild |
+| `npm run lint` | Run ESLint on the source code |
+| `npm run test` | Run all tests using VS Code test runner |
+| `npm run test:unit` | Run unit tests with Mocha |
+| `npm run vscode:package` | Package the extension as .vsix file |
 
-*   Svelte UI in webview sends a message (e.g., `{ command: 'stepSelected', stepId: '...' }`).
-*   `TutorialPanel` receives the message and passes it to `WebviewMessageHandler`.
-*   `WebviewMessageHandler` interprets the command and calls `tutorialController.selectStep(stepId)`.
-*   `TutorialController.selectStep(stepId)`:
-    *   Validates the request.
-    *   Calls `stepProgressService.setCurrentStep(tutorialId, stepId)` to persist the new active step (Domain Service interaction).
-    *   Calls the `IGitOperations` adapter (via `this.activeGitAdapter`) to checkout the corresponding commit.
-    *   Updates its internal state (e.g., `activeTutorial.currentStepId`).
-    *   Prepares a new `TutorialViewModel`.
-    *   Calls `TutorialPanelManager.createOrShow(...)` which updates the `TutorialPanel` with the new view model.
-*   `TutorialPanel` sends the updated view model to the Svelte app, which re-renders the UI.
+### Development Loop
 
-### Data Flow Example 2: Opening an Existing Local Gitorial via Command
+1. **Make changes** to TypeScript/Svelte code
+2. **Compile**: Run `npm run compile` or use watch mode
+3. **Test**: Press `F5` in VS Code to launch Extension Development Host
+4. **Debug**: Use VS Code debugger or console logs
+5. **Iterate**: Reload the Extension Development Host (`Ctrl+R`/`Cmd+R`)
 
-1.  **User Action (VS Code UI)**:
-    *   User opens the Command Palette (`Cmd+Shift+P`).
-    *   User runs the command `Gitorial: Open Tutorial`.
+### Watch Mode (Recommended)
 
-2.  **Extension Activation & Command Handling (`extension.ts` - UI Layer / Composition Root)**:
-    *   If the extension isn't already active, VS Code activates it, running the `activate` function in `extension.ts`.
-    *   The `activate` function has already registered the command `gitorial.openTutorial` and associated it with a handler, which is typically a method on an instance of `TutorialController` (e.g., `tutorialController.initiateOpenLocalTutorial()`).
-    *   The command handler `tutorialController.initiateOpenLocalTutorial()` is executed.
+For faster development, you can run components in watch mode:
 
-3.  **`TutorialController.initiateOpenLocalTutorial()` (UI Layer - `src/ui/controllers/`)**:
-    *   This method is responsible for orchestrating the process of opening a local tutorial.
-    *   **User Interaction (Infrastructure Layer via Port)**: It uses an injected `IUserInteraction` adapter (e.g., `VsCodeUserInteractionAdapter`) to show an open dialog to the user, asking them to select a folder (`this.userInteraction.showOpenDialog(...)`).
-    *   **Path Received**: The controller receives the selected folder path (e.g., `/path/to/gitorial-folder`).
+```bash
+# Terminal 1: Watch webview changes
+cd webview-ui && npm run dev
 
-4.  **Controller Delegates to Domain Service (UI Layer -> Domain Layer)**:
-    *   The `TutorialController` now needs to load the tutorial data from this path. It calls a method on an injected instance of a domain service, for example, `this.tutorialService.loadTutorialFromPath(folderPath)`.
+# Terminal 2: Watch extension changes  
+npm run compile:extension -- --watch
 
-5.  **`TutorialService.loadTutorialFromPath(folderPath)` (Domain Layer - `src/domain/services/`)**:
-    *   This service method contains the core business logic for loading a tutorial from a file path.
-    *   **Repository Interaction (Domain Layer Port)**: It uses an injected `ITutorialRepository` (e.g., `FileSystemTutorialRepository` which implements the interface) to find and load tutorial metadata from the given `folderPath` (`this.repository.findByPath(folderPath)`).
-    *   **Git Operations (Domain Layer Port)**: If tutorial metadata is found, the `TutorialService` (or the `TutorialBuilder` it uses) might need to interact with the Git repository to fetch commit history to build the steps. It would use an injected `IGitOperations` adapter. The `Tutorial` object is constructed, potentially using `TutorialBuilder.buildFromLocalPath()`, which internally uses the `IGitOperations` adapter to get commit history.
-    *   **Returns `Tutorial` Object**: The `TutorialService` returns the fully populated `Tutorial` domain model object (or `null` if not found/failed).
+# Then press F5 in VS Code to start debugging
+```
 
-6.  **`TutorialController` Receives `Tutorial` Object (Domain Layer -> UI Layer)**:
-    *   The `TutorialController.initiateOpenLocalTutorial()` method receives the `Tutorial` object from `TutorialService`.
-    *   **State Management**: It sets `this.activeTutorial = tutorial;`. It also ensures `this.activeGitAdapter` is set for the active tutorial's path.
-    *   **UI Update Preparation**: It prepares a `TutorialViewModel` based on the `activeTutorial`.
-    *   **Display Panel (UI Layer)**: It calls `TutorialPanelManager.createOrShow(this.context.extensionUri, tutorialViewModel, this)` to display the tutorial in the webview panel.
-    *   **VS Code Context (UI Layer)**: It might set a VS Code context flag like `vscode.commands.executeCommand('setContext', 'gitorial.tutorialActive', true);`.
-    *   **User Notification (Infrastructure Layer via Port)**: It might use `this.userInteraction.showInformationMessage(...)` to notify the user that the tutorial is loaded.
+### Webview Development
 
-7.  **`TutorialPanelManager` & `TutorialPanel` (UI Layer - `src/ui/panels/`)**:
-    *   `TutorialPanelManager.createOrShow()` either creates a new `TutorialPanel` instance or updates an existing one.
-    *   The `TutorialPanel` receives the `TutorialViewModel`.
-    *   It updates its webview's HTML content or posts a message to the Svelte app within the webview with the new `TutorialViewModel`.
+The webview UI is a separate Svelte application with its own build process:
 
-8.  **Svelte App in Webview (UI Layer - `webview-ui/`)**:
-    *   The Svelte app receives the new `TutorialViewModel`.
-    *   It re-renders the UI to display the tutorial steps, content for the current step, navigation buttons, etc.
+```bash
+# Navigate to webview directory
+cd webview-ui
 
-**Layer Activation Summary for "Open Local Gitorial":**
+# Install webview dependencies
+npm install
 
-*   **VS Code UI**: User initiates the command.
-*   **`extension.ts` (UI Layer - Composition Root)**: Command handler invoked.
-*   **`TutorialController` (UI Layer)**: Orchestrates, uses `IUserInteraction`.
-*   **`TutorialService` (Domain Layer)**: Core loading logic, uses `ITutorialRepository`, `IGitOperations` (via injected adapter), `TutorialBuilder`.
-*   **`ITutorialRepository` / `IGitOperations` (Domain Ports)**: Interfaces used by `TutorialService`.
-*   **`FileSystemTutorialRepository` / `GitAdapter` (Infrastructure Layer - Adapters)**: Concrete implementations of the ports, performing actual file system/Git operations.
-*   **`Tutorial` / `Step` (Domain Models)**: Data returned from `TutorialService` to `TutorialController`.
-*   **`TutorialViewModel` (UI Layer - ViewModel)**: Prepared by `TutorialController`.
-*   **`TutorialPanelManager` / `TutorialPanel` (UI Layer)**: Display the view model in the webview.
-*   **Svelte App (UI Layer - Webview)**: Renders the final UI.
+# Development server with hot reload
+npm run dev
 
-## Project Structure Overview
+# Production build
+npm run build
+```
 
--   **`.vscode/`**: VS Code specific settings, launch configurations for debugging.
--   **`media/`** (if you have static images/icons for README or extension description)
--   **`webview-ui/`**: Contains the Svelte (or other framework) source code for the webview panel UI.
-    -   `src/`: Svelte components, stores, etc.
-    -   `public/`: Static assets for the webview.
-    -   `dist/` or `build/`: Compiled output of the webview UI.
--   **`src/`**: Main TypeScript source code for the extension.
-    -   **`extension.ts`**: The primary entry point for the VS Code extension. Handles activation, command registration, and initial setup (composition root).
-    -   **`ui/`**: UI layer components.
-        -   `controllers/`: Controllers like `TutorialController` that handle UI logic and mediate between user actions and the domain.
-        -   `panels/`: Manages VS Code WebviewPanels (e.g., `TutorialPanelManager`, `TutorialPanel`).
-        -   `handlers/`: Message handlers like `WebviewMessageHandler`.
-        -   `viewmodels/`: View-specific data structures (`TutorialViewModel`).
-    -   **`domain/`**: Core domain logic, independent of VS Code or specific frameworks.
-        -   `models/`: Domain entities (e.g., `Tutorial`, `Step`).
-        -   `services/`: Domain services containing business logic (e.g., `TutorialService`, `StepProgressService`, `TutorialBuilder`).
-        -   `repositories/`: Interfaces for data persistence (e.g., `ITutorialRepository`).
-        -   `ports/`: Interfaces for other external concerns (e.g., `IGitOperations`, `IUserInteraction`).
-        -   `events/`: Domain event definitions and event bus.
-    -   **`infrastructure/`**: Implementations of domain ports, interacting with external systems.
-        -   `adapters/`: Concrete implementations of ports (e.g., Git adapter, file system adapter, VS Code API adapters).
-        -   `repositories/`: Concrete repository implementations (e.g., for storing tutorial state).
-        -   `factories/`: Factories for creating infrastructure components.
-        -   `state/`: May contain specific logic for managing extension state if not covered by repositories (e.g., VS Code `Memento` based storage).
-    -   **`libs/`**: Utility libraries or self-contained modules (e.g., `uri-parser`).
-    -   **`utilities/`**: General helper functions used across the extension.
--   **`package.json`**: Defines extension metadata, contributions (commands, views), dependencies, and scripts.
--   **`tsconfig.json`**: TypeScript compiler configuration.
--   **`.eslintrc.js`, `.prettierrc.js`** (or similar): Linting and code formatting configurations.
+**Key webview files:**
+- `src/App.svelte`: Main Svelte component
+- `src/lib/`: Reusable Svelte components
+- `src/assets/`: Static assets (CSS, images)
+- `public/`: Public assets served directly
 
-This structure aims to follow Clean Architecture principles, promoting separation of concerns, testability, and maintainability. 
+## Architecture Overview
+
+The extension follows **Clean Architecture** principles with clear separation of concerns across three main layers:
+
+### 1. UI Layer (`src/ui/`, `webview-ui/`, `shared/types/viewmodels/`)
+
+**Purpose**: Handles all user interface concerns and VS Code API interactions.
+
+- **Controllers** (`src/ui/controllers/`): Orchestrate user actions and coordinate between domain services and UI services
+  - `TutorialController.ts`: Main controller handling tutorial operations
+- **Services** (`src/ui/services/`): Manage UI-specific operations
+  - `TutorialViewService.ts`: Manages tutorial display, file views, and editor groups
+  - `DiffViewService.ts`: Handles diff view generation and display
+- **Panels** (`src/ui/panels/`): Manage VS Code webview panels
+  - `TutorialPanelManager.ts`: Singleton manager for tutorial panels
+  - `TutorialPanel.ts`: Individual webview panel instances
+- **Handlers** (`src/ui/handlers/`): Process messages between webview and extension
+  - `WebviewMessageHandler.ts`: Translates webview messages to controller actions
+- **Ports** (`src/ui/ports/`): Interfaces for UI-specific abstractions
+  - `IMarkdownConverter.ts`, `IGitChanges.ts`, etc.
+- **ViewModels** (`src/ui/viewmodels/`): UI-specific data structures
+- **Webview UI** (`webview-ui/`): Svelte application for the tutorial panel
+
+### 2. Domain Layer (`src/domain/`)
+
+**Purpose**: Contains core business logic, independent of UI or infrastructure concerns.
+
+- **Models** (`src/domain/models/`): Core entities with minimal business logic
+  - `Tutorial.ts`, `Step.ts`, `EnrichedStep.ts`, `StepState.ts`
+- **Services** (`src/domain/services/`): Business logic and use cases
+  - `TutorialService.ts`: Core tutorial operations
+  - `StepProgressService.ts`: Step navigation and progress tracking
+  - `TutorialBuilder.ts`: Constructs tutorial objects from Git repositories
+- **Repositories** (`src/domain/repositories/`): Data persistence interfaces
+  - `ITutorialRepository.ts`, `IStepStateRepository.ts`
+- **Ports** (`src/domain/ports/`): External operation interfaces
+  - `IGitOperations.ts`, `IFileSystem.ts`, `IUserInteraction.ts`
+
+### 3. Infrastructure Layer (`src/infrastructure/`)
+
+**Purpose**: Implements domain and UI ports, handles external systems and VS Code APIs.
+
+- **Adapters** (`src/infrastructure/adapters/`): Concrete implementations of ports
+  - Git adapters, file system adapters, VS Code API adapters
+- **Repositories** (`src/infrastructure/repositories/`): Data persistence implementations
+- **Factories** (`src/infrastructure/factories/`): Create infrastructure components
+  - `GitAdapterFactory.ts`, `GitChangesFactory.ts`
+- **State** (`src/infrastructure/state/`): Extension state management
+
+### 4. Shared Layer (`shared/`)
+
+**Purpose**: Types and utilities shared across layers.
+
+- **Types** (`shared/types/`): TypeScript definitions
+  - `viewmodels/`: Shared between extension backend and webview frontend
+  - `domain-primitives/`: Basic reusable types
+
+
+## Data Flow Examples
+
+### Example 1: User Selects a Step in the Webview
+
+1. **User Action**: User clicks "Next Step" in the webview
+2. **Message Passing**: Svelte app posts message `{command: 'stepSelected', stepId: '...'}`
+3. **Handler Processing**: `WebviewMessageHandler` receives and processes the message
+4. **Controller Action**: Calls `TutorialController.requestPreviousStep()` or `TutorialController.requestNextStep()`
+5. **Domain Update**: Controller updates step progress via domain services
+6. **UI Refresh**: Controller calls `TutorialViewService.display(updatedTutorial)`
+7. **View Management**: `TutorialViewService` updates file views and diff displays
+8. **Panel Update**: Updates webview panel with new `TutorialViewModel`
+9. **Frontend Render**: Svelte app receives updated data and re-renders UI
+
+### Example 2: Opening an Existing Local Tutorial
+
+1. **User Action**: Runs `Gitorial: Open Tutorial` command
+2. **Command Handling**: `extension.ts` invokes `TutorialController.openLocalTutorial()`
+3. **User Interaction**: Controller shows folder selection dialog via `IUserInteraction` port
+4. **Domain Processing**: Controller calls `TutorialService.loadTutorialFromPath()`
+5. **Data Loading**: Service uses `ITutorialRepository` and `IGitOperations` to build `Tutorial` object
+6. **UI Update**: Controller calls `TutorialViewService.display()` to show tutorial and open files
+7. **Panel Management**: `TutorialViewService` updates webview via `TutorialPanelManager`
+8. **Frontend Rendering**: Svelte app receives `TutorialViewModel` and renders UI
+
+## Testing
+
+### Running Tests
+
+```bash
+# Run all tests
+npm run test
+
+# Run unit tests only
+npm run test:unit
+
+# Run with coverage (if configured)
+npm run test:unit -- --coverage
+```
+
+### Test Structure
+
+- **Unit Tests**: Located alongside source files (`*.test.ts`)
+- **Integration Tests**: In `src/test/` directory
+- **Test Framework**: Mocha with Chai assertions
+- **VS Code Testing**: Uses `@vscode/test-electron` for extension testing
+
+### Writing Tests
+
+```typescript
+// Example unit test
+import { expect } from 'chai';
+import { TutorialService } from '../services/TutorialService';
+
+describe('TutorialService', () => {
+  it('should load tutorial from valid path', async () => {
+    // Test implementation
+  });
+});
+```
+
+## Debugging
+
+### Extension Debugging
+
+1. **Set Breakpoints**: In VS Code, set breakpoints in your TypeScript code
+2. **Launch Debugger**: Press `F5` to start Extension Development Host
+3. **Trigger Code**: Perform actions that execute your code
+4. **Debug**: Use VS Code's debugging features (variables, call stack, etc.)
+
+### Webview Debugging
+
+1. **Open Developer Tools**: In Extension Development Host, run `Developer: Open Webview Developer Tools`
+2. **Debug Svelte**: Use browser dev tools to debug the Svelte application
+3. **Message Debugging**: Log messages between webview and extension
+
+### Logging
+
+```typescript
+// Extension logging
+console.log('Debug info:', data);
+
+// Webview logging (appears in webview dev tools)
+console.log('Webview debug:', data);
+```
+
+## Building and Packaging
+
+### Development Build
+
+```bash
+npm run compile
+```
+
+### Production Package
+
+```bash
+# Create .vsix package
+npm run vscode:package
+
+# The package will be created as gitorial-0.1.4.vsix
+```
+
+### Build Process
+
+1. **TypeScript Compilation**: Checks types and compiles
+2. **Webview Build**: Builds Svelte app with Vite
+3. **Extension Bundle**: Creates optimized bundle with esbuild
+4. **Post-build**: Copies assets and finalizes structure
+
+## Contributing Guidelines
+
+### Code Style
+
+- Follow existing TypeScript and Svelte conventions
+- Use ESLint configuration: `npm run lint`
+- Prefer functional programming for utilities
+- Use classes for domain models with behavior
+- Follow Clean Architecture dependency rules
+
+### Dependency Rules
+
+- **UI Layer**: Can depend on Domain layer
+- **Domain Layer**: Cannot depend on UI or Infrastructure
+- **Infrastructure Layer**: Can depend on Domain layer
+- **No circular dependencies** between layers
+
+### Pull Request Process
+
+1. **Fork** the repository
+2. **Create feature branch**: `git checkout -b feature/your-feature`
+3. **Make changes** following code style guidelines
+4. **Add tests** for new functionality
+5. **Run tests**: `npm run test`
+6. **Lint code**: `npm run lint`
+7. **Commit changes**: Use conventional commit messages
+8. **Push branch**: `git push origin feature/your-feature`
+9. **Create Pull Request** with clear description
+
+## Troubleshooting
+
+### Common Development Issues
+
+**Extension not loading in Development Host**
+- Check console for compilation errors
+- Ensure `npm run compile` completed successfully
+- Verify `package.json` contributions are correct
+
+**Webview not displaying**
+- Check webview build: `npm run compile:webview`
+- Verify webview HTML and assets are generated
+- Check browser console in webview dev tools
+
+**TypeScript errors**
+- Run `npm run typecheck` to see all type errors
+- Ensure all dependencies are installed
+- Check `tsconfig.json` configuration
+
+**Git operations failing**
+- Verify Git is installed and in PATH
+- Check repository permissions
+- Ensure test repositories are valid Git repos
+
+### Performance Considerations
+
+- **Lazy Loading**: Load heavy operations only when needed
+- **Debouncing**: Debounce frequent operations like file watching
+- **Memory Management**: Dispose of VS Code resources properly
+- **Bundle Size**: Monitor extension bundle size
+
+### Getting Help
+
+- 📖 [VS Code Extension API](https://code.visualstudio.com/api)
+- 🏗️ [Clean Architecture](https://blog.cleancoder.com/uncle-bob/2012/08/13/the-clean-architecture.html)
+- 🎯 [Svelte Documentation](https://svelte.dev/docs)
+- 💬 [Project Issues](https://github.com/andrzejSulkowski/gitorial-vs-code-plugin/issues)
+
+---
+
+This architecture promotes maintainability, testability, and scalability while keeping the codebase organized and easy to understand. 

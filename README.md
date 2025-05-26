@@ -1,9 +1,11 @@
 # Gitorial
 
-![Version](https://img.shields.io/badge/version-0.1.4--alpha-yellow)
-![Status](https://img.shields.io/badge/status-experimental-orange)
+![Version](https://img.shields.io/badge/version-0.1.4-yellow)
+![Status](https://img.shields.io/badge/status-preview-orange)
+![VS Code](https://img.shields.io/badge/VS%20Code-1.87.0+-blue)
+![License](https://img.shields.io/badge/license-MIT-green)
 
-A VS Code extension that enables interactive, step-by-step, [Gitorial-based](https://github.com/gitorial-sdk) tutorials directly in your editor.
+A VS Code extension that enables interactive, step-by-step, [Gitorial-based](https://github.com/gitorial-sdk) tutorials directly in your editor. Learn coding concepts, frameworks, and best practices through guided, hands-on experiences.
 
 ## Table of Contents
 
@@ -11,58 +13,141 @@ A VS Code extension that enables interactive, step-by-step, [Gitorial-based](htt
 - [How to Use](#how-to-use)
   - [For Tutorial Users](#for-tutorial-users)
   - [For Tutorial Authors](#for-tutorial-authors)
+- [Installation](#installation)
 - [Development](#development)
 - [Commands](#commands)
+- [Troubleshooting](#troubleshooting)
+- [Contributing](#contributing)
 - [License](#license)
 
 ## Features
 
-- Clone tutorial repositories.
-- Navigate through structured step-by-step tutorials.
-- View rich Markdown content for each tutorial step.
-- Persistent state that remembers your progress across sessions.
-- Easily follow coding lessons at your own pace within the editor.
+- **📚 Interactive Learning**: Clone and navigate through structured, step-by-step tutorials
+- **📝 Rich Content**: View beautifully rendered Markdown content for each tutorial step
+- **🔄 Git Integration**: Seamlessly work with Git-based tutorial repositories
+- **💾 Persistent State**: Automatically remembers your progress across VS Code sessions
+- **🎯 Focused Learning**: Automatically opens relevant files for each step
+- **🔍 Solution Viewing**: Compare your work with step solutions using built-in diff views
+- **⚡ Smart Navigation**: Easy step-by-step progression with intuitive controls
+- **🎨 Clean UI**: Dedicated tutorial panel that doesn't interfere with your coding workflow
 
 ## How to Use
 
 ### For Tutorial Users
 
-1.  **Clone a New Tutorial**
-    *   Open the command palette (`Ctrl+Shift+P` or `Cmd+Shift+P`).
-    *   Run the command `Gitorial: Clone New Tutorial`.
-    *   Enter the Git URL of the tutorial repository.
-    *   Select a **parent directory** where the tutorial folder will be created.
-    *   The extension clones the repository into a new sub-folder named after the repository.
-    *   A **new VS Code window** should automatically open with the cloned tutorial folder. (If not, open the cloned folder manually).
-    *   The Gitorial panel should load automatically in the new window if the tutorial is detected.
+#### 1. Clone a New Tutorial
 
-2.  **Open an Existing Local Tutorial**
-    *   Open a folder containing a Gitorial project in VS Code (e.g., using `File > Open Folder...`).
-    *   Once the folder is open, the Gitorial extension will activate.
-    *   It should detect the Gitorial and may show an **information prompt** (e.g., `Gitorial '[Tutorial Title]' detected. Load it?`).
-    *   Click **"Load Tutorial"** (or similar) on the prompt to open the tutorial panel.
-    *   If you miss the prompt or want to open it later, use the command `Gitorial: Open Tutorial` and select **"Use Current Workspace"** (if the workspace is the tutorial root) or **"Select Directory..."** to browse to the tutorial folder. If you select a directory, it will typically open in a new VS Code window, triggering detection.
+1. Open the command palette (`Ctrl+Shift+P` or `Cmd+Shift+P`)
+2. Run the command **`Gitorial: Clone New Tutorial`**
+3. Enter the Git URL of the tutorial repository
+4. Select a **parent directory** where the tutorial folder will be created
+5. The extension clones the repository into a new sub-folder named after the repository
+6. A **new VS Code window** automatically opens with the cloned tutorial folder
+7. The Gitorial panel loads automatically when the tutorial is detected
 
-3.  **Using the Gitorial Panel**
-    *   Once the panel is open, the tutorial content for the current step is displayed.
-    *   Use the **"Next"**, **"Previous"** (or "Back") buttons to navigate through the steps.
-    *   A **"Show Solution"** button may be available to display the differences for the current step.
+#### 2. Open an Existing Local Tutorial
+
+**Option A: Automatic Detection**
+1. Open a folder containing a Gitorial project in VS Code (`File > Open Folder...`)
+2. The Gitorial extension will activate and detect the tutorial
+3. Click **"Load Tutorial"** when prompted to open the tutorial panel
+
+**Option B: Manual Opening**
+1. Use the command **`Gitorial: Open Tutorial`**
+2. Choose **"Use Current Workspace"** (if the workspace is the tutorial root) or **"Select Directory..."** to browse to the tutorial folder
+3. If you select a directory, it will open in a new VS Code window and trigger tutorial detection
+
+#### 3. Using the Gitorial Panel
+
+- **Navigation**: Use **"Next"** and **"Previous"** buttons to move through tutorial steps
+- **Content**: Read step instructions and explanations in the main panel
+- **Files**: Relevant files for each step automatically open in the editor
+- **Solutions**: Click **"Show Solution"** to view differences and compare your progress
+- **Progress**: Your current position is automatically saved and restored
 
 ### For Tutorial Authors
 
 For information on creating Gitorial-compatible tutorials, please refer to the official [Gitorial SDK documentation](https://github.com/gitorial-sdk).
 
-_🏗️ In an upcoming version the extension will support the creation of new Gitorials from within the extension._
+> 🏗️ **Coming Soon**: In an upcoming version, the extension will support creating new Gitorials directly from within VS Code.
+
+## Installation
+
+### From VS Code Marketplace
+1. Open VS Code
+2. Go to the Extensions view (`Ctrl+Shift+X` or `Cmd+Shift+X`)
+3. Search for "Gitorial"
+4. Click **Install**
+
+### Manual Installation
+1. Download the latest `.vsix` file from the [releases page](https://github.com/andrzejSulkowski/gitorial-vs-code-plugin/releases)
+2. In VS Code, run `Extensions: Install from VSIX...` from the command palette
+3. Select the downloaded `.vsix` file
 
 ## Development
 
-For details on how to set up the development environment, understand the project architecture, and contribute to the extension, please see the [Gitorial Development Guide](./DEVELOPMENT.md).
+For comprehensive information on setting up the development environment, understanding the project architecture, and contributing to the extension, please see the [Gitorial Development Guide](./DEVELOPMENT.md).
+
+### Quick Start
+```bash
+# Clone the repository
+git clone https://github.com/andrzejSulkowski/gitorial-vs-code-plugin.git
+cd gitorial-vs-code-plugin/project
+
+# Install dependencies
+npm install
+
+# Compile the extension
+npm run compile
+
+# Open in VS Code and press F5 to run in Extension Development Host
+code .
+```
 
 ## Commands
 
--   `Gitorial: Clone New Tutorial` (`gitorial.cloneTutorial`): Clones a new tutorial repository into a selected parent folder and attempts to open it.
--   `Gitorial: Open Tutorial` (`gitorial.openTutorial`): Allows opening an existing local tutorial, either from the current workspace or by selecting a directory.
+| Command | ID | Description |
+|---------|----|-----------| 
+| **Gitorial: Clone New Tutorial** | `gitorial.cloneTutorial` | Clones a new tutorial repository into a selected parent folder and opens it |
+| **Gitorial: Open Tutorial** | `gitorial.openTutorial` | Opens an existing local tutorial from current workspace or selected directory |
+
+## Troubleshooting
+
+### Common Issues
+
+**Tutorial not detected after opening folder**
+- Ensure the folder contains a valid Gitorial configuration
+- Try running `Gitorial: Open Tutorial` manually
+- Check that the folder is a Git repository
+
+**Files not opening automatically**
+- Verify that the tutorial repository has the expected file structure
+- Check VS Code's file associations and permissions
+- Restart VS Code if the issue persists
+
+**Git operations failing**
+- Ensure Git is installed and accessible from your PATH
+- Verify you have proper permissions for the tutorial repository
+- Check that the repository is not corrupted
+
+### Getting Help
+
+- 🐛 [Report bugs](https://github.com/andrzejSulkowski/gitorial-vs-code-plugin/issues)
+- 💡 [Request features](https://github.com/andrzejSulkowski/gitorial-vs-code-plugin/issues)
+- 📖 [View documentation](https://github.com/gitorial-sdk)
+
+## Contributing
+
+We welcome contributions! Please see our [Development Guide](./DEVELOPMENT.md) for details on:
+- Setting up the development environment
+- Understanding the codebase architecture
+- Running tests
+- Submitting pull requests
 
 ## License
 
-MIT
+MIT © [Andrzej Sulkowski](https://github.com/andrzejSulkowski)
+
+---
+
+**Enjoy learning with Gitorial! 🚀**

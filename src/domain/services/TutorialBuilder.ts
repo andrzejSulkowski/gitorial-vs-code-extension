@@ -31,7 +31,7 @@ export class TutorialBuilder {
     try {
       const repoUrl = await gitService.getRepoUrl();
       if (!repoUrl) {
-        throw new Error("For now a gitorial needs to be linked to a remote origin\nOtherwise we can not derive the Gitorials Identifier")
+        throw new Error("For now a gitorial needs to be linked to a remote origin\nOtherwise we can not derive the Gitorials Identifier");
       }
       const details = this.extractRepoDetails(repoUrl);
 

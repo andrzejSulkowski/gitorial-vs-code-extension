@@ -1,270 +1,159 @@
+// ___  ___      _       
+// |  \/  |     (_)      
+// | .  . | __ _ _ _ __  
+// | |\/| |/ _` | | '_ \ 
+// | |  | | (_| | | | | |
+// \_|  |_/\__,_|_|_| |_|
+
 import * as vscode from "vscode";
-import { TutorialBuilder, Tutorial } from "./services/tutorial";
-import { GitService } from "./services/git";
-import { TutorialPanel } from "./panels/TutorialPanel";
-import { TutorialController } from "./controllers/TutorialController";
-import path from "path";
-import fs from "fs";
-import { GlobalState } from "./utilities/globalState";
+import { createDiffDisplayerAdapter } from "./infrastructure/adapters/DiffDisplayerAdapter";
+import { createMementoAdapter } from "./infrastructure/adapters/MementoAdapter";
+import { createProgressReportAdapter } from "./infrastructure/adapters/ProgressReportAdapter";
+import { GitOperationsFactory } from "./infrastructure/factories/GitOperationsFactory";
+import { TutorialUriHandler } from "./ui/handlers/UriHandler";
+import { TutorialController } from "./ui/controllers/TutorialController";
+import { CommandHandler } from "./ui/handlers/CommandHandler";
+import { TutorialRepositoryImpl } from "./domain/repositories/TutorialRepositoryImpl";
+import { GlobalState } from "./infrastructure/state/GlobalState";
+import { IUserInteraction } from "./domain/ports/IUserInteraction";
+import { createUserInteractionAdapter } from "./infrastructure/adapters/VSCodeUserInteractionAdapter";
+import { createFileSystemAdapter } from "./infrastructure/adapters/VSCodeFileSystemAdapter";
+import { TutorialService } from "./domain/services/TutorialService";
+import { createMarkdownConverterAdapter } from "./infrastructure/adapters/MarkdownConverter";
+import { StepContentRepository } from "./infrastructure/repositories/StepContentRepository";
+import { MementoActiveTutorialStateRepository } from "./infrastructure/repositories/MementoActiveTutorialStateRepository";
+import { TutorialViewService } from "./ui/services/TutorialViewService";
+import { AutoOpenState } from "./infrastructure/state/AutoOpenState";
+import { IActiveTutorialStateRepository } from "./domain/repositories/IActiveTutorialStateRepository";
+import { ITutorialRepository } from "./domain/repositories/ITutorialRepository";
+import { DiffViewService } from "./ui/services/DiffViewService";
+import { GitChangesFactory } from "./infrastructure/factories/GitChangesFactory";
 
-let activeController: TutorialController | undefined;
 
 /**
- * Main extension activation point
+ * Main extension activation point.
+ * This function is called when the extension is activated.
+ * It sets up global state, registers URI handlers, commands,
+ * and handles initial tutorial loading logic.
  */
-export async function activate(context: vscode.ExtensionContext) {
-  console.log("📖 Gitorial engine active");
+export async function activate(context: vscode.ExtensionContext): Promise<vscode.ExtensionContext> {
+  console.log("📖 Gitorial extension active");
 
-  const state = new GlobalState(context);
+  const {
+    tutorialController,
+    autoOpenState,
+    userInteractionAdapter,
+    activeTutorialStateRepository,
+    tutorialRepository,
+    workspaceId,
+  } = await bootstrapApplication(context);
 
-  context.subscriptions.push(
-    vscode.commands.registerCommand("gitorial.cloneTutorial", () =>
-      cloneTutorial(context, state)
-    ),
-    vscode.commands.registerCommand("gitorial.openTutorial", () =>
-      openTutorialSelector(context, state)
-    )
+  // --- VS Code Specific Registrations (Infrastructure concern, performed here) ---
+  const commandHandler = new CommandHandler(tutorialController);
+  const uriHandler = new TutorialUriHandler(tutorialController);
+
+  commandHandler.register(context);
+  uriHandler.register(context);
+
+  // --- Handle startup logic (auto-open, session restore, workspace check) ---
+  await handleApplicationStartup(
+    tutorialController,
+    autoOpenState,
   );
 
-  const pendingOpenPath = state.pendingOpenPath.get();
-  const currentWorkspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-  let autoOpened = false;
-
-  if (pendingOpenPath && currentWorkspacePath && pendingOpenPath === currentWorkspacePath) {
-    await state.pendingOpenPath.set(undefined);
-    try {
-      const tutorial = await TutorialBuilder.build(currentWorkspacePath, context);
-      if (tutorial) {
-        await openTutorial(tutorial, context);
-        autoOpened = true;
-      }
-    } catch (error) {
-      console.error("Error auto-opening tutorial:", error);
-      vscode.window.showErrorMessage(`Failed to auto-open Gitorial: ${error instanceof Error ? error.message : String(error)}`);
-    }
-  } else if (pendingOpenPath) {
-    await state.pendingOpenPath.set(undefined);
-  }
-
-  if (!autoOpened && currentWorkspacePath) {
-    const detectedTutorial = await findWorkspaceTutorial(context);
-
-    if (detectedTutorial && activeController?.tutorial.id !== detectedTutorial.id) {
-      const loadChoice = await vscode.window.showInformationMessage(
-        `Gitorial '${detectedTutorial.title}' detected in this workspace. Load it?`,
-        "Load Gitorial", "Dismiss"
-      );
-
-      if (loadChoice === "Load Gitorial") {
-        await openTutorial(detectedTutorial, context);
-      }
-    }
-  }
+  console.log("📖 Gitorial activation complete.");
+  return context;
 }
 
 /**
- * Clone a tutorial repository and load its structure
- */
-async function cloneTutorial(context: vscode.ExtensionContext, state: GlobalState): Promise<void> {
-  const repoUrl = await vscode.window.showInputBox({
-    prompt: "Git URL of the Gitorial repo",
-    value: "https://github.com/shawntabrizi/rust-state-machine.git",
-  });
-  if (!repoUrl) {
-    return;
-  }
-
-  const folderPick = await vscode.window.showOpenDialog({
-    canSelectFolders: true,
-    canSelectFiles: false,
-    openLabel: "Select folder to clone into",
-  });
-
-  if (!folderPick?.length) {
-    return;
-  }
-
-  try {
-    const parentDir = folderPick[0].fsPath;
-    const repoName = TutorialBuilder.generateTutorialId(repoUrl);
-    const targetDir = path.join(parentDir, repoName);
-
-    if (fs.existsSync(targetDir)) {
-      const overwrite = await vscode.window.showWarningMessage(
-        `Folder "${repoName}" already exists. Overwrite?`,
-        { modal: true },
-        "Yes",
-        "No"
-      );
-      if (overwrite === "Yes") {
-        fs.rmSync(targetDir, { recursive: true, force: true });
-      } else {
-        return;
-      }
-    }
-
-    await GitService.cloneRepo(repoUrl, targetDir);
-    const tutorial = await TutorialBuilder.build(targetDir, context);
-
-    if (!tutorial) {
-      throw new Error("Failed to load Tutorial inside the Tutorial Service");
-    }
-
-    await promptToOpenTutorial(tutorial, context, state);
-  } catch (error) {
-    vscode.window.showErrorMessage(`Failed to clone tutorial: ${error}`);
-  }
-}
-
-/**
- * Show a selector to choose from available tutorials
- */
-async function openTutorialSelector(
-  context: vscode.ExtensionContext,
-  state: GlobalState
-): Promise<void> {
-  const USE_CURRENT = "Use Current Workspace";
-  const SELECT_DIRECTORY = "Select Directory";
-  let option: string | undefined = SELECT_DIRECTORY;
-
-  const tutorial = await findWorkspaceTutorial(context);
-  if (tutorial instanceof Tutorial) {
-    const quickPickChoice = await vscode.window.showQuickPick(
-      [USE_CURRENT, SELECT_DIRECTORY],
-      { placeHolder: "How would you like to open a gitorial?" }
-    );
-    if (quickPickChoice) option = quickPickChoice;
-  }
-
-  switch (option) {
-    case USE_CURRENT:
-      await openTutorial(tutorial!, context);
-      break;
-    case SELECT_DIRECTORY:
-      const folderPick = await vscode.window.showOpenDialog({
-        canSelectFolders: true,
-        canSelectFiles: false,
-        openLabel: "Select Gitorial Directory",
-      });
-
-      if (folderPick?.length) {
-        const targetDir = folderPick[0].fsPath;
-        const tutorial = await TutorialBuilder.build(targetDir, context);
-
-        if (!tutorial) {
-          throw new Error("Path was not valid");
-        }
-
-        await openFolderForTutorial(tutorial, context, state);
-      }
-      break;
-  }
-}
-
-/**
- * Detect if the current workspace is a Gitorial repository
- */
-async function findWorkspaceTutorial(
-  context: vscode.ExtensionContext
-): Promise<Tutorial | null> {
-  const workspaceFolders = vscode.workspace.workspaceFolders;
-  if (!workspaceFolders || workspaceFolders.length === 0) {
-    return null;
-  }
-
-  for (const folder of workspaceFolders) {
-    const folderPath = folder.uri.fsPath;
-    const tutorial = await TutorialBuilder.build(folderPath, context);
-    if (tutorial) {
-      return tutorial;
-    }
-  }
-  return null;
-}
-
-/**
- * Ask user if they want to open the tutorial immediately after loading/cloning.
- */
-async function promptToOpenTutorial(
-  tutorial: Tutorial,
-  context: vscode.ExtensionContext,
-  state: GlobalState
-): Promise<void> {
-  const openNow = await vscode.window.showInformationMessage(
-    "Tutorial loaded successfully. Would you like to open it now?",
-    "Open Now"
-  );
-
-  if (openNow === "Open Now") {
-    await openFolderForTutorial(tutorial, context, state);
-  }
-}
-
-/**
- * Helper function to open the folder.
- * @param tutorial The loaded tutorial instance.
- * @context vscode.ExtensionContext
- */
-async function openFolderForTutorial(tutorial: Tutorial, context: vscode.ExtensionContext, state: GlobalState): Promise<boolean> {
-  const folderPath = tutorial.localPath;
-  const currentWorkspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-
-  if (folderPath === currentWorkspacePath) {
-    await openTutorial(tutorial, context);
-    return true;
-  } else {
-    try {
-      const folderUri = vscode.Uri.file(folderPath);
-      await state.pendingOpenPath.set(folderUri.fsPath);
-
-      await vscode.commands.executeCommand("vscode.openFolder", folderUri);
-      return true;
-    } catch (error) {
-      console.error("Error executing vscode.openFolder:", error);
-      vscode.window.showErrorMessage(`Failed to open folder: ${folderPath}`);
-      return false;
-    }
-  }
-
-}
-
-/**
- * Opens the tutorial panel for a given Tutorial instance.
- * Assumes this is called *after* the correct workspace is already open.
- * @param tutorial The loaded tutorial instance.
- * @param context The extension context.
- */
-async function openTutorial(
-  tutorial: Tutorial,
-  context: vscode.ExtensionContext
-) {
-  try {
-    if (activeController) {
-      activeController.dispose();
-      activeController = undefined;
-    }
-
-    activeController = new TutorialController(tutorial);
-    TutorialPanel.render(context.extensionUri, activeController);
-  } catch (error) {
-    console.error("Error opening tutorial:", error);
-    vscode.window.showErrorMessage(
-      `Failed to open tutorial: ${error instanceof Error ? error.message : String(error)
-      }`
-    );
-    if (activeController) {
-      activeController.dispose();
-      activeController = undefined;
-    }
-  }
-}
-
-/**
- * Extension deactivation
+ * This function is called when the extension is deactivated.
+ * It can be used to clean up any resources.
  */
 export function deactivate() {
-  if (activeController) {
-    activeController.dispose();
-    activeController = undefined;
+  console.log("📖 Gitorial extension deactivated");
+  // Clean up the active controller if it exists
+}
+
+interface BootstrappedDependencies {
+  tutorialController: TutorialController;
+  autoOpenState: AutoOpenState;
+  userInteractionAdapter: IUserInteraction;
+  activeTutorialStateRepository: IActiveTutorialStateRepository;
+  tutorialRepository: ITutorialRepository;
+  workspaceId: string | undefined;
+}
+
+async function bootstrapApplication(context: vscode.ExtensionContext): Promise<BootstrappedDependencies> {
+  // --- Adapters ---
+  const globalStateMementoAdapter = createMementoAdapter(context, false);
+  const workspaceStateMementoAdapter = createMementoAdapter(context, true);
+  const userInteractionAdapter = createUserInteractionAdapter();
+  const fileSystemAdapter = createFileSystemAdapter();
+  const progressReportAdapter = createProgressReportAdapter();
+  const markdownConverter = createMarkdownConverterAdapter();
+  const diffDisplayerAdapter = createDiffDisplayerAdapter();
+
+  // --- State ---
+  const autoOpenState = new AutoOpenState(new GlobalState(globalStateMementoAdapter));
+
+  // --- Factories ---
+  const gitOperationsFactory = new GitOperationsFactory();
+  const gitChangesFactory = new GitChangesFactory();
+
+  // --- Determine Workspace ID ---
+  let workspaceId: string | undefined;
+  if (vscode.workspace.workspaceFolders && vscode.workspace.workspaceFolders.length > 0) {
+    workspaceId = vscode.workspace.workspaceFolders[0].uri.fsPath;
+  } else {
+    console.warn("Gitorial: No workspace folder open. Workspace-specific tutorial state persistence will be limited.");
   }
+
+  // --- Infrastructure Repositories ---
+  const stepContentRepository = new StepContentRepository(fileSystemAdapter);
+  const activeTutorialStateRepository = new MementoActiveTutorialStateRepository(workspaceStateMementoAdapter);
+  const tutorialRepository = new TutorialRepositoryImpl(
+    workspaceStateMementoAdapter, // Using workspace specific state for tutorials
+    gitOperationsFactory.fromPath,
+  );
+
+  // --- Domain Services ---
+  const tutorialService = new TutorialService(
+    tutorialRepository,
+    gitOperationsFactory,
+    stepContentRepository,
+    activeTutorialStateRepository,
+    workspaceId
+  );
+
+
+  // --- UI Services ---
+  const diffViewService = new DiffViewService(diffDisplayerAdapter);
+  const tutorialViewService = new TutorialViewService(fileSystemAdapter, markdownConverter, diffViewService, gitChangesFactory, context.extensionUri);
+
+  // --- UI Layer Controllers ---
+  const tutorialController = new TutorialController(
+    context.extensionUri,
+    progressReportAdapter,
+    userInteractionAdapter,
+    fileSystemAdapter,
+    tutorialService,
+    tutorialViewService,
+    autoOpenState
+  );
+
+  return {
+    tutorialController,
+    autoOpenState,
+    userInteractionAdapter,
+    activeTutorialStateRepository,
+    tutorialRepository,
+    workspaceId,
+  };
+}
+
+async function handleApplicationStartup(
+  tutorialController: TutorialController,
+  autoOpenState: AutoOpenState,
+): Promise<void> {
+  await tutorialController.detectTutorialInWorkspace(autoOpenState);
 }

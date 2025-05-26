@@ -6,7 +6,13 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## [Unreleased]
 
-## [0.1.3] - 2024-07-26
+## [0.1.3] - 2025-05-12
 
 - Moved Next/Back buttons in the webview panel to the left side for consistent positioning.
 - Simplified Gitorial opening process, requiring only a single click after selection or cloning.
+
+## [0.1.4] - 2025-05-26
+
+- Refactor the codebase
+- Add Sync handling
+

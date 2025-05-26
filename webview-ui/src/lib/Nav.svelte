@@ -17,11 +17,11 @@
   const isNextDisabled = $derived(currentStep === totalSteps - 1);
 
   function handlePrev() {
-    vscode.postMessage({ command: "prev" });
+    vscode.postMessage({ command: "prevStep" });
   }
 
   function handleNext() {
-    vscode.postMessage({ command: "next" });
+    vscode.postMessage({ command: "nextStep" });
   }
 
   function handleShowSolution() {

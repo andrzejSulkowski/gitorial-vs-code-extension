@@ -1,0 +1,18 @@
+---
+description: 
+globs: *.ts
+alwaysApply: false
+---
+# TypeScript Usage
+
+Best practices for leveraging TypeScript for type safety and improved developer experience.
+
+<rule>
+name: typescript_usage
+description: Encourages TypeScript, use of interfaces for message structures, and leveraging union types/type guards.
+
+# Actual guidelines:
+- Encourage TypeScript for type safety and better developer experience
+- Use interfaces for defining message structures and API responses
+- Leverage TypeScript's union types and type guards for runtime checks
+</rule>

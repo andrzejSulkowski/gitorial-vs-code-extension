@@ -1,0 +1,18 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Dependency Management
+
+Best practices for managing external dependencies in the extension.
+
+<rule>
+name: dependency_management
+description: Recommends using well-maintained libraries, regular updates, and minimizing external dependencies.
+
+# Actual guidelines:
+- Prefer well-maintained and reputable libraries.
+- Regularly review and update dependencies, paying attention to breaking changes.
+- Strive to minimize the number of external dependencies to reduce extension size and potential conflicts.
+</rule>

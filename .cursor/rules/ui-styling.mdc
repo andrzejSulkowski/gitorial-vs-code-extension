@@ -1,0 +1,18 @@
+---
+description: 
+globs: *.svelte,*.html,*.tsx
+alwaysApply: false
+---
+# UI and Styling
+
+Guidelines for creating responsive, consistent, and well-laid-out user interfaces.
+
+<rule>
+name: ui_and_styling
+description: Recommendations for responsive design, CSS Grid/Flexbox for layouts, and consistent styling.
+
+# Actual guidelines:
+- Create responsive designs for popup and options pages
+- Use CSS Grid or Flexbox for layouts
+- Implement consistent styling across all extension UI elements
+</rule>

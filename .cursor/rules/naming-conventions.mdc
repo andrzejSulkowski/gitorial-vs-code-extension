@@ -1,0 +1,19 @@
+---
+description: 
+globs: *.ts
+alwaysApply: false
+---
+# Naming Conventions
+
+Establishes conventions for naming files, directories, variables, and functions.
+
+<rule>
+name: naming_conventions
+description: Guidelines for PascalCase, kebab-case, test file naming, and camelCase for variables/functions.
+
+# Actual guidelines:
+- Use PascalCase only for files that export a single class or Svelte component (TutorialPanel.ts, NavBar.svelte)
+- Use lowercase with dash for file names and directories(e.g., content-script.js, background-worker.js)
+- Use '*.test.ts' for test files
+- Use camelCase for function and variable names
+</rule>

@@ -1,0 +1,20 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Context-Aware Development
+
+Principles for developing code that is mindful of the entire project context.
+
+<rule>
+name: context_aware_development
+description: Stresses considering project context, avoiding duplication, ensuring seamless integration, and reviewing existing state.
+
+# Actual guidelines:
+- Always consider the whole project context when providing suggestions or generating code
+- Avoid duplicating existing functionality or creating conflicting implementations
+- Ensure that new code integrates seamlessly with the existing project structure and architecture
+- Before adding new features or modifying existing ones, review the current project state to maintain consistency and avoid redundancy
+- When answering questions or providing solutions, take into account previously discussed or implemented features to prevent contradictions or repetitions
+</rule>

@@ -1,9 +1,9 @@
 import esbuild from 'esbuild';
 
 const config = {
-  entryPoints: ['src/extension.ts'],
+  entryPoints: ['src/extension.ts', 'src/test/extension.test.ts'],
   bundle: true,
-  outfile: 'out/extension.js',
+  outdir: 'out',
   external: ['vscode'],
   format: 'cjs',
   platform: 'node',

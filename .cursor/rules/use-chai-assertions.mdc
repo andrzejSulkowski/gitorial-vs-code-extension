@@ -1,0 +1,68 @@
+---
+description: 
+globs: *.test.ts,*.test.spec.ts
+alwaysApply: false
+---
+# Use Chai for Assertions
+
+<rule>
+name: use-chai-assertions
+description: Ensures that test files utilize Chai's assertion syntax and discourages common assertion patterns from other libraries like Jest.
+
+filters:
+  # Match test files based on glob patterns (defined above)
+  - type: file_extension
+    pattern: "\\.(test|spec)\\.ts$"
+  # Detect common Jest-style matchers
+  - type: content
+    # This regex looks for expect(...).matcher_name(...)
+    # It targets common Jest matchers like toBe, toEqual, toHaveBeenCalled, etc.
+    pattern: "expect\\s*\\(.*\\)\\s*\\.\\s*(toBe|toEqual|toBeTruthy|toBeFalsy|toBeNull|toBeUndefined|toBeNaN|toHaveBeenCalled|toHaveBeenCalledWith|toHaveBeenCalledTimes|toHaveBeenLastCalledWith|toHaveBeenNthCalledWith|toHaveReturned|toHaveReturnedTimes|toHaveReturnedWith|toHaveLastReturnedWith|toHaveNthReturnedWith|toHaveLength|toHaveProperty|toMatch|toMatchObject|toMatchSnapshot|toMatchInlineSnapshot|toStrictEqual|toThrow|toThrowErrorMatchingSnapshot|toThrowErrorMatchingInlineSnapshot)\\s*\\("
+
+actions:
+  - type: suggest # Suggests rather than strictly rejects, to allow for phased adoption or specific exceptions
+    message: |
+      Detected a non-Chai assertion style (likely Jest). Please use Chai assertion syntax.
+
+      For example:
+      - Instead of: `expect(value).toBe(true);`
+      - Use: `expect(value).to.be.true;`
+
+      - Instead of: `expect(object).toEqual({ a: 1 });`
+      - Use: `expect(object).to.deep.equal({ a: 1 });`
+
+      - Instead of: `expect(array).toHaveLength(3);`
+      - Use: `expect(array).to.have.lengthOf(3);`
+
+      - Instead of: `expect(spy).toHaveBeenCalled();`
+      - Use: `expect(spy).to.have.been.called();` (requires `chai-spies` or similar)
+
+      Ensure you have Chai installed (`npm install --save-dev chai @types/chai`) 
+      and import `expect` from Chai: `import { expect } from 'chai';`
+
+examples:
+  - input: |
+      // Bad: Jest-style assertion
+      describe('MyTest', () => {
+        it('should be true', () => {
+          const myVar = true;
+          expect(myVar).toBe(true);
+        });
+      });
+    output: "Suggestion: Detected a non-Chai assertion style... Use `expect(myVar).to.be.true;`"
+
+  - input: |
+      // Good: Chai-style assertion
+      import { expect } from 'chai';
+      describe('MyTest', () => {
+        it('should be true', () => {
+          const myVar = true;
+          expect(myVar).to.be.true;
+        });
+      });
+    output: "No suggestion needed."
+
+metadata:
+  priority: medium
+  version: 1.0
+</rule>

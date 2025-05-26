@@ -15,7 +15,7 @@ interface TutorialStep {
  * Main tutorial data structure which holds all the required tutorial state
  */
 interface TutorialData {
-  id: string;
+  id: TutorialId;
   repoUrl: string;
   localPath: string;
   title: string;
@@ -35,6 +35,7 @@ interface WebViewData {
   isShowingSolution: boolean;
 }
 
+export type TutorialId = string & { readonly __brand: 'TutorialId' };
 
 //TODO: Create interfaces for all types of messages from Extension -> WebView AND from WebView -> Extension
 //type MessagePayload = WebViewData | SomeOtherData | 

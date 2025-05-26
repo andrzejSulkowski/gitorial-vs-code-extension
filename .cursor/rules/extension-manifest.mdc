@@ -1,0 +1,18 @@
+---
+description: 
+globs: package.json
+alwaysApply: false
+---
+# Extension Manifest (`package.json`)
+
+Guidelines for maintaining a clear and efficient `package.json` file.
+
+<rule>
+name: extension_manifest_package_json
+description: Best practices for defining contribution points, specific activation events, and clear display name/description.
+
+# Actual guidelines:
+- Keep contribution points (commands, views, configurations, keybindings, etc.) clearly defined and documented.
+- Ensure `activationEvents` are as specific as possible to improve extension startup performance.
+- Provide a clear and concise `displayName` and `description`.
+</rule>

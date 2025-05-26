@@ -1,0 +1,20 @@
+---
+description: 
+globs: *.ts
+alwaysApply: false
+---
+# Code Style and Structure
+
+Guidelines for writing concise, modern, and well-structured TypeScript code.
+
+<rule>
+name: code_style_and_structure
+description: Defines standards for code style, modern JavaScript usage, functional patterns, class usage, and naming.
+
+# Actual guidelines:
+- Write concise, technical TypeScript code with accurate examples
+- Use modern JavaScript features and best practices
+- Prefer functional programming patterns for small utility logic and stateless data transformations;
+- Use classes for Domain models with rich behavior and state
+- Use descriptive variable names (e.g., isExtensionEnabled, hasPermission)
+</rule>

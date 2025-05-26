@@ -19,7 +19,12 @@
 		"baseUrl": ".",
 		"paths": {
 			"@shared/*": ["./shared/*"]
-		}
+		},
+		"types": [
+			"node",
+			"mocha",
+			"chai"
+		]
 	},
 	"include": [
 		"src/**/*",

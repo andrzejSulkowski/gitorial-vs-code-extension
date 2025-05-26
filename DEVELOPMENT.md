@@ -104,6 +104,75 @@ npm run build
 - `src/assets/`: Static assets (CSS, images)
 - `public/`: Public assets served directly
 
+## URI Commands and External Integration
+
+The extension supports URI-based commands for external integration, allowing other applications or websites to trigger tutorial operations.
+
+### Sync Command
+
+The sync command allows external sources to open a specific tutorial at a particular commit state.
+
+#### URI Schema
+
+```
+<IDE_NAME>://AndrzejSulkowski.gitorial/sync?platform=<platform>&creator=<creator>&repo=<repo>&commitHash=<commitHash>
+```
+
+#### Parameters
+
+| Parameter | Description | Required | Supported Values |
+|-----------|-------------|----------|------------------|
+| `platform` | Git hosting platform | Yes | `github`, `gitlab` |
+| `creator` | Repository owner/organization | Yes | Any valid username/org |
+| `repo` | Repository name | Yes | Any valid repository name |
+| `commitHash` | Specific commit to sync to | Yes | Full SHA commit hash |
+
+#### Example URIs
+
+```bash
+# GitHub repository example
+cursor://AndrzejSulkowski.gitorial/sync?platform=github&creator=shawntabrizi&repo=rust-state-machine&commitHash=b74e58d9b3165a2e18f11f0fead411a754386c75
+
+# GitLab repository example  
+cursor://AndrzejSulkowski.gitorial/sync?platform=gitlab&creator=myorg&repo=my-tutorial&commitHash=a1b2c3d4e5f6789012345678901234567890abcd
+```
+
+#### How It Works
+
+1. **URI Registration**: Extension registers as a URI handler for the `cursor://AndrzejSulkowski.gitorial` scheme
+2. **URI Parsing**: `UriParser` validates and extracts parameters from the URI
+3. **Repository Construction**: Builds the full repository URL (e.g., `https://github.com/creator/repo`)
+4. **Tutorial Processing**: Clones repository, checks out specified commit, and loads tutorial
+5. **UI Display**: Opens tutorial in VS Code with the webview panel
+
+#### Testing URI Commands
+
+For development and testing, you can trigger URI commands programmatically:
+
+```typescript
+// In extension development
+const uri = vscode.Uri.parse("cursor://AndrzejSulkowski.gitorial/sync?platform=github&creator=shawntabrizi&repo=rust-state-machine&commitHash=b74e58d9b3165a2e18f11f0fead411a754386c75");
+const uriHandler = new TutorialUriHandler(controller);
+await uriHandler.handleUri(uri);
+```
+
+#### URI Components
+
+- **`CommandHandler.ts`**: Registers VS Code commands and handles the debug command
+- **`UriHandler.ts`**: Implements `vscode.UriHandler` interface and processes incoming URIs
+- **`UriParser.ts`**: Parses and validates URI structure and parameters
+- **`TutorialController`**: Handles the actual tutorial operations triggered by URI commands
+
+#### Error Handling
+
+The URI system includes comprehensive error handling:
+
+- **Invalid URI format**: Shows error message to user
+- **Unsupported platform**: Validates against supported platforms list
+- **Missing parameters**: Checks for required parameters
+- **Repository access**: Handles Git clone and checkout failures
+- **Tutorial loading**: Manages tutorial parsing and loading errors
+
 ## Architecture Overview
 
 The extension follows **Clean Architecture** principles with clear separation of concerns across three main layers:
@@ -186,6 +255,16 @@ The extension follows **Clean Architecture** principles with clear separation of
 6. **UI Update**: Controller calls `TutorialViewService.display()` to show tutorial and open files
 7. **Panel Management**: `TutorialViewService` updates webview via `TutorialPanelManager`
 8. **Frontend Rendering**: Svelte app receives `TutorialViewModel` and renders UI
+
+### Example 3: URI-based Tutorial Sync
+
+1. **External Trigger**: User clicks a URI link or extension receives URI via protocol handler
+2. **URI Parsing**: `TutorialUriHandler` receives and parses the URI using `UriParser`
+3. **Command Processing**: Handler identifies sync command and extracts repository information
+4. **Controller Action**: Calls `TutorialController.handleExternalTutorialRequest()`
+5. **Repository Operations**: Controller clones repository and checks out specific commit
+6. **Tutorial Loading**: Loads tutorial from cloned repository
+7. **UI Display**: Shows tutorial in webview and opens relevant files
 
 ## Testing
 

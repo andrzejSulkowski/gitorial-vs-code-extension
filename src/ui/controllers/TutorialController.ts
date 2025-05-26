@@ -163,7 +163,6 @@ export class TutorialController {
     return this.userInteraction.showOpenDialog({
       canSelectFolders: true,
       canSelectFiles: false,
-      canSelectMany: false,
       openLabel: options.openLabel,
       title: options.title
     });
@@ -291,12 +290,9 @@ export class TutorialController {
    * @param commitHash Optional commit hash (step ID) to sync to after opening.
    */
   private async _handleOpenLocalForExternalRequest(repoUrl: string, commitHash?: string): Promise<void> {
-    const dirAbsPathResult = await this.userInteraction.showOpenDialog({
-      canSelectFolders: true,
-      canSelectFiles: false,
-      canSelectMany: false,
-      openLabel: 'Select Local Tutorial Folder to Sync',
-      title: 'Open Local Gitorial for Syncing'
+    const dirAbsPathResult = await this._pickFolder({
+      title: 'Open Local Gitorial for Syncing',
+      openLabel: 'Select Local Tutorial Folder to Sync'
     });
 
     if (dirAbsPathResult && dirAbsPathResult.length > 0) {
@@ -321,8 +317,9 @@ export class TutorialController {
   /**
    * Opens a tutorial from a specified local folder path.
    * It loads the tutorial using TutorialService and then activates it.
+   * If the tutorial is not in the current workspace, it forces a workspace switch.
    * @param folderPath The absolute file system path to the tutorial folder.
-   * @param options Optional parameters, e.g., initialStepId to activate.
+   * @param options Optional parameters, e.g., initialStepCommitHash to activate.
    */
   private async _openTutorialFromPath(folderPath: string, options?: { initialStepCommitHash?: string }): Promise<void> {
     try {
@@ -331,6 +328,17 @@ export class TutorialController {
       });
 
       if (tutorial) {
+        const workspaceFolders = vscode.workspace.workspaceFolders;
+        const currentWorkspacePath = workspaceFolders?.[0]?.uri.fsPath;
+
+        if (currentWorkspacePath !== tutorial.localPath) {
+          console.log(`TutorialController: Tutorial at ${folderPath} is not in current workspace. Forcing workspace switch.`);
+          await this._forceWorkspaceSwitch(tutorial, options);
+          return;
+        }
+
+        // Tutorial is in current workspace - proceed with loading
+        console.log(`TutorialController: Tutorial at ${folderPath} is in current workspace. Loading directly.`);
         await this._processLoadedTutorial(tutorial, options?.initialStepCommitHash);
       } else {
         this.userInteraction.showErrorMessage(`Could not load Gitorial from: ${folderPath}`);
@@ -399,6 +407,32 @@ export class TutorialController {
     TutorialPanelManager.disposeCurrentPanel();
     vscode.commands.executeCommand('setContext', 'gitorial.tutorialActive', false);
     console.log('TutorialController: Active tutorial state cleared.');
+  }
+
+  /**
+   * Forces a workspace switch to the tutorial directory.
+   * Saves the current state to auto-open the tutorial after the workspace switch.
+   * @param tutorial The tutorial to switch to.
+   * @param options Optional parameters to preserve across workspace switch.
+   */
+  private async _forceWorkspaceSwitch(tutorial: Tutorial, options?: { initialStepCommitHash?: string }): Promise<void> {
+    try {
+      // Save state for auto-opening after workspace switch
+      await this.autoOpenState.set({
+        tutorialId: tutorial.id, // Will be determined after loading
+        timestamp: Date.now(),
+        commitHash: options?.initialStepCommitHash,
+      });
+
+      const folderUri = vscode.Uri.file(tutorial.localPath);
+      console.log(`TutorialController: Switching workspace to ${tutorial.localPath}`);
+
+      // This will cause the extension to restart in the new workspace
+      await vscode.commands.executeCommand('vscode.openFolder', folderUri, {});
+    } catch (error) {
+      console.error('TutorialController: Error forcing workspace switch:', error);
+      this.userInteraction.showErrorMessage(`Failed to switch workspace: ${error instanceof Error ? error.message : String(error)}`);
+    }
   }
   //  __          __  _          _                 _    _                 _ _               
   //  \ \        / / | |        (_)               | |  | |               | | |              

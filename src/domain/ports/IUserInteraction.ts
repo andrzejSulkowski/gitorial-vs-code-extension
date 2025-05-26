@@ -15,7 +15,6 @@ export interface PathSelectionOptions {
 export type OpenDialogOptions = {
   canSelectFolders?: boolean;
   canSelectFiles?: boolean;
-  canSelectMany?: boolean;
   openLabel?: string;
   title?: string;
 }
@@ -32,7 +31,7 @@ export interface IUserInteraction {
    * @param options Configuration for the path selection dialog.
    * @returns The selected path(s) or undefined if cancelled.
    */
-  selectPath(options: PathSelectionOptions): Promise<string | string[] | undefined>;
+  selectPath(options: PathSelectionOptions): Promise<string | undefined>;
 
   /**
    * Prompts the user for an input string.

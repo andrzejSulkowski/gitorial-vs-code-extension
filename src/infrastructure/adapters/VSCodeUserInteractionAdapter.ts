@@ -29,12 +29,11 @@ export class VSCodeUserInteractionAdapter implements IUserInteraction {
     await vscode.window.showErrorMessage(message);
   }
 
-  public async selectPath(options: PathSelectionOptions): Promise<string | string[] | undefined> {
+  public async selectPath(options: PathSelectionOptions): Promise<string | undefined> {
     const defaultUri = options.defaultUri ? vscode.Uri.parse(options.defaultUri) : undefined;
     const result = await vscode.window.showOpenDialog({
       canSelectFiles: options.canSelectFiles,
       canSelectFolders: options.canSelectFolders,
-      canSelectMany: options.canSelectMany,
       openLabel: options.openLabel,
       title: options.title,
       defaultUri: defaultUri,
@@ -44,9 +43,6 @@ export class VSCodeUserInteractionAdapter implements IUserInteraction {
       return undefined;
     }
 
-    if (options.canSelectMany) {
-      return result.map(uri => uri.fsPath);
-    }
     return result[0].fsPath;
   }
 

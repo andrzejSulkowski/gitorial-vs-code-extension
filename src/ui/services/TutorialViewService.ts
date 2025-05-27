@@ -104,7 +104,8 @@ export class TutorialViewService {
         const relativePath = path.relative(tutorial.localPath, lastActiveFile.fsPath);
         preferredFocusFile = relativePath;
       }
-      
+      //TODO: we have two methods to restore/focus tabs, one is in TabTrackingService, the other is in DiffViewService.showStepSolution.
+      //We should use one method (pref. TabTrackingService) to restore focus to the last active tutorial file only.
       await this.diffViewService.showStepSolution(tutorial, this._gitAdapter!, preferredFocusFile);
       await this._closeNonDiffTabsInGroupTwo();
     } else {

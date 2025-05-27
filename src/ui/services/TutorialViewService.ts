@@ -13,6 +13,7 @@ import { DiffViewService } from './DiffViewService';
 import { IGitChanges } from '../ports/IGitChanges';
 import { IGitChangesFactory } from '../ports/IGitChangesFactory';
 import { TutorialController } from '../controllers/TutorialController';
+import { TabTrackingService } from './TabTrackingService';
 
 
 enum TutorialViewChangeType {
@@ -33,7 +34,8 @@ export class TutorialViewService {
     private readonly markdownConverter: IMarkdownConverter,
     private readonly diffViewService: DiffViewService,
     private readonly gitAdapterFactory: IGitChangesFactory,
-    private readonly extensionUri: vscode.Uri
+    private readonly extensionUri: vscode.Uri,
+    private readonly tabTrackingService: TabTrackingService
   ) { }
 
 
@@ -94,15 +96,33 @@ export class TutorialViewService {
   private async _solutionToggle(tutorial: Readonly<Tutorial>) {
     //show -> hide
     if (tutorial.isShowingSolution) {
-      await this.diffViewService.showStepSolution(tutorial, this._gitAdapter!);
+      // Get the preferred focus file from tab tracking service
+      let preferredFocusFile: string | undefined;
+      const lastActiveFile = this.tabTrackingService.getLastActiveTutorialFile();
+      
+      if (lastActiveFile && tutorial.localPath) {
+        const relativePath = path.relative(tutorial.localPath, lastActiveFile.fsPath);
+        preferredFocusFile = relativePath;
+      }
+      
+      await this.diffViewService.showStepSolution(tutorial, this._gitAdapter!, preferredFocusFile);
       await this._closeNonDiffTabsInGroupTwo();
     } else {
       //hide -> show
+      const lastActiveTutorialFile = this.tabTrackingService.getLastActiveTutorialFile();
       const changedFiles = await this.diffViewService.getDiffModelsForParent(tutorial, this._gitAdapter!);
-      await this._updateSidePanelFiles(tutorial.activeStep, changedFiles.map(f => f.relativePath), tutorial.localPath);
+      await this._updateSidePanelFiles(tutorial.activeStep, changedFiles.map(f => f.relativePath), tutorial.localPath); //FIXME: this and '_closeDiffTabsInGroupTwo' both close tabs
       await this._closeDiffTabsInGroupTwo();
-    }
-    await vscode.commands.executeCommand('workbench.action.focusSecondEditorGroup');
+      
+      // Restore focus to the last active tutorial file if available
+      if (lastActiveTutorialFile) {
+        try {
+          await this.tabTrackingService.restoreFocusToFile(lastActiveTutorialFile);
+        } catch (error) {
+          console.error('TutorialViewService: Error restoring focus using TabTrackingService:', error);
+        }
+      }
+    }  
   }
 
   private _initializeTutorialView(tutorial: Readonly<Tutorial>, controller: TutorialController) {
@@ -112,6 +132,9 @@ export class TutorialViewService {
     if (!this._gitAdapter) {
       this._gitAdapter = this.gitAdapterFactory.createFromPath(tutorial.localPath);
     }
+    
+    // Set the tutorial path for tab tracking
+    this.tabTrackingService.setTutorialPath(tutorial.localPath);
   }
 
   private _getTutorialViewChangeType(newTutorialViewModel: TutorialViewModel, oldTutorialViewModel: TutorialViewModel | null): TutorialViewChangeType {
@@ -281,6 +304,8 @@ export class TutorialViewService {
         await vscode.window.tabGroups.close(tabsToClose, false);
       } catch (error) {
         console.error("TutorialViewService: Error closing tabs in group two:", error);
+        console.error("tabs to close");
+        console.error(tabsToClose);
       }
     }
 
@@ -383,5 +408,12 @@ export class TutorialViewService {
     if (uris.length > 0) {
       await vscode.commands.executeCommand('workbench.action.focusSecondEditorGroup');
     }
+  }
+
+  /**
+   * Disposes of the service and cleans up resources.
+   */
+  public dispose(): void {
+    this.tabTrackingService.dispose();
   }
 } 

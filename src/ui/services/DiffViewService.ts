@@ -52,7 +52,7 @@ export class DiffViewService {
     }
   }
 
-  public async showStepSolution(tutorial: Readonly<Tutorial>, gitAdapter: IGitChanges): Promise<void> {
+  public async showStepSolution(tutorial: Readonly<Tutorial>, gitAdapter: IGitChanges, preferredFocusFile?: string): Promise<void> {
     const currentStepIdx = tutorial.activeStepIndex;
     if (currentStepIdx === -1) {
       console.warn('TutorialService: Current step not found by ID for showing solution.');
@@ -125,7 +125,7 @@ export class DiffViewService {
         });
       }
 
-      await this.diffView.displayDiff(filesToDisplay);
+      await this.diffView.displayDiff(filesToDisplay, preferredFocusFile);
     } catch (error) {
       console.error('Error showing step solution:', error);
     }

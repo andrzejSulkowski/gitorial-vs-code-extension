@@ -324,7 +324,7 @@ suite("DiffViewService Show Solution Tests", () => {
 
         // Create a more realistic DiffViewService mock that actually calls the file system
         const diffViewService = {
-            async showStepSolution(tutorial: any, gitAdapter: any): Promise<void> {
+            async showStepSolution(tutorial: any, gitAdapter: any, preferredFocusFile?: string): Promise<void> {
                 const currentStepIdx = tutorial.activeStepIndex;
                 const currentStep = tutorial.activeStep;
                 const nextStep = tutorial.steps[currentStepIdx + 1];
@@ -372,7 +372,7 @@ suite("DiffViewService Show Solution Tests", () => {
                     await file.rightContentProvider();
                 }
 
-                await mockDiffDisplayer.displayDiff(filesToDisplay);
+                await mockDiffDisplayer.displayDiff(filesToDisplay, preferredFocusFile);
             }
         };
 
@@ -402,6 +402,117 @@ suite("DiffViewService Show Solution Tests", () => {
             'Left side should be identified as working directory');
         assert.strictEqual(diffFiles[0].rightCommitId, 'next456', 
             'Right side should be the solution commit');
+    });
+
+    test("showStepSolution should preserve focus on preferred file when specified", async () => {
+        // Mock file system
+        const mockFs = {
+            join: sandbox.stub().callsFake((path1: string, path2: string) => `${path1}/${path2}`),
+            pathExists: sandbox.stub().resolves(true),
+            readFile: sandbox.stub().resolves('// User\'s current code with TODO: implement this')
+        };
+
+        // Mock diff displayer
+        const mockDiffDisplayer = {
+            displayDiff: sandbox.stub().resolves()
+        };
+
+        // Mock tutorial
+        const mockTutorial = {
+            activeStepIndex: 0,
+            activeStep: { commitHash: 'current123', title: 'Step 1' },
+            steps: [
+                { commitHash: 'current123', title: 'Step 1' },
+                { commitHash: 'next456', title: 'Step 2' }
+            ],
+            localPath: '/tutorial/path'
+        };
+
+        // Mock git adapter with multiple files
+        const mockGitAdapter = {
+            getCommitDiff: sandbox.stub().resolves([
+                {
+                    relativeFilePath: 'src/main.rs',
+                    absoluteFilePath: '/tutorial/path/src/main.rs',
+                    commitHash: 'next456',
+                    originalContent: '// Main file with TODO: implement this',
+                    modifiedContent: '// Main file - implemented!',
+                    isNew: false,
+                    isDeleted: false,
+                    isModified: true
+                },
+                {
+                    relativeFilePath: 'src/balances.rs',
+                    absoluteFilePath: '/tutorial/path/src/balances.rs',
+                    commitHash: 'next456',
+                    originalContent: '// Balances file with TODO: implement this',
+                    modifiedContent: '// Balances file - implemented!',
+                    isNew: false,
+                    isDeleted: false,
+                    isModified: true
+                }
+            ])
+        };
+
+        // Create a DiffViewService mock that handles preferred focus
+        const diffViewService = {
+            async showStepSolution(tutorial: any, gitAdapter: any, preferredFocusFile?: string): Promise<void> {
+                const currentStepIdx = tutorial.activeStepIndex;
+                const nextStep = tutorial.steps[currentStepIdx + 1];
+
+                if (!nextStep) return;
+
+                const commitDiffPayloads = await gitAdapter.getCommitDiff(nextStep.commitHash);
+                
+                const filteredDiffPayloads = commitDiffPayloads.filter((payload: any) => {
+                    const baseName = payload.relativeFilePath.substring(payload.relativeFilePath.lastIndexOf('/') + 1).toLowerCase();
+                    if (['readme.md', '.gitignore'].includes(baseName)) {
+                        return false;
+                    }
+                    return payload.originalContent && payload.originalContent.includes("TODO:");
+                });
+
+                const filesToDisplay = [];
+                
+                for (const payload of filteredDiffPayloads) {
+                    const absoluteFilePath = mockFs.join(tutorial.localPath, payload.relativeFilePath);
+                    
+                    filesToDisplay.push({
+                        leftContentProvider: async () => {
+                            if (await mockFs.pathExists(absoluteFilePath)) {
+                                return await mockFs.readFile(absoluteFilePath);
+                            }
+                            return "";
+                        },
+                        rightContentProvider: async () => payload.modifiedContent || "",
+                        relativePath: payload.relativeFilePath,
+                        leftCommitId: "working-dir",
+                        rightCommitId: nextStep.commitHash,
+                        titleCommitId: nextStep.commitHash.slice(0, 7)
+                    });
+                }
+
+                await mockDiffDisplayer.displayDiff(filesToDisplay, preferredFocusFile);
+            }
+        };
+
+        // Execute the method with a preferred focus file
+        const preferredFile = 'src/balances.rs';
+        await diffViewService.showStepSolution(mockTutorial, mockGitAdapter, preferredFile);
+
+        // Verify that displayDiff was called with the preferred focus file
+        assert.ok(mockDiffDisplayer.displayDiff.calledOnce, 
+            'displayDiff should be called once');
+        
+        const [diffFiles, passedPreferredFile] = mockDiffDisplayer.displayDiff.firstCall.args;
+        assert.strictEqual(passedPreferredFile, preferredFile, 
+            'displayDiff should be called with the preferred focus file');
+        assert.strictEqual(diffFiles.length, 2, 'Should have two diff files');
+        
+        // Verify that both files are included
+        const fileNames = diffFiles.map((f: any) => f.relativePath);
+        assert.ok(fileNames.includes('src/main.rs'), 'Should include main.rs');
+        assert.ok(fileNames.includes('src/balances.rs'), 'Should include balances.rs');
     });
 });
 

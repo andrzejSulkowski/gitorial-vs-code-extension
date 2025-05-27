@@ -60,6 +60,7 @@ export interface IDiffDisplayer {
   /**
    * Display diffs for a set of file changes.
    * @param diffs An array of file descriptions, where each file has providers for left and right content.
+   * @param preferredFocusFile Optional relative path of the file that should receive focus after displaying diffs.
    */
-  displayDiff(diffs: DiffFile[]): Promise<void>;
+  displayDiff(diffs: DiffFile[], preferredFocusFile?: string): Promise<void>;
 }

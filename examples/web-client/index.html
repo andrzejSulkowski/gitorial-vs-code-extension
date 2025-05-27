@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gitorial Sync Client Example</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        .status.connected {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status.disconnected {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .status.locked {
+            background-color: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        button {
+            background-color: #007cba;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #005a87;
+        }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        .tutorial-info {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .step-content {
+            background-color: #ffffff;
+            padding: 15px;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            margin: 10px 0;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .logs {
+            background-color: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+            margin: 10px 0;
+        }
+        input[type="text"] {
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            width: 300px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔗 Gitorial Sync Client Example</h1>
+        
+        <div class="connection-section">
+            <h2>Connection</h2>
+            <div>
+                <label for="wsUrl">WebSocket URL:</label>
+                <input type="text" id="wsUrl" value="ws://localhost:3001/gitorial-sync" />
+                <button id="connectBtn">Connect</button>
+                <button id="disconnectBtn" disabled>Disconnect</button>
+            </div>
+            <div id="connectionStatus" class="status disconnected">Disconnected</div>
+        </div>
+
+        <div class="control-section">
+            <h2>Controls</h2>
+            <button id="requestSyncBtn" disabled>Request Sync</button>
+            <button id="lockExtensionBtn" disabled>Lock Extension (Take Control)</button>
+            <button id="unlockExtensionBtn" disabled>Unlock Extension (Return Control)</button>
+        </div>
+
+        <div class="tutorial-section">
+            <h2>Tutorial State</h2>
+            <div id="tutorialInfo" class="tutorial-info">
+                <p>No tutorial data received yet. Connect and request sync to see tutorial state.</p>
+            </div>
+            <div id="stepContent" class="step-content">
+                <p>Step content will appear here when tutorial state is synced.</p>
+            </div>
+        </div>
+
+        <div class="logs-section">
+            <h2>Logs</h2>
+            <div id="logs" class="logs"></div>
+            <button id="clearLogsBtn">Clear Logs</button>
+        </div>
+    </div>
+
+    <script>
+        class GitorialSyncClient {
+            constructor() {
+                this.ws = null;
+                this.clientId = null;
+                this.isLocked = false;
+                this.tutorialState = null;
+                
+                this.initializeUI();
+            }
+
+            initializeUI() {
+                // Connection controls
+                document.getElementById('connectBtn').addEventListener('click', () => this.connect());
+                document.getElementById('disconnectBtn').addEventListener('click', () => this.disconnect());
+                
+                // Control buttons
+                document.getElementById('requestSyncBtn').addEventListener('click', () => this.requestSync());
+                document.getElementById('lockExtensionBtn').addEventListener('click', () => this.lockExtension());
+                document.getElementById('unlockExtensionBtn').addEventListener('click', () => this.unlockExtension());
+                
+                // Utility
+                document.getElementById('clearLogsBtn').addEventListener('click', () => this.clearLogs());
+            }
+
+            connect() {
+                const url = document.getElementById('wsUrl').value;
+                this.log(`Connecting to ${url}...`);
+                
+                try {
+                    this.ws = new WebSocket(url);
+                    
+                    this.ws.onopen = () => {
+                        this.log('Connected to Gitorial sync tunnel');
+                        this.updateConnectionStatus('connected');
+                        this.updateButtonStates(true);
+                    };
+                    
+                    this.ws.onmessage = (event) => {
+                        this.handleMessage(JSON.parse(event.data));
+                    };
+                    
+                    this.ws.onclose = () => {
+                        this.log('Disconnected from sync tunnel');
+                        this.updateConnectionStatus('disconnected');
+                        this.updateButtonStates(false);
+                        this.ws = null;
+                    };
+                    
+                    this.ws.onerror = (error) => {
+                        this.log(`WebSocket error: ${error}`);
+                    };
+                    
+                } catch (error) {
+                    this.log(`Failed to connect: ${error.message}`);
+                }
+            }
+
+            disconnect() {
+                if (this.ws) {
+                    this.ws.close();
+                }
+            }
+
+            handleMessage(message) {
+                this.log(`Received: ${message.type}`);
+                
+                switch (message.type) {
+                    case 'client_connected':
+                        this.clientId = message.data.clientId;
+                        this.log(`Assigned client ID: ${this.clientId}`);
+                        break;
+                        
+                    case 'state_update':
+                        this.tutorialState = message.data;
+                        this.updateTutorialDisplay(message.data);
+                        if (message.data) {
+                            this.log(`Tutorial state updated: ${message.data.tutorialTitle}`);
+                        } else {
+                            this.log('Tutorial state cleared (no active tutorial)');
+                        }
+                        break;
+                        
+                    case 'error':
+                        this.log(`Error: ${message.data.error}`);
+                        break;
+                        
+                    default:
+                        this.log(`Unknown message type: ${message.type}`);
+                }
+            }
+
+            sendMessage(type, data = {}) {
+                if (!this.ws || this.ws.readyState !== this.ws.OPEN) {
+                    this.log('Cannot send message: not connected');
+                    return;
+                }
+                
+                const message = {
+                    type,
+                    clientId: this.clientId || 'unknown',
+                    data,
+                    timestamp: Date.now()
+                };
+                
+                this.ws.send(JSON.stringify(message));
+                this.log(`Sent: ${type}`);
+            }
+
+            requestSync() {
+                this.sendMessage('request_sync');
+            }
+
+            lockExtension() {
+                this.sendMessage('lock_screen');
+                this.isLocked = true;
+                this.updateConnectionStatus('locked');
+                this.log('Extension locked - web app has control');
+            }
+
+            unlockExtension() {
+                this.sendMessage('unlock_screen');
+                this.isLocked = false;
+                this.updateConnectionStatus('connected');
+                this.log('Extension unlocked - returned control to VS Code');
+            }
+
+            updateConnectionStatus(status) {
+                const statusEl = document.getElementById('connectionStatus');
+                statusEl.className = `status ${status}`;
+                
+                switch (status) {
+                    case 'connected':
+                        statusEl.textContent = '🟢 Connected';
+                        break;
+                    case 'disconnected':
+                        statusEl.textContent = '🔴 Disconnected';
+                        break;
+                    case 'locked':
+                        statusEl.textContent = '🔒 Connected (Extension Locked)';
+                        break;
+                }
+            }
+
+            updateButtonStates(connected) {
+                document.getElementById('connectBtn').disabled = connected;
+                document.getElementById('disconnectBtn').disabled = !connected;
+                document.getElementById('requestSyncBtn').disabled = !connected;
+                document.getElementById('lockExtensionBtn').disabled = !connected || this.isLocked;
+                document.getElementById('unlockExtensionBtn').disabled = !connected || !this.isLocked;
+            }
+
+            updateTutorialDisplay(tutorialState) {
+                const infoEl = document.getElementById('tutorialInfo');
+                const contentEl = document.getElementById('stepContent');
+                
+                if (!tutorialState) {
+                    infoEl.innerHTML = '<p>No tutorial data available.</p>';
+                    contentEl.innerHTML = '<p>No step content available.</p>';
+                    return;
+                }
+                
+                infoEl.innerHTML = `
+                    <h3>${tutorialState.tutorialTitle}</h3>
+                    <p><strong>Tutorial ID:</strong> ${tutorialState.tutorialId}</p>
+                    <p><strong>Current Step:</strong> ${tutorialState.currentStepIndex + 1} of ${tutorialState.totalSteps}</p>
+                    <p><strong>Step ID:</strong> ${tutorialState.currentStepId}</p>
+                    <p><strong>Showing Solution:</strong> ${tutorialState.isShowingSolution ? 'Yes' : 'No'}</p>
+                    <p><strong>Open Files:</strong> ${tutorialState.openFiles.length} files</p>
+                    ${tutorialState.repoUrl ? `<p><strong>Repository:</strong> <a href="${tutorialState.repoUrl}" target="_blank">${tutorialState.repoUrl}</a></p>` : ''}
+                `;
+                
+                contentEl.innerHTML = `
+                    <h4>${tutorialState.stepContent.title}</h4>
+                    <p><strong>Type:</strong> ${tutorialState.stepContent.type}</p>
+                    ${tutorialState.stepContent.htmlContent || '<p><em>No content available for this step.</em></p>'}
+                `;
+            }
+
+            log(message) {
+                const logsEl = document.getElementById('logs');
+                const timestamp = new Date().toLocaleTimeString();
+                logsEl.innerHTML += `[${timestamp}] ${message}\n`;
+                logsEl.scrollTop = logsEl.scrollHeight;
+            }
+
+            clearLogs() {
+                document.getElementById('logs').innerHTML = '';
+            }
+        }
+
+        // Initialize the client when the page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            window.gitorialClient = new GitorialSyncClient();
+        });
+    </script>
+</body>
+</html> 

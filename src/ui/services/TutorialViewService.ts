@@ -13,6 +13,7 @@ import { DiffViewService } from './DiffViewService';
 import { IGitChanges } from '../ports/IGitChanges';
 import { IGitChangesFactory } from '../ports/IGitChangesFactory';
 import { TutorialController } from '../controllers/TutorialController';
+import { TutorialSyncService } from '../../domain/services/TutorialSyncService';
 
 
 enum TutorialViewChangeType {
@@ -33,7 +34,8 @@ export class TutorialViewService {
     private readonly markdownConverter: IMarkdownConverter,
     private readonly diffViewService: DiffViewService,
     private readonly gitAdapterFactory: IGitChangesFactory,
-    private readonly extensionUri: vscode.Uri
+    private readonly extensionUri: vscode.Uri,
+    private readonly tutorialSyncService: TutorialSyncService
   ) { }
 
 
@@ -86,6 +88,15 @@ export class TutorialViewService {
 
     if (groupTwoTabs.length > 0 || isShowingSolutionInGroupTwo) {
       await vscode.commands.executeCommand('workbench.action.focusSecondEditorGroup');
+    }
+
+    // Sync tutorial state if sync service is available
+    if (this.tutorialSyncService && this.tutorialSyncService.isTunnelActive()) {
+      try {
+        await this.tutorialSyncService.syncTutorialState(tutorial);
+      } catch (error) {
+        console.error('TutorialViewService: Failed to sync tutorial state:', error);
+      }
     }
 
     this._oldTutorialViewModel = tutorialViewModel;

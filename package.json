@@ -63,8 +63,24 @@
         "title": "Gitorial: Open Tutorial"
       },
       {
-        "command": "gitorial.debug",
-        "title": "Gitorial: Temp Debugging"
+        "command": "gitorial.startSyncTunnel",
+        "title": "Gitorial: Start Sync Tunnel"
+      },
+      {
+        "command": "gitorial.stopSyncTunnel",
+        "title": "Gitorial: Stop Sync Tunnel"
+      },
+      {
+        "command": "gitorial.toggleSyncTunnel",
+        "title": "Gitorial: Toggle Sync Tunnel"
+      },
+      {
+        "command": "gitorial.showSyncStatus",
+        "title": "Gitorial: Show Sync Status"
+      },
+      {
+        "command": "gitorial.syncCurrentTutorial",
+        "title": "Gitorial: Sync Current Tutorial"
       }
     ],
     "uriHandler": [
@@ -81,6 +97,7 @@
     "@types/node": "20.x",
     "@types/sinon": "^17.0.4",
     "@types/vscode": "^1.87.0",
+    "@types/ws": "^8.18.1",
     "@typescript-eslint/eslint-plugin": "^8.28.0",
     "@typescript-eslint/parser": "^8.28.0",
     "@vscode/test-cli": "^0.0.10",
@@ -95,7 +112,8 @@
   },
   "dependencies": {
     "markdown-it": "^14.1.0",
-    "simple-git": "^3.27.0"
+    "simple-git": "^3.27.0",
+    "ws": "^8.18.0"
   },
   "workspaces": [
     "webview-ui"

@@ -28,6 +28,10 @@ import { IActiveTutorialStateRepository } from "./domain/repositories/IActiveTut
 import { ITutorialRepository } from "./domain/repositories/ITutorialRepository";
 import { DiffViewService } from "./ui/services/DiffViewService";
 import { GitChangesFactory } from "./infrastructure/factories/GitChangesFactory";
+import { TutorialSyncService } from "./domain/services/TutorialSyncService";
+import { WebSocketSyncTunnel } from "./infrastructure/adapters/WebSocketSyncTunnel";
+import { SyncController } from "./ui/controllers/SyncController";
+import { SyncCommandHandler } from "./ui/handlers/SyncCommandHandler";
 
 
 /**
@@ -46,14 +50,18 @@ export async function activate(context: vscode.ExtensionContext): Promise<vscode
     activeTutorialStateRepository,
     tutorialRepository,
     workspaceId,
+    syncController,
   } = await bootstrapApplication(context);
 
   // --- VS Code Specific Registrations (Infrastructure concern, performed here) ---
   const commandHandler = new CommandHandler(tutorialController);
+  const syncCommandHandler = new SyncCommandHandler(syncController);
   const uriHandler = new TutorialUriHandler(tutorialController);
 
   commandHandler.register(context);
+  syncCommandHandler.register(context);
   uriHandler.register(context);
+
 
   // --- Handle startup logic (auto-open, session restore, workspace check) ---
   await handleApplicationStartup(
@@ -81,6 +89,7 @@ interface BootstrappedDependencies {
   activeTutorialStateRepository: IActiveTutorialStateRepository;
   tutorialRepository: ITutorialRepository;
   workspaceId: string | undefined;
+  syncController: SyncController;
 }
 
 async function bootstrapApplication(context: vscode.ExtensionContext): Promise<BootstrappedDependencies> {
@@ -126,9 +135,16 @@ async function bootstrapApplication(context: vscode.ExtensionContext): Promise<B
   );
 
 
+  // --- Sync Infrastructure ---
+  const syncTunnel = new WebSocketSyncTunnel();
+  const tutorialSyncService = new TutorialSyncService(syncTunnel);
+  
+  // Set up reference to get current tutorial from TutorialService
+  tutorialSyncService.setTutorialServiceRef(() => tutorialService.tutorial);
+
   // --- UI Services ---
   const diffViewService = new DiffViewService(diffDisplayerAdapter);
-  const tutorialViewService = new TutorialViewService(fileSystemAdapter, markdownConverter, diffViewService, gitChangesFactory, context.extensionUri);
+  const tutorialViewService = new TutorialViewService(fileSystemAdapter, markdownConverter, diffViewService, gitChangesFactory, context.extensionUri, tutorialSyncService);
 
   // --- UI Layer Controllers ---
   const tutorialController = new TutorialController(
@@ -141,6 +157,12 @@ async function bootstrapApplication(context: vscode.ExtensionContext): Promise<B
     autoOpenState
   );
 
+  const syncController = new SyncController(
+    tutorialSyncService,
+    tutorialService,
+    userInteractionAdapter
+  );
+
   return {
     tutorialController,
     autoOpenState,
@@ -148,6 +170,7 @@ async function bootstrapApplication(context: vscode.ExtensionContext): Promise<B
     activeTutorialStateRepository,
     tutorialRepository,
     workspaceId,
+    syncController,
   };
 }
 

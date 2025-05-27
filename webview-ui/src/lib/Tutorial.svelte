@@ -2,7 +2,8 @@
   import Nav from './Nav.svelte';
   import StepContent from './StepContent.svelte';
   import { onMount } from 'svelte';
-    import type { TutorialViewModel, TutorialStepViewModel } from '@shared/types/viewmodels';
+  import type { TutorialViewModel } from '@shared/types/viewmodels/TutorialViewModel';
+  import type { TutorialStepViewModel } from '@shared/types/viewmodels/TutorialStepViewModel';
 
   // State based on `import { WebViewData } from "@shared/types"`
   let tutorialTitle = $state('Loading...');
@@ -17,17 +18,18 @@
       const message = event.data;
       if (message.command === 'updateTutorial') {
         const data = message.data as TutorialViewModel;
+        const steps = data.steps.filter(step => step.type !== 'solution'); // Removes solution steps
         tutorialTitle = data.title;
 
-        const mabyeCurrentStepIndex = data.steps.findIndex(step => step.id === data.currentStepId);
+        const mabyeCurrentStepIndex = steps.findIndex(step => step.id === data.currentStepId);
         if (mabyeCurrentStepIndex === -1) {
           console.warn("Tutorial.svelte: Current step not found in steps array");
           // Potentially set step to null or a default state if currentStepId is invalid
         } else {
           currentStepIndex = mabyeCurrentStepIndex;
-          step = data.steps[currentStepIndex];
+          step = steps[currentStepIndex];
         }
-        totalSteps = data.steps.length;
+        totalSteps = steps.length;
         isShowingSolution = data.isShowingSolution; // Use the flag from the view model
       } else {
         console.warn("Webview received unhandled command:", message.command);

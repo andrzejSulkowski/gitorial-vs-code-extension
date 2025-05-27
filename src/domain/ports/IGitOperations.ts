@@ -207,6 +207,14 @@ export interface IGitOperations {
   checkout(commitHash: string): Promise<void>;
 
   /**
+   * Checkout a specific commit and clean the working directory.
+   * This method combines checkout with cleaning untracked files to ensure
+   * a clean state when navigating between tutorial steps.
+   * @param commitHash - The commit hash or branch name to checkout.
+   */
+  checkoutAndClean(commitHash: string): Promise<void>;
+
+  /**
    * Retrieve the repository's name (derived from remote URL or folder name).
    * @returns The repository name.
    */

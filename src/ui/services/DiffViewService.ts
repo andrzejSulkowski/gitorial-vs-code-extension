@@ -1,13 +1,16 @@
-
 import { Tutorial } from "src/domain/models/Tutorial";
 import { DiffModel, DiffChangeType } from "../viewmodels/DiffModel";
 import { IGitChanges, DiffFilePayload } from "../ports/IGitChanges";
 import { IDiffDisplayer, DiffFile } from 'src/ui/ports/IDiffDisplayer';
+import { IFileSystem } from 'src/domain/ports/IFileSystem';
 
 
 export class DiffViewService {
 
-  constructor(private readonly diffView: IDiffDisplayer){}
+  constructor(
+    private readonly diffView: IDiffDisplayer,
+    private readonly fs: IFileSystem
+  ){}
 
   /**
    * Get the diff models for changes between the current commit and its parent
@@ -94,14 +97,33 @@ export class DiffViewService {
         return;
       }
 
-      const filesToDisplay: DiffFile[] = filteredDiffPayloads.map(payload => ({
-        leftContentProvider: async () => payload.originalContent || "",
-        rightContentProvider: async () => payload.modifiedContent || "",
-        relativePath: payload.relativeFilePath,
-        leftCommitId: currentStep.commitHash,
-        rightCommitId: nextStep.commitHash,
-        titleCommitId: nextStep.commitHash.slice(0, 7)
-      }));
+      const filesToDisplay: DiffFile[] = [];
+      
+      for (const payload of filteredDiffPayloads) {
+        const absoluteFilePath = this.fs.join(tutorial.localPath, payload.relativeFilePath);
+        
+        filesToDisplay.push({
+          leftContentProvider: async () => {
+            try {
+              // Read the user's current working directory state
+              if (await this.fs.pathExists(absoluteFilePath)) {
+                return await this.fs.readFile(absoluteFilePath);
+              } else {
+                // File doesn't exist in working directory, show empty content
+                return "";
+              }
+            } catch (error) {
+              console.error(`Error reading current file ${absoluteFilePath}:`, error);
+              return `// Error reading current file: ${error}`;
+            }
+          },
+          rightContentProvider: async () => payload.modifiedContent || "",
+          relativePath: payload.relativeFilePath,
+          leftCommitId: "working-dir",
+          rightCommitId: nextStep.commitHash,
+          titleCommitId: nextStep.commitHash.slice(0, 7)
+        });
+      }
 
       await this.diffView.displayDiff(filesToDisplay);
     } catch (error) {

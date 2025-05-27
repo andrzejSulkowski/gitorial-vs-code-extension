@@ -21,3 +21,8 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 - Fix Next Button not being disabled when on the last step
 - Fix reset of untracked files on git checkout
 
+## [0.1.6] - 2025-05-27
+
+- Fix Gitorial branch setup when user is on a commit that belongs to the gitorial branch
+- Fix diff view compares users code with the solution code instead of the previous step
+

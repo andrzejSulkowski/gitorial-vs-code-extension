@@ -28,6 +28,7 @@ import { IActiveTutorialStateRepository } from "./domain/repositories/IActiveTut
 import { ITutorialRepository } from "./domain/repositories/ITutorialRepository";
 import { DiffViewService } from "./ui/services/DiffViewService";
 import { GitChangesFactory } from "./infrastructure/factories/GitChangesFactory";
+import { TabTrackingService } from "./ui/services/TabTrackingService";
 
 
 /**
@@ -128,7 +129,12 @@ async function bootstrapApplication(context: vscode.ExtensionContext): Promise<B
 
   // --- UI Services ---
   const diffViewService = new DiffViewService(diffDisplayerAdapter, fileSystemAdapter);
-  const tutorialViewService = new TutorialViewService(fileSystemAdapter, markdownConverter, diffViewService, gitChangesFactory, context.extensionUri);
+  const tabTrackingService = new TabTrackingService();
+  const tutorialViewService = new TutorialViewService(fileSystemAdapter, markdownConverter, diffViewService, gitChangesFactory, context.extensionUri, tabTrackingService);
+
+  // Add services to context subscriptions for proper disposal
+  context.subscriptions.push(tabTrackingService);
+  context.subscriptions.push(tutorialViewService);
 
   // --- UI Layer Controllers ---
   const tutorialController = new TutorialController(

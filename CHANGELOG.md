@@ -16,3 +16,8 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 - Refactor the codebase
 - Add Sync handling
 
+## [0.1.5] - 2025-05-27
+
+- Fix Next Button not being disabled when on the last step
+- Fix reset of untracked files on git checkout
+

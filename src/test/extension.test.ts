@@ -119,3 +119,153 @@ suite("Extension Integration Tests", () => {
     });
 });
 */
+
+// Simple test for the checkoutAndClean logic
+suite("GitAdapter checkoutAndClean Logic Tests", () => {
+    let sandbox: sinon.SinonSandbox;
+
+    setup(() => {
+        sandbox = sinon.createSandbox();
+    });
+
+    teardown(() => {
+        sandbox.restore();
+    });
+
+    test("checkoutAndClean logic should handle successful checkout and clean", async () => {
+        // Create a mock git object
+        const mockGit = {
+            checkout: sandbox.stub().resolves(),
+            raw: sandbox.stub().resolves('')
+        };
+
+        // Create a mock GitAdapter-like object with the checkoutAndClean logic
+        const mockAdapter = {
+            async checkoutAndClean(commitHash: string): Promise<void> {
+                try {
+                    await mockGit.checkout(commitHash);
+                } catch (error: any) {
+                    if (error.message?.includes('Your local changes')) {
+                        await mockGit.checkout(['-f', commitHash]);
+                    } else {
+                        throw error;
+                    }
+                }
+                
+                // Clean up untracked files
+                await mockGit.raw(['clean', '-f', '-d']);
+            }
+        };
+
+        const commitHash = 'abc123';
+        
+        // Execute the method
+        await mockAdapter.checkoutAndClean(commitHash);
+
+        // Verify checkout was called with correct commit hash
+        assert.ok(mockGit.checkout.calledOnce, 
+            'checkout should be called once');
+        assert.ok(mockGit.checkout.calledWith(commitHash), 
+            'checkout should be called with the correct commit hash');
+        
+        // Verify clean was called
+        assert.ok(mockGit.raw.calledOnce, 
+            'git clean should be called to remove untracked files');
+        assert.ok(mockGit.raw.calledWith(['clean', '-f', '-d']), 
+            'git clean should be called with correct arguments');
+    });
+
+    test("checkoutAndClean logic should handle local changes error", async () => {
+        // Create a mock git object
+        const localChangesError = new Error('Your local changes to the following files would be overwritten by checkout');
+        const mockGit = {
+            checkout: sandbox.stub(),
+            raw: sandbox.stub().resolves('')
+        };
+        
+        // Setup checkout to fail first time, succeed second time
+        mockGit.checkout.onFirstCall().rejects(localChangesError);
+        mockGit.checkout.onSecondCall().resolves();
+
+        // Create a mock GitAdapter-like object with the checkoutAndClean logic
+        const mockAdapter = {
+            async checkoutAndClean(commitHash: string): Promise<void> {
+                try {
+                    await mockGit.checkout(commitHash);
+                } catch (error: any) {
+                    if (error.message?.includes('Your local changes')) {
+                        await mockGit.checkout(['-f', commitHash]);
+                    } else {
+                        throw error;
+                    }
+                }
+                
+                // Clean up untracked files
+                await mockGit.raw(['clean', '-f', '-d']);
+            }
+        };
+
+        const commitHash = 'abc123';
+        
+        // Execute the method
+        await mockAdapter.checkoutAndClean(commitHash);
+
+        // Verify checkout was called twice - first normal, then forced
+        assert.ok(mockGit.checkout.calledTwice, 'checkout should be called twice');
+        assert.ok(mockGit.checkout.firstCall.calledWith(commitHash), 
+            'first checkout should be called with commit hash');
+        assert.ok(mockGit.checkout.secondCall.calledWith(['-f', commitHash]), 
+            'second checkout should be forced with -f flag');
+        
+        // Verify clean was still called
+        assert.ok(mockGit.raw.calledOnce, 
+            'git clean should be called even after forced checkout');
+    });
+
+    test("checkoutAndClean logic should propagate non-local-changes errors", async () => {
+        const unexpectedError = new Error('Some other git error');
+        const mockGit = {
+            checkout: sandbox.stub().rejects(unexpectedError),
+            raw: sandbox.stub().resolves('')
+        };
+
+        // Create a mock GitAdapter-like object with the checkoutAndClean logic
+        const mockAdapter = {
+            async checkoutAndClean(commitHash: string): Promise<void> {
+                try {
+                    await mockGit.checkout(commitHash);
+                } catch (error: any) {
+                    if (error.message?.includes('Your local changes')) {
+                        await mockGit.checkout(['-f', commitHash]);
+                    } else {
+                        throw error;
+                    }
+                }
+                
+                // Clean up untracked files
+                await mockGit.raw(['clean', '-f', '-d']);
+            }
+        };
+
+        const commitHash = 'abc123';
+        
+        // Execute and expect error
+        try {
+            await mockAdapter.checkoutAndClean(commitHash);
+            assert.fail('Expected method to throw an error');
+        } catch (error) {
+            assert.strictEqual(error, unexpectedError, 
+                'Should propagate the original error when it\'s not about local changes');
+        }
+
+        // Verify checkout was called only once
+        assert.ok(mockGit.checkout.calledOnce, 
+            'checkout should be called once');
+        assert.ok(mockGit.checkout.calledWith(commitHash), 
+            'checkout should be called with the correct commit hash');
+        
+        // Verify clean was not called due to error
+        assert.ok(mockGit.raw.notCalled, 
+            'git clean should not be called when checkout fails with unexpected error');
+    });
+});

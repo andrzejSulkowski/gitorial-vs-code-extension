@@ -49,7 +49,7 @@ export class DiffDisplayerAdapter implements IDiffDisplayer {
           'vscode.diff',
           leftUri,  // Left side (e.g., current step)
           rightUri, // Right side (e.g., next step/solution)
-          `${file.relativePath} (Current ↔ Solution ${file.titleCommitId})`,
+          `${file.relativePath} (Your Code ↔ Solution ${file.titleCommitId})`,
           { preview: false, viewColumn: vscode.ViewColumn.Two }
         );
       } finally {

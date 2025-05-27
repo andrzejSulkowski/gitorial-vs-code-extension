@@ -127,7 +127,7 @@ async function bootstrapApplication(context: vscode.ExtensionContext): Promise<B
 
 
   // --- UI Services ---
-  const diffViewService = new DiffViewService(diffDisplayerAdapter);
+  const diffViewService = new DiffViewService(diffDisplayerAdapter, fileSystemAdapter);
   const tutorialViewService = new TutorialViewService(fileSystemAdapter, markdownConverter, diffViewService, gitChangesFactory, context.extensionUri);
 
   // --- UI Layer Controllers ---

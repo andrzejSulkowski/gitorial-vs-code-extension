@@ -133,9 +133,9 @@ export class GitAdapter implements IGitOperations, IGitChanges {
   }
   
   /**
-   * Checkout a specific commit
+   * Checkout a specific commit and clean the working directory
    */
-  public async checkoutCommit(commitHash: string): Promise<void> {
+  public async checkoutAndClean(commitHash: string): Promise<void> {
     try {
       await this.git.checkout(commitHash);
     } catch (error: any) {

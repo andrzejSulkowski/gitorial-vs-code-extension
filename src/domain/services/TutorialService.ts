@@ -248,7 +248,7 @@ export class TutorialService {
   private async _afterStepChange(oldIndex: number): Promise<void> {
     try {
       if(this._tutorial && this._gitOperations){
-        await this._gitOperations.checkout(this._tutorial.activeStep.commitHash);
+        await this._gitOperations.checkoutAndClean(this._tutorial.activeStep.commitHash);
       }else {
         throw new Error('TutorialService: no active tutorial, or no git operations for _afterStepChange.');
       }

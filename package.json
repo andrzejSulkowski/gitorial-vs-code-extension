@@ -61,10 +61,6 @@
       {
         "command": "gitorial.openTutorial",
         "title": "Gitorial: Open Tutorial"
-      },
-      {
-        "command": "gitorial.debug",
-        "title": "Gitorial: Temp Debugging"
       }
     ],
     "uriHandler": [

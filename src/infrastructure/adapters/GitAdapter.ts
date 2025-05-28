@@ -54,20 +54,23 @@ export class GitAdapter implements IGitOperations, IGitChanges {
     const branches = await this.git.branch();
 
     // 1. Check if current branch is already 'gitorial'
-    if (branches.current === 'gitorial' && branches.all.includes('gitorial')) {
-      console.log("GitAdapter: Already on 'gitorial' branch.");
+    // Handle both normal branch state and detached HEAD state
+    const isOnGitorialBranch = await this._isCurrentlyOnGitorialBranch(branches);
+    
+    if (isOnGitorialBranch) {
+      console.log("GitAdapter: Already on 'gitorial' branch. No checkout needed.");
       return;
     }
 
-    // 2. Check if local 'gitorial' branch exists (but not current), try to checkout
+    // 2. Check if local 'gitorial' branch exists (but not current), try to force checkout
     if (branches.all.includes('gitorial')) {
       try {
-        console.log("GitAdapter: Local 'gitorial' branch found. Attempting checkout...");
-        await this.git.checkout('gitorial');
-        console.log("GitAdapter: Successfully checked out local 'gitorial' branch.");
+        console.log("GitAdapter: Local 'gitorial' branch found. Attempting force checkout (dropping local changes)...");
+        await this.git.checkout(['-f', 'gitorial']);
+        console.log("GitAdapter: Successfully force checked out local 'gitorial' branch.");
         return;
       } catch (checkoutError) {
-        console.warn("GitAdapter: Failed to checkout existing local 'gitorial' branch. Will try to set up from remote.", checkoutError);
+        console.warn("GitAdapter: Failed to force checkout existing local 'gitorial' branch. Will try to set up from remote.", checkoutError);
         // Proceed to check remote branches
       }
     }
@@ -94,22 +97,22 @@ export class GitAdapter implements IGitOperations, IGitChanges {
       }
       
       const trackingBranch = `${remoteName}/${remoteBranchName}`;
-      console.log(`GitAdapter: Attempting to create and track local 'gitorial' from '${trackingBranch}'...`);
+      console.log(`GitAdapter: Attempting to create and track local 'gitorial' from '${trackingBranch}' (force checkout)...`);
 
       try {
-        // Try to checkout a new local branch 'gitorial' tracking the remote one
-        await this.git.checkout(['-b', 'gitorial', '--track', trackingBranch]);
-        console.log(`GitAdapter: Successfully created and checked out local 'gitorial' branch tracking '${trackingBranch}'.`);
+        // Try to checkout a new local branch 'gitorial' tracking the remote one with force
+        await this.git.checkout(['-B', 'gitorial', '--track', trackingBranch]);
+        console.log(`GitAdapter: Successfully created and force checked out local 'gitorial' branch tracking '${trackingBranch}'.`);
         return;
       } catch (error) {
-        console.warn(`GitAdapter: Failed to create tracking branch 'gitorial' from '${trackingBranch}' directly. Error: ${error instanceof Error ? error.message : String(error)}. Attempting fetch and checkout...`);
-        // Fallback: Fetch the specific remote branch to a local 'gitorial' branch, then checkout 'gitorial'.
+        console.warn(`GitAdapter: Failed to create tracking branch 'gitorial' from '${trackingBranch}' directly. Error: ${error instanceof Error ? error.message : String(error)}. Attempting fetch and force checkout...`);
+        // Fallback: Fetch the specific remote branch to a local 'gitorial' branch, then force checkout 'gitorial'.
         // This handles cases where the remote branch might exist but isn't locally known well enough for --track to work immediately.
         try {
           await this.git.fetch(remoteName, `${remoteBranchName}:gitorial`); // Fetch remoteBranchName from remoteName into local 'gitorial'
-          console.log(`GitAdapter: Fetched '${trackingBranch}' to local 'gitorial'. Attempting checkout...`);
-          await this.git.checkout('gitorial'); // Checkout the newly fetched local 'gitorial'
-          console.log("GitAdapter: Successfully checked out 'gitorial' after fetch.");
+          console.log(`GitAdapter: Fetched '${trackingBranch}' to local 'gitorial'. Attempting force checkout...`);
+          await this.git.checkout(['-f', 'gitorial']); // Force checkout the newly fetched local 'gitorial'
+          console.log("GitAdapter: Successfully force checked out 'gitorial' after fetch.");
           return;
         } catch (fetchCheckoutError) {
           console.error(`GitAdapter: Critical error setting up 'gitorial' branch from remote '${trackingBranch}' after fetch attempt.`, fetchCheckoutError);
@@ -120,6 +123,27 @@ export class GitAdapter implements IGitOperations, IGitChanges {
       console.error("GitAdapter: No suitable local or remote 'gitorial' branch found to set up.");
       throw new Error("No suitable local or remote 'gitorial' branch found to set up.");
     }
+  }
+
+  /**
+   * Helper method to determine if we're currently on the gitorial branch
+   * Handles both normal branch state and detached HEAD scenarios
+   */
+  private async _isCurrentlyOnGitorialBranch(branches: BranchSummary): Promise<boolean> {
+    // Case 1: Normal branch state - branches.current contains the branch name
+    if (branches.current === 'gitorial' && branches.all.includes('gitorial')) {
+      return true;
+    }
+
+    // Case 2: Detached HEAD state - check if current commit belongs to gitorial branch
+    // Get all commits from gitorial branch and see if current commit hash matches any of them
+    if (branches.all.includes('gitorial')) {
+      const commits = await this.getCommits('gitorial');
+      const currentCommitHash = branches.current;
+      return !!commits.find(c => c.hash.startsWith(currentCommitHash));
+    }
+
+    return false;
   }
 
   public async clone(): Promise<void> {
@@ -182,6 +206,11 @@ export class GitAdapter implements IGitOperations, IGitChanges {
   public async getCommitHistory(): Promise<readonly (DefaultLogFields & ListLogLine)[]> {
     const log = await this.git.log(['gitorial']);
     return log.all;
+  }
+
+  public async getCommits(branch?: string): Promise<Array<DefaultLogFields & ListLogLine>> {
+    const log = await this.git.log(branch ? [branch] : []);
+    return log.all as Array<DefaultLogFields & ListLogLine>; // Type assertion, ensure compatibility
   }
   
   /**
@@ -259,10 +288,6 @@ export class GitAdapter implements IGitOperations, IGitChanges {
     }
   }
 
-  public async getCommits(branch?: string): Promise<Array<DefaultLogFields & ListLogLine>> {
-    const log = await this.git.log(branch ? [branch] : []);
-    return log.all as Array<DefaultLogFields & ListLogLine>; // Type assertion, ensure compatibility
-  }
 
   public async isGitRepository(): Promise<boolean> {
     return this.git.checkIsRepo(CheckRepoActions.IS_REPO_ROOT);

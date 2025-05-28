@@ -1,0 +1,110 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# PNPM Workspace Management
+
+Guidelines for using pnpm in a workspace environment and ensuring proper package management.
+
+<rule>
+name: pnpm_workspace_management
+description: Enforces the use of pnpm for package management and ensures workspace-aware commands are used in monorepo environments.
+
+filters:
+  # Match package.json files
+  - type: file_extension
+    pattern: "\\.json$"
+    file_name: "package\\.json"
+  
+  # Match terminal commands or scripts that use npm
+  - type: content
+    pattern: "\\b(npm install|npm i|npm run|npm test|npm build|npm start|yarn install|yarn add|yarn run)\\b"
+  
+  # Match dependency installation patterns
+  - type: content
+    pattern: "npm (install|i|add|remove|uninstall)"
+
+actions:
+  - type: suggest
+    message: |
+      Use pnpm instead of npm/yarn for package management in this workspace.
+
+      **Workspace Commands:**
+      
+      **From workspace root:**
+      - `pnpm install` - Install all workspace dependencies
+      - `pnpm -r build` - Build all packages
+      - `pnpm -r test` - Test all packages
+      - `pnpm --filter @gitorial/sync-client build` - Build specific package
+      - `pnpm --filter @gitorial/sync-client test` - Test specific package
+
+      **From package directory:**
+      - `pnpm install` - Install dependencies (respects workspace)
+      - `pnpm add <package>` - Add dependency to current package
+      - `pnpm add <package> -w` - Add dependency to workspace root
+      - `pnpm test` - Run tests for current package
+      - `pnpm build` - Build current package
+
+      **Workspace-specific patterns:**
+      - Use `workspace:*` for internal package dependencies
+      - Run commands from workspace root when possible
+      - Use `--filter` to target specific packages
+      - Use `-r` (recursive) for operations across all packages
+
+      **Examples:**
+      ```bash
+      # Install dependencies for all packages
+      pnpm install
+
+      # Add a dev dependency to sync-client package
+      pnpm --filter @gitorial/sync-client add -D typescript
+
+      # Run tests for all packages
+      pnpm -r test
+
+      # Build only the sync-client package
+      pnpm --filter @gitorial/sync-client build
+
+      # Add a dependency to workspace root
+      pnpm add -w eslint
+      ```
+
+      **Avoid:**
+      - `npm install` → Use `pnpm install`
+      - `npm run build` → Use `pnpm build` or `pnpm -r build`
+      - `yarn add` → Use `pnpm add`
+      - Installing packages without considering workspace structure
+
+guidelines:
+  - Always use pnpm for package management operations
+  - Understand workspace context when running commands
+  - Use workspace root for global operations
+  - Use package-specific directories for targeted operations
+  - Leverage pnpm's workspace features (filters, recursive operations)
+  - Maintain workspace protocol dependencies (`workspace:*`)
+
+examples:
+  - input: |
+      # Bad: Using npm in workspace
+      npm install
+      npm run test
+      npm add lodash
+    output: "Use pnpm commands: `pnpm install`, `pnpm test`, `pnpm add lodash`"
+
+  - input: |
+      # Good: Using pnpm with workspace awareness
+      pnpm install
+      pnpm -r test
+      pnpm --filter @gitorial/sync-client add lodash
+    output: "Correct pnpm workspace usage"
+
+metadata:
+  priority: high
+  version: 1.0
+  applies_to:
+    - package.json files
+    - terminal commands
+    - documentation
+    - scripts
+</rule>

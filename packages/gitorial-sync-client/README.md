@@ -1,5 +1,9 @@
 # @gitorial/sync-client
 
+![Version](https://img.shields.io/badge/version-0.1.0-yellow)
+![Status](https://img.shields.io/badge/status-preview-orange)
+![License](https://img.shields.io/badge/license-MIT-green)
+
 A TypeScript/JavaScript client library for integrating with the [Gitorial VS Code extension](https://github.com/AndrzejSulkowski/gitorial-vs-plugin) sync tunnel. This package enables web applications and other software to synchronize tutorial state with the VS Code extension in real-time.
 
 ## Features

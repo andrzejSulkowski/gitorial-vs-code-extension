@@ -1,11 +1,12 @@
 // Domain primitives
-export { TutorialId } from './domain/TutorialId';
-export { StepType } from './domain/StepType';
+export * from './domain/TutorialId';
+export * from './domain/StepType';
+export * from './domain/StepData'
 
 // View models
-export { HTML } from './viewmodels/HTML';
-export { TutorialViewModel } from './viewmodels/TutorialViewModel';
-export { TutorialStepViewModel } from './viewmodels/TutorialStepViewModel';
+export * from './viewmodels/HTML';
+export * from './viewmodels/TutorialViewModel';
+export * from './viewmodels/TutorialStepViewModel';
 
 // Contracts (for future API definitions)
 // export * from './contracts'; 

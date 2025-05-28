@@ -8,8 +8,8 @@ import { Tutorial, TutorialData } from '../models/Tutorial';
 import { GitService } from './GitService';
 import { TutorialId } from '@gitorial/shared-types';
 import { DomainCommit } from '../ports/IGitOperations';
-import { Step, StepData } from '../models/Step';
-import { StepType } from '@gitorial/shared-types';
+import { Step } from '../models/Step';
+import { StepType, StepData } from '@gitorial/shared-types';
 
 /**
  * Constructs Tutorial domain objects from raw data (e.g., repository information,

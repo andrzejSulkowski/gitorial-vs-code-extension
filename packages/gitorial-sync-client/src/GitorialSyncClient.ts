@@ -10,6 +10,7 @@ import {
   SyncErrorType,
   SyncClientError
 } from './types';
+import { SYNC_PROTOCOL_VERSION } from './constants/protocol';
 
 /**
  * Main client class for connecting to and synchronizing with the Gitorial VS Code extension
@@ -43,7 +44,7 @@ export class GitorialSyncClient extends EventEmitter {
 
   constructor(config: SyncClientConfig = {}) {
     super();
-    
+
     this.config = {
       url: config.url || 'ws://localhost:3001/gitorial-sync',
       autoReconnect: config.autoReconnect ?? true,
@@ -58,8 +59,8 @@ export class GitorialSyncClient extends EventEmitter {
    * @returns Promise that resolves when connected
    */
   public async connect(): Promise<void> {
-    if (this.connectionStatus === ConnectionStatus.CONNECTED || 
-        this.connectionStatus === ConnectionStatus.CONNECTING) {
+    if (this.connectionStatus === ConnectionStatus.CONNECTED ||
+      this.connectionStatus === ConnectionStatus.CONNECTING) {
       return;
     }
 
@@ -143,12 +144,12 @@ export class GitorialSyncClient extends EventEmitter {
   public disconnect(): void {
     this._clearReconnectTimer();
     this._clearConnectionTimer();
-    
+
     if (this.ws) {
       this.ws.close();
       this.ws = null;
     }
-    
+
     this.clientId = null;
     this._setConnectionStatus(ConnectionStatus.DISCONNECTED);
   }
@@ -161,17 +162,17 @@ export class GitorialSyncClient extends EventEmitter {
   }
 
   /**
-   * Take control of the extension (lock it)
+   * We lock our application and give control to the Receiver
    */
-  public async lockExtension(): Promise<void> {
+  public async lockSender(): Promise<void> {
     this._sendMessage(SyncMessageType.LOCK_SCREEN);
     this._setConnectionStatus(ConnectionStatus.LOCKED);
   }
 
   /**
-   * Return control to the extension (unlock it)
+   * Return control to the Receiver
    */
-  public async unlockExtension(): Promise<void> {
+  public async unlockReceiver(): Promise<void> {
     this._sendMessage(SyncMessageType.UNLOCK_SCREEN);
     this._setConnectionStatus(ConnectionStatus.CONNECTED);
   }
@@ -201,8 +202,8 @@ export class GitorialSyncClient extends EventEmitter {
    * Check if currently connected
    */
   public isConnected(): boolean {
-    return this.connectionStatus === ConnectionStatus.CONNECTED || 
-           this.connectionStatus === ConnectionStatus.LOCKED;
+    return this.connectionStatus === ConnectionStatus.CONNECTED ||
+      this.connectionStatus === ConnectionStatus.LOCKED;
   }
 
   /**
@@ -218,7 +219,15 @@ export class GitorialSyncClient extends EventEmitter {
   private _handleMessage(message: SyncMessage): void {
     switch (message.type) {
       case SyncMessageType.CLIENT_CONNECTED:
-        this.clientId = message.data?.clientId || null;
+        //TODO: here in the future we can implement a handleV1(msg) and handleV2(msg) to provide a sliding window for upgrades
+        if (SYNC_PROTOCOL_VERSION !== message.protocol_version) {
+          this._handleError(
+            new SyncClientError(SyncErrorType.PROTOCOL_VERSION,
+              `Server speaks protocol version: ${SYNC_PROTOCOL_VERSION} but sender speaks version: ${message.protocol_version}\nPlease update your gitorial-sync-client`
+            ))
+          return;
+        }
+        this.clientId = message.clientId;
         this.emit(SyncClientEvent.CLIENT_ID_ASSIGNED, this.clientId);
         break;
 
@@ -250,11 +259,16 @@ export class GitorialSyncClient extends EventEmitter {
       );
     }
 
+    if (this.clientId === null) {
+      throw new Error("Can not send messsages without specifying a recipient (clientId is missing)");
+    }
+
     const message: SyncMessage = {
       type,
-      clientId: this.clientId || 'unknown',
+      clientId: this.clientId,
       data,
-      timestamp: Date.now()
+      timestamp: Date.now(),
+      protocol_version: SYNC_PROTOCOL_VERSION
     };
 
     try {
@@ -290,9 +304,9 @@ export class GitorialSyncClient extends EventEmitter {
    */
   private _scheduleReconnect(): void {
     this._clearReconnectTimer();
-    
+
     this.reconnectAttempts++;
-    
+
     if (this.reconnectAttempts > this.config.maxReconnectAttempts) {
       this._handleError(new SyncClientError(
         SyncErrorType.MAX_RECONNECT_ATTEMPTS_EXCEEDED,

@@ -1,17 +1,10 @@
 // Represents a single step in a tutorial. Contains metadata like title, commit hash,
 // and type (e.g., section, template, solution, action).
 
-import { StepType } from "@gitorial/shared-types";
+import { StepType, StepData } from "@gitorial/shared-types";
 import { EnrichedStep } from "./EnrichedStep";
 import { Markdown } from "./Markdown";
 
-export interface StepData {
-  id: string;
-  title: string;
-  commitHash: string;
-  type: StepType;
-  index: number;
-}
 
 export class Step {
   public readonly id: string;

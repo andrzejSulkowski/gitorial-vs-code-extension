@@ -15,14 +15,18 @@ export enum SyncMessageType {
   /** Request to unlock the extension (return control) */
   UNLOCK_SCREEN = 'unlock_screen',
   /** Error message */
-  ERROR = 'error'
+  ERROR = 'error',
+  /** Protocol version handshake from client to server */
+  PROTOCOL_HANDSHAKE = 'protocol_handshake',
+  /** Protocol version acknowledgment from server to client */
+  PROTOCOL_ACK = 'protocol_ack'
 }
 
 /**
- * Shared fields for all sync messages (except `CLIENT_CONNECTED`)
+ * Shared fields for all sync messages (except `CLIENT_CONNECTED` and handshake messages)
  */
 export interface SyncMessageBase {
-  type: Exclude<SyncMessageType, SyncMessageType.CLIENT_CONNECTED>;
+  type: Exclude<SyncMessageType, SyncMessageType.CLIENT_CONNECTED | SyncMessageType.PROTOCOL_HANDSHAKE | SyncMessageType.PROTOCOL_ACK>;
   clientId: string;
   data: any; // You can replace `any` with a discriminated union later
   timestamp: number;
@@ -40,6 +44,26 @@ export interface SyncMessageClientConnected {
 }
 
 /**
+ * Protocol handshake message sent by client immediately upon connection
+ */
+export interface SyncMessageProtocolHandshake {
+  type: SyncMessageType.PROTOCOL_HANDSHAKE;
+  protocol_version: number;
+  timestamp: number;
+}
+
+/**
+ * Protocol acknowledgment message sent by server in response to handshake
+ */
+export interface SyncMessageProtocolAck {
+  type: SyncMessageType.PROTOCOL_ACK;
+  protocol_version: number;
+  timestamp: number;
+  accepted: boolean;
+  error?: string;
+}
+
+/**
  * Unified message type for all sync messages
  */
-export type SyncMessage = SyncMessageBase | SyncMessageClientConnected;
+export type SyncMessage = SyncMessageBase | SyncMessageClientConnected | SyncMessageProtocolHandshake | SyncMessageProtocolAck;

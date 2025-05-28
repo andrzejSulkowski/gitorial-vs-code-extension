@@ -7,15 +7,19 @@ import {
   SyncMessageType,
   SyncErrorType,
   SyncMessage,
-  TutorialSyncState
+  TutorialSyncState,
+  SyncMessageProtocolHandshake,
+  SyncMessageProtocolAck
 } from '../src/types';
+import { SYNC_PROTOCOL_VERSION } from '../src/constants/protocol';
+import { asTutorialId } from '@gitorial/shared-types';
 
 /**
  * Simple WebSocket server that acts as a sync tunnel between clients
  */
 class TestSyncServer {
   private wss: WebSocketServer | null = null;
-  private clients: Set<WebSocket> = new Set();
+  private clients: Map<WebSocket, string> = new Map();
   private port: number;
 
   constructor(port: number = 0) {
@@ -33,35 +37,12 @@ class TestSyncServer {
       this.wss.on('error', reject);
 
       this.wss.on('connection', (ws) => {
-        this.clients.add(ws);
-        console.log(`Client connected. Total clients: ${this.clients.size}`);
-
-        // Send client ID assignment
-        const clientId = `client-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-        const connectMessage: SyncMessage = {
-          type: SyncMessageType.CLIENT_CONNECTED,
-          clientId: 'server',
-          data: { clientId },
-          timestamp: Date.now()
-        };
-        ws.send(JSON.stringify(connectMessage));
+        console.log(`Client connected. Total clients: ${this.clients.size + 1}`);
 
         ws.on('message', (data) => {
           try {
             const message: SyncMessage = JSON.parse(data.toString());
-            console.log(`Received message from ${message.clientId}:`, message.type);
-            
-            // Handle specific message types first
             this.handleMessage(ws, message);
-            
-            // Only broadcast certain message types to other clients (not back to sender)
-            if (message.type === SyncMessageType.STATE_UPDATE) {
-              this.clients.forEach(client => {
-                if (client !== ws && client.readyState === WebSocket.OPEN) {
-                  client.send(data.toString());
-                }
-              });
-            }
           } catch (error) {
             console.error('Failed to parse message:', error);
           }
@@ -82,31 +63,56 @@ class TestSyncServer {
 
   private handleMessage(sender: WebSocket, message: SyncMessage): void {
     switch (message.type) {
+      case SyncMessageType.PROTOCOL_HANDSHAKE:
+        // Handle protocol handshake
+        const handshakeMsg = message as SyncMessageProtocolHandshake;
+        const clientId = `client-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        this.clients.set(sender, clientId);
+
+        // Send protocol acknowledgment
+        const ackMessage: SyncMessageProtocolAck = {
+          type: SyncMessageType.PROTOCOL_ACK,
+          protocol_version: SYNC_PROTOCOL_VERSION,
+          timestamp: Date.now(),
+          accepted: handshakeMsg.protocol_version === SYNC_PROTOCOL_VERSION
+        };
+        sender.send(JSON.stringify(ackMessage));
+
+        // Send client connected message
+        if (ackMessage.accepted) {
+          const connectMessage: SyncMessage = {
+            type: SyncMessageType.CLIENT_CONNECTED,
+            clientId: clientId,
+            timestamp: Date.now(),
+            protocol_version: SYNC_PROTOCOL_VERSION
+          };
+          sender.send(JSON.stringify(connectMessage));
+        }
+        break;
+
       case SyncMessageType.REQUEST_SYNC:
         // Send mock tutorial state
         const mockState: TutorialSyncState = {
-          tutorialId: 'test-tutorial-123',
+          tutorialId: asTutorialId('test-tutorial-123'),
           tutorialTitle: 'Real Integration Test Tutorial',
-          currentStepId: 'step-1',
-          currentStepIndex: 0,
           totalSteps: 3,
           isShowingSolution: false,
           stepContent: {
+            id: 'step-1',
             title: 'Introduction',
-            htmlContent: '<h1>Welcome to the real integration test</h1>',
-            type: 'section'
+            commitHash: 'abc123',
+            type: 'section',
+            index: 0
           },
-          openFiles: ['src/index.ts'],
-          repoUrl: 'https://github.com/test/tutorial',
-          localPath: '/path/to/tutorial',
-          timestamp: Date.now()
+          repoUrl: 'https://github.com/test/tutorial'
         };
 
         const stateMessage: SyncMessage = {
           type: SyncMessageType.STATE_UPDATE,
           clientId: 'server',
           data: mockState,
-          timestamp: Date.now()
+          timestamp: Date.now(),
+          protocol_version: SYNC_PROTOCOL_VERSION
         };
         sender.send(JSON.stringify(stateMessage));
         break;
@@ -114,7 +120,10 @@ class TestSyncServer {
       case SyncMessageType.LOCK_SCREEN:
       case SyncMessageType.UNLOCK_SCREEN:
         // Acknowledge lock/unlock
-        console.log(`${message.type} acknowledged for ${message.clientId}`);
+        const clientId2 = this.clients.get(sender);
+        if (clientId2) {
+          console.log(`${message.type} acknowledged for ${clientId2}`);
+        }
         break;
     }
   }
@@ -122,7 +131,7 @@ class TestSyncServer {
   async stop(): Promise<void> {
     return new Promise((resolve) => {
       if (this.wss) {
-        this.clients.forEach(client => client.close());
+        this.clients.forEach((clientId, client) => client.close());
         this.clients.clear();
         this.wss.close(() => {
           console.log('Test sync server stopped');
@@ -136,7 +145,7 @@ class TestSyncServer {
 
   broadcastMessage(message: SyncMessage): void {
     const data = JSON.stringify(message);
-    this.clients.forEach(client => {
+    this.clients.forEach((clientId, client) => {
       if (client.readyState === WebSocket.OPEN) {
         client.send(data);
       }
@@ -259,30 +268,32 @@ describe('GitorialSyncClient Real Integration Tests', () => {
       // Send multiple state updates from server
       const states = [
         {
-          tutorialId: 'test-tutorial-123',
+          tutorialId: asTutorialId('test-tutorial-123'),
           tutorialTitle: 'Step 1',
-          currentStepId: 'step-1',
-          currentStepIndex: 0,
           totalSteps: 3,
           isShowingSolution: false,
-          stepContent: { title: 'Step 1', htmlContent: '<h1>Step 1</h1>', type: 'section' as const },
-          openFiles: ['src/index.ts'],
-          repoUrl: 'https://github.com/test/tutorial',
-          localPath: '/path/to/tutorial',
-          timestamp: Date.now()
+          stepContent: { 
+            id: 'step-1',
+            title: 'Step 1', 
+            commitHash: 'abc123',
+            type: 'section' as const,
+            index: 0
+          },
+          repoUrl: 'https://github.com/test/tutorial'
         },
         {
-          tutorialId: 'test-tutorial-123',
+          tutorialId: asTutorialId('test-tutorial-123'),
           tutorialTitle: 'Step 2',
-          currentStepId: 'step-2',
-          currentStepIndex: 1,
           totalSteps: 3,
           isShowingSolution: false,
-          stepContent: { title: 'Step 2', htmlContent: '<h1>Step 2</h1>', type: 'action' as const },
-          openFiles: ['src/index.ts', 'src/utils.ts'],
-          repoUrl: 'https://github.com/test/tutorial',
-          localPath: '/path/to/tutorial',
-          timestamp: Date.now()
+          stepContent: { 
+            id: 'step-2',
+            title: 'Step 2', 
+            commitHash: 'def456',
+            type: 'action' as const,
+            index: 1
+          },
+          repoUrl: 'https://github.com/test/tutorial'
         }
       ];
 
@@ -291,7 +302,8 @@ describe('GitorialSyncClient Real Integration Tests', () => {
           type: SyncMessageType.STATE_UPDATE,
           clientId: 'server',
           data: state,
-          timestamp: Date.now()
+          timestamp: Date.now(),
+          protocol_version: SYNC_PROTOCOL_VERSION
         });
         
         // Wait a bit for message processing
@@ -303,10 +315,10 @@ describe('GitorialSyncClient Real Integration Tests', () => {
 
       expect(client1Updates).to.have.length(2);
       expect(client2Updates).to.have.length(2);
-      expect(client1Updates[0].currentStepIndex).to.equal(0);
-      expect(client1Updates[1].currentStepIndex).to.equal(1);
-      expect(client2Updates[0].currentStepIndex).to.equal(0);
-      expect(client2Updates[1].currentStepIndex).to.equal(1);
+      expect(client1Updates[0].stepContent.index).to.equal(0);
+      expect(client1Updates[1].stepContent.index).to.equal(1);
+      expect(client2Updates[0].stepContent.index).to.equal(0);
+      expect(client2Updates[1].stepContent.index).to.equal(1);
     });
   });
 
@@ -327,12 +339,12 @@ describe('GitorialSyncClient Real Integration Tests', () => {
       await client2.connect();
 
       // Client 1 locks extension
-      await client1.lockExtension();
+      await client1.lockSender();
       expect(client1.isLocked()).to.be.true;
       expect(client1.getConnectionStatus()).to.equal(ConnectionStatus.LOCKED);
 
       // Client 1 unlocks extension
-      await client1.unlockExtension();
+      await client1.unlockReceiver();
       expect(client1.isLocked()).to.be.false;
       expect(client1.getConnectionStatus()).to.equal(ConnectionStatus.CONNECTED);
 
@@ -499,28 +511,26 @@ describe('GitorialSyncClient Real Integration Tests', () => {
       // Send 10 rapid state updates
       for (let i = 0; i < 10; i++) {
         const state: TutorialSyncState = {
-          tutorialId: 'stress-test',
+          tutorialId: asTutorialId('stress-test'),
           tutorialTitle: `Rapid Update ${i}`,
-          currentStepId: `step-${i}`,
-          currentStepIndex: i,
           totalSteps: 10,
           isShowingSolution: false,
           stepContent: {
+            id: `step-${i}`,
             title: `Step ${i}`,
-            htmlContent: `<h1>Step ${i}</h1>`,
-            type: 'section'
+            commitHash: `hash${i}`,
+            type: 'section',
+            index: i
           },
-          openFiles: [`file-${i}.ts`],
-          repoUrl: 'https://github.com/test/stress',
-          localPath: '/path/to/stress',
-          timestamp: Date.now() + i
+          repoUrl: 'https://github.com/test/stress'
         };
 
         server.broadcastMessage({
           type: SyncMessageType.STATE_UPDATE,
           clientId: 'server',
           data: state,
-          timestamp: Date.now()
+          timestamp: Date.now(),
+          protocol_version: SYNC_PROTOCOL_VERSION
         });
       }
 
@@ -528,7 +538,7 @@ describe('GitorialSyncClient Real Integration Tests', () => {
       await new Promise(resolve => setTimeout(resolve, 100));
 
       expect(client2Messages).to.have.length(10);
-      expect(client2Messages[9].currentStepIndex).to.equal(9);
+      expect(client2Messages[9].stepContent.index).to.equal(9);
     });
   });
 }); 

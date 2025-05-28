@@ -8,7 +8,7 @@ import { WebviewMessageHandler } from './WebviewMessageHandler';
 import { Uri } from 'vscode';
 import path from 'path';
 import fs from 'fs';
-import { TutorialViewModel } from '@shared/types/viewmodels/TutorialViewModel';
+import { TutorialViewModel } from '@gitorial/shared-types';
 
 function getNonce() {
   let text = '';

@@ -1,4 +1,4 @@
-import { StepType } from '../domain-primitives/StepType';
+import { StepType } from '../domain/StepType';
 
 export interface TutorialStepViewModel {
   id: string;

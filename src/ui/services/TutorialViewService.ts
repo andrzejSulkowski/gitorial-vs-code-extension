@@ -1,12 +1,11 @@
 import * as vscode from 'vscode';
-import { IFileSystem } from 'src/domain/ports/IFileSystem';
+import { IFileSystem } from '../../domain/ports/IFileSystem';
 import { Step } from 'src/domain/models/Step';
 import * as path from 'path'; // TODO: Extend IFileSystem with needed functionality to replace 'path'
-import { Tutorial } from 'src/domain/models/Tutorial';
+import { Tutorial } from '../../domain/models/Tutorial';
 import { IMarkdownConverter } from '../ports/IMarkdownConverter';
-import { TutorialViewModel } from '@shared/types/viewmodels/TutorialViewModel';
-import { TutorialStepViewModel } from '@shared/types/viewmodels/TutorialStepViewModel';
-import { EnrichedStep } from 'src/domain/models/EnrichedStep';
+import { TutorialViewModel, TutorialStepViewModel } from '@gitorial/shared-types';
+import { EnrichedStep } from '../../domain/models/EnrichedStep';
 import { TutorialPanelManager } from '../panels/TutorialPanelManager';
 import { WebviewMessageHandler } from '../panels/WebviewMessageHandler';
 import { DiffViewService } from './DiffViewService';

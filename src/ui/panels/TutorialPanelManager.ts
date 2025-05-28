@@ -4,7 +4,7 @@
 import * as vscode from 'vscode';
 import { TutorialPanel } from './TutorialPanel'; // Import the new TutorialPanel
 import { WebviewMessageHandler } from './WebviewMessageHandler'; // Added import
-import { TutorialViewModel } from '@shared/types/viewmodels/TutorialViewModel';
+import { TutorialViewModel } from '@gitorial/shared-types';
 
 export class TutorialPanelManager {
   private static currentPanelInstance: TutorialPanel | undefined;

@@ -146,7 +146,7 @@ async function bootstrapApplication(context: vscode.ExtensionContext): Promise<B
   // --- UI Services ---
   const diffViewService = new DiffViewService(diffDisplayerAdapter, fileSystemAdapter);
   const tabTrackingService = new TabTrackingService();
-  const tutorialViewService = new TutorialViewService(fileSystemAdapter, markdownConverter, diffViewService, gitChangesFactory, context.extensionUri, tabTrackingService, tutorialSyncService);
+  const tutorialViewService = new TutorialViewService(fileSystemAdapter, markdownConverter, diffViewService, gitChangesFactory, context.extensionUri, tutorialSyncService, tabTrackingService);
 
   // Add services to context subscriptions for proper disposal
   context.subscriptions.push(tabTrackingService);

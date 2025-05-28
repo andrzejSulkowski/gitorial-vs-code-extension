@@ -86,7 +86,7 @@ For information on creating Gitorial-compatible tutorials, please refer to the o
 
 ## Development
 
-For comprehensive information on setting up the development environment, understanding the project architecture, and contributing to the extension, please see the [Gitorial Development Guide](./DEVELOPMENT.md).
+For comprehensive information on setting up the development environment, understanding the project architecture, and contributing to the extension, please see the [Gitorial Development Guide](./docs/DEVELOPMENT.md).
 
 ### Quick Start
 ```bash
@@ -138,7 +138,7 @@ code .
 
 ## Contributing
 
-We welcome contributions! Please see our [Development Guide](./DEVELOPMENT.md) for details on:
+We welcome contributions! Please see our [Development Guide](./docs/DEVELOPMENT.md) for details on:
 - Setting up the development environment
 - Understanding the codebase architecture
 - Running tests

@@ -20,6 +20,8 @@
     "vite": "^6.3.1"
   },
   "dependencies": {
+    "@gitorial/shared-types": "workspace:*",
+    "@gitorial/webview-contracts": "workspace:*",
     "@types/vscode-webview": "^1.57.5",
     "prismjs": "^1.30.0",
     "rehype-raw": "^7.0.0",

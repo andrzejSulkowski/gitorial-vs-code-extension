@@ -39,6 +39,7 @@
   },
   "homepage": "https://github.com/AndrzejSulkowski/gitorial-vs-plugin#readme",
   "dependencies": {
+    "@gitorial/shared-types": "workspace:*",
     "ws": "^8.18.0"
   },
   "devDependencies": {

@@ -2,7 +2,7 @@
 // to trigger actions like cloning and opening a tutorial. Delegates to TutorialController.
 import * as vscode from 'vscode';
 import { TutorialController } from '../controllers/TutorialController';
-import { UriParser, UriCommand, ParseResult } from '../../libs/uri-parser/UriParser'; // Adjusted path
+import { UriParser, UriCommand, ParseResult } from '../../utils/uri-parser/UriParser'; // Adjusted path
 
 export class TutorialUriHandler implements vscode.UriHandler {
   constructor(private tutorialController: TutorialController) { }

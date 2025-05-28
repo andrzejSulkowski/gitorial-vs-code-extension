@@ -13,21 +13,28 @@
   },
   "type": "commonjs",
   "engines": {
-    "vscode": "^1.87.0"
+    "vscode": "^1.87.0",
+    "node": ">=20.0.0",
+    "pnpm": ">=10.0.0"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "vscode:prepublish": "npm run compile",
-    "compile": "npm run typecheck && npm run compile:webview && npm run compile:extension && npm run post-build",
-    "compile:webview": "cd webview-ui && npm run build && cd ..",
-    "compile:extension": "node ./esbuild.config.mjs",
-    "post-build": "node scripts/post-build.js",
-    "pretest": "npm run compile && npm run lint",
+    "vscode:prepublish": "pnpm run esbuild-base -- --production",
+    "esbuild-base": "node ./scripts/esbuild.js",
+    "esbuild-watch": "node ./scripts/esbuild.js --watch",
+    "esbuild-production": "node ./scripts/esbuild.js --production",
+    "compile": "pnpm run typecheck && pnpm run compile:webview && pnpm run compile:extension",
+    "compile:webview": "cd webview-ui && pnpm run build && cd ..",
+    "compile:extension": "node ./scripts/esbuild.js",
+    "compile:extension:watch": "node ./scripts/esbuild.js --watch",
+    "compile:extension:production": "node ./scripts/esbuild.js --production",
+    "pretest": "pnpm run compile && pnpm run lint",
     "lint": "eslint src",
     "test": "vscode-test",
-    "vscode:package": "vsce package",
     "test:unit:js": "mocha dist/test/unit",
-    "test:unit": "mocha --require ts-node/register \"src/**/*.test.ts\" --exclude \"src/test/**/*.test.ts\""
+    "test:unit": "mocha --require ts-node/register \"src/**/*.test.ts\" --exclude \"src/test/**/*.test.ts\"",
+    "package": "pnpx vsce package --no-dependencies",
+    "publish": "pnpx vsce publish --no-dependencies"
   },
   "categories": [
     "Education",
@@ -91,31 +98,40 @@
     ]
   },
   "devDependencies": {
+    "@sinonjs/fake-timers": "^14.0.0",
     "@types/chai": "^5.2.2",
+    "@types/deep-eql": "^4.0.2",
+    "@types/linkify-it": "^5.0.0",
     "@types/markdown-it": "^14.1.2",
+    "@types/mdurl": "^2.0.0",
     "@types/mocha": "^10.0.10",
     "@types/node": "20.x",
     "@types/sinon": "^17.0.4",
+    "@types/sinonjs__fake-timers": "^8.1.5",
     "@types/vscode": "^1.87.0",
     "@types/ws": "^8.18.1",
     "@typescript-eslint/eslint-plugin": "^8.28.0",
     "@typescript-eslint/parser": "^8.28.0",
     "@vscode/test-cli": "^0.0.10",
     "@vscode/test-electron": "^2.4.1",
+    "@vscode/vsce": "^3.4.2",
     "chai": "^5.2.0",
-    "esbuild": "^0.25.3",
+    "deep-eql": "^5.0.2",
+    "esbuild": "^0.25.5",
     "eslint": "^9.23.0",
+    "linkify-it": "^5.0.0",
+    "mdurl": "^2.0.0",
     "mocha": "^11.2.2",
     "sinon": "^20.0.0",
     "ts-node": "^10.9.2",
-    "typescript": "^5.8.2"
+    "typescript": "^5.8.2",
+    "undici-types": "^7.10.0"
   },
   "dependencies": {
+    "@gitorial/shared-types": "workspace:*",
+    "@gitorial/webview-contracts": "workspace:*",
     "markdown-it": "^14.1.0",
     "simple-git": "^3.27.0",
     "ws": "^8.18.0"
-  },
-  "workspaces": [
-    "webview-ui"
-  ]
+  }
 }

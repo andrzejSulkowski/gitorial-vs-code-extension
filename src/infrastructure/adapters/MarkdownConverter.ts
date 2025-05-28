@@ -1,7 +1,7 @@
 import MarkdownIt from 'markdown-it';
 import { IMarkdownConverter } from '../../ui/ports/IMarkdownConverter';
-import { HTML } from '@shared/types/viewmodels/HTML';
-import { Markdown } from 'src/domain/models/Markdown';
+import { Markdown } from '../../domain/models/Markdown';
+import { HTML } from '@gitorial/shared-types';
 
 export class MarkdownItConverter implements IMarkdownConverter {
   private md: MarkdownIt;

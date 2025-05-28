@@ -1,7 +1,7 @@
-// Represents a single step within a Tutorial. Contains data like step ID, title,
-// (e.g., pending, active, completed).
+// Represents a single step in a tutorial. Contains metadata like title, commit hash,
+// and type (e.g., section, template, solution, action).
 
-import { StepType } from "@shared/types/domain-primitives/StepType";
+import { StepType } from "@gitorial/shared-types";
 import { EnrichedStep } from "./EnrichedStep";
 import { Markdown } from "./Markdown";
 

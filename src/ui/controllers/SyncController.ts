@@ -2,7 +2,6 @@ import * as vscode from 'vscode';
 import { TutorialSyncService } from '../../domain/services/TutorialSyncService';
 import { TutorialService } from '../../domain/services/TutorialService';
 import { IUserInteraction } from '../../domain/ports/IUserInteraction';
-import { Tutorial } from '../../domain/models/Tutorial';
 
 /**
  * UI Controller for managing tutorial synchronization with external web applications

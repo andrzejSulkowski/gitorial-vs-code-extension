@@ -2,8 +2,7 @@
   import Nav from './Nav.svelte';
   import StepContent from './StepContent.svelte';
   import { onMount } from 'svelte';
-  import type { TutorialViewModel } from '@shared/types/viewmodels/TutorialViewModel';
-  import type { TutorialStepViewModel } from '@shared/types/viewmodels/TutorialStepViewModel';
+  import type { TutorialViewModel, TutorialStepViewModel } from '@gitorial/shared-types';
 
   // State based on `import { WebViewData } from "@shared/types"`
   let tutorialTitle = $state('Loading...');

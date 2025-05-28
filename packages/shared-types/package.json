@@ -1,0 +1,28 @@
+{
+  "name": "@gitorial/shared-types",
+  "version": "1.0.0",
+  "description": "Shared type definitions for Gitorial packages",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist/**/*"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "build:watch": "tsc --watch",
+    "clean": "rm -rf dist"
+  },
+  "keywords": [
+    "gitorial",
+    "types",
+    "shared"
+  ],
+  "author": "Andrzej Sulkowski",
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "^5.8.2"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+} 

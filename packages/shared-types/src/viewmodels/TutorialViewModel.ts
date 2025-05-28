@@ -1,4 +1,4 @@
-import { TutorialId } from '../domain-primitives/TutorialId';
+import { TutorialId } from '../domain/TutorialId';
 import { TutorialStepViewModel } from './TutorialStepViewModel';
 
 export interface TutorialViewModel {

@@ -1,12 +1,12 @@
 <script lang="ts">
   import Button from "./Button.svelte";
   import { vscode } from "./vscode";
-  import * as T from "@shared/types";
+  import type { StepType } from "@gitorial/shared-types";
 
   interface Props {
     currentStep: number;
     totalSteps: number;
-    stepType: T.StepType;
+    stepType: StepType;
     isShowingSolution: boolean;
   }
 

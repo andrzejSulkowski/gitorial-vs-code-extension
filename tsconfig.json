@@ -17,18 +17,15 @@
 		"esModuleInterop": true,
 		"skipLibCheck": false,
 		"baseUrl": ".",
-		"paths": {
-			"@shared/*": ["./shared/*"]
-		},
 		"types": [
 			"node",
 			"mocha",
 			"chai"
-		]
+		],
+		"preserveSymlinks": true
 	},
 	"include": [
-		"src/**/*",
-		"shared/**/*"
+		"src/**/*"
 	],
 	"exclude": [
 		"node_modules",

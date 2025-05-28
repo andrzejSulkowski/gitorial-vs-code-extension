@@ -9,7 +9,7 @@
 // Business logic related to a tutorial (e.g., progression) should be in domain services.
 
 import { Step } from './Step';
-import { TutorialId } from '../../../shared/types/domain-primitives/TutorialId';
+import { TutorialId } from '@gitorial/shared-types';
 import { EnrichedStep } from './EnrichedStep';
 import { Markdown } from './Markdown';
 

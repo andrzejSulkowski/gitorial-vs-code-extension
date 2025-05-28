@@ -86,7 +86,7 @@ For information on creating Gitorial-compatible tutorials, please refer to the o
 
 ## Development
 
-For comprehensive information on setting up the development environment, understanding the project architecture, and contributing to the extension, please see the [Gitorial Development Guide](./docs/DEVELOPMENT.md).
+For comprehensive information on setting up the development environment, understanding the project architecture, and contributing to the extension, please see the [Development Guide](./DEVELOPMENT.md).
 
 ### Quick Start
 ```bash
@@ -95,14 +95,29 @@ git clone https://github.com/andrzejSulkowski/gitorial-vs-code-plugin.git
 cd gitorial-vs-code-plugin/project
 
 # Install dependencies
-npm install
+pnpm install
 
-# Compile the extension
-npm run compile
+# Start development mode (builds shared packages + watches for changes)
+pnpm run dev
+
+# Build everything for production
+pnpm run build
+
+# Package the extension
+pnpm run package
 
 # Open in VS Code and press F5 to run in Extension Development Host
 code .
 ```
+
+### Available Scripts
+- **`pnpm run dev`** - Start development mode with watch
+- **`pnpm run build`** - Build everything for production
+- **`pnpm run test`** - Run all tests and quality checks
+- **`pnpm run package`** - Create .vsix package
+- **`pnpm run clean`** - Clean all build artifacts
+
+See [DEVELOPMENT.md](./DEVELOPMENT.md) for complete script documentation.
 
 ## Commands
 
@@ -138,7 +153,7 @@ code .
 
 ## Contributing
 
-We welcome contributions! Please see our [Development Guide](./docs/DEVELOPMENT.md) for details on:
+We welcome contributions! Please see our [Development Guide](./DEVELOPMENT.md) for details on:
 - Setting up the development environment
 - Understanding the codebase architecture
 - Running tests

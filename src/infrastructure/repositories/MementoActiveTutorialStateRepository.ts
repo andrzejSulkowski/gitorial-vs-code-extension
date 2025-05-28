@@ -1,6 +1,6 @@
 import { IActiveTutorialStateRepository, StoredTutorialState } from "../../domain/repositories/IActiveTutorialStateRepository";
 import { IStateStorage } from "../../domain/ports/IStateStorage";
-import { TutorialId } from "shared/types/domain-primitives/TutorialId";
+import { TutorialId } from "@gitorial/shared-types";
 
 const ACTIVE_TUTORIAL_STATE_KEY = 'gitorial:activeTutorialInfo';
 

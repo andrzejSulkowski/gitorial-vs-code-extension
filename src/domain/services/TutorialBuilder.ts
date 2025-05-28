@@ -6,7 +6,7 @@
 import * as path from 'path';
 import { Tutorial, TutorialData } from '../models/Tutorial';
 import { GitService } from './GitService';
-import { TutorialId } from 'shared/types/domain-primitives/TutorialId';
+import { TutorialId } from '@gitorial/shared-types';
 import { DomainCommit } from '../ports/IGitOperations';
 import { Step, StepData } from '../models/Step';
 import { StepType } from '@gitorial/shared-types';

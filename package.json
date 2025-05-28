@@ -18,23 +18,30 @@
     "pnpm": ">=10.0.0"
   },
   "scripts": {
+    "// Development": "=== Development Commands ===",
+    "dev": "pnpm run build:shared && pnpm run build:watch",
+    "build": "pnpm run build:shared && pnpm run typecheck && pnpm run build:webview && pnpm run build:extension",
+    "build:watch": "concurrently \"pnpm run build:extension:watch\" \"pnpm run build:webview:watch\"",
+    "build:shared": "cd packages/shared-types && pnpm run build && cd ../webview-contracts && pnpm run build && cd ../..",
+    "build:webview": "cd webview-ui && pnpm run build",
+    "build:webview:watch": "cd webview-ui && pnpm run dev",
+    "build:extension": "node ./scripts/esbuild.js",
+    "build:extension:watch": "node ./scripts/esbuild.js --watch",
+    "build:extension:production": "node ./scripts/esbuild.js --production",
+    "// Quality": "=== Code Quality ===",
     "typecheck": "tsc --noEmit",
-    "vscode:prepublish": "pnpm run esbuild-base -- --production",
-    "esbuild-base": "node ./scripts/esbuild.js",
-    "esbuild-watch": "node ./scripts/esbuild.js --watch",
-    "esbuild-production": "node ./scripts/esbuild.js --production",
-    "compile": "pnpm run typecheck && pnpm run compile:webview && pnpm run compile:extension",
-    "compile:webview": "cd webview-ui && pnpm run build && cd ..",
-    "compile:extension": "node ./scripts/esbuild.js",
-    "compile:extension:watch": "node ./scripts/esbuild.js --watch",
-    "compile:extension:production": "node ./scripts/esbuild.js --production",
-    "pretest": "pnpm run compile && pnpm run lint",
     "lint": "eslint src",
-    "test": "vscode-test",
-    "test:unit:js": "mocha dist/test/unit",
+    "lint:fix": "eslint src --fix",
+    "// Testing": "=== Testing Commands ===",
+    "test": "pnpm run build && pnpm run lint && vscode-test",
     "test:unit": "mocha --require ts-node/register \"src/**/*.test.ts\" --exclude \"src/test/**/*.test.ts\"",
-    "package": "pnpx vsce package --no-dependencies",
-    "publish": "pnpx vsce publish --no-dependencies"
+    "// Publishing": "=== VS Code Extension ===",
+    "vscode:prepublish": "pnpm run build:extension:production",
+    "package": "pnpm run build && pnpx vsce package --no-dependencies",
+    "publish": "pnpm run build && pnpx vsce publish --no-dependencies",
+    "// Utilities": "=== Utility Commands ===",
+    "clean": "rm -rf out dist node_modules/.cache packages/*/dist webview-ui/dist",
+    "reset": "pnpm run clean && pnpm install && pnpm run build:shared"
   },
   "categories": [
     "Education",
@@ -97,6 +104,13 @@
       }
     ]
   },
+  "dependencies": {
+    "@gitorial/shared-types": "workspace:*",
+    "@gitorial/webview-contracts": "workspace:*",
+    "markdown-it": "^14.1.0",
+    "simple-git": "^3.27.0",
+    "ws": "^8.18.0"
+  },
   "devDependencies": {
     "@sinonjs/fake-timers": "^14.0.0",
     "@types/chai": "^5.2.2",
@@ -116,6 +130,7 @@
     "@vscode/test-electron": "^2.4.1",
     "@vscode/vsce": "^3.4.2",
     "chai": "^5.2.0",
+    "concurrently": "^9.1.2",
     "deep-eql": "^5.0.2",
     "esbuild": "^0.25.5",
     "eslint": "^9.23.0",
@@ -126,12 +141,5 @@
     "ts-node": "^10.9.2",
     "typescript": "^5.8.2",
     "undici-types": "^7.10.0"
-  },
-  "dependencies": {
-    "@gitorial/shared-types": "workspace:*",
-    "@gitorial/webview-contracts": "workspace:*",
-    "markdown-it": "^14.1.0",
-    "simple-git": "^3.27.0",
-    "ws": "^8.18.0"
   }
 }

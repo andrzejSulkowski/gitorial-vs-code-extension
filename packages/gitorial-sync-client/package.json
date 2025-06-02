@@ -1,6 +1,6 @@
 {
   "name": "@gitorial/sync-client",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "Client library for peer-to-peer synchronization of tutorial state",
   "main": "dist/index.js",
   "module": "dist/index.esm.js",

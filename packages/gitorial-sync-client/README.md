@@ -16,6 +16,7 @@ A TypeScript/JavaScript client library for peer-to-peer synchronization of tutor
 - 🎯 **Event-driven**: Clean event-based API for handling state changes
 - 🛡️ **Error Handling**: Comprehensive error handling with detailed error types
 - 🏗️ **Modular Architecture**: Simple, composable components
+- 📦 **Multiple Formats**: CommonJS and ESM builds, minified for production
 
 ## Installation
 
@@ -351,6 +352,77 @@ peer.on('error', (error) => {
   }
 });
 ```
+
+## Development
+
+### Building the Package
+
+The package uses [esbuild](https://esbuild.github.io/) for fast, optimized bundling:
+
+```bash
+# Development build (with source maps)
+npm run build
+
+# Production build (minified, no source maps)
+npm run build:production
+
+# Watch mode for development
+npm run build:watch
+
+# Clean build artifacts
+npm run clean
+```
+
+### Build Outputs
+
+The build produces multiple formats for maximum compatibility:
+
+- **`dist/index.js`** - CommonJS build (Node.js)
+- **`dist/index.esm.js`** - ES Module build (modern Node.js/bundlers)
+- **`dist/*.d.ts`** - TypeScript declaration files
+
+### Size Analysis
+
+| Build Type | CommonJS | ESM |
+|------------|----------|-----|
+| Development | 28.2kb | 26.3kb |
+| Production | 14.3kb | 13.5kb |
+
+The production build achieves ~50% size reduction through minification.
+
+### Scripts
+
+```bash
+npm run build              # Development build
+npm run build:production   # Production build (minified)
+npm run build:watch        # Watch mode
+npm run build:legacy       # TypeScript-only build (fallback)
+npm run test               # Run tests
+npm run test:watch         # Watch tests
+npm run lint               # Lint code
+npm run clean              # Clean dist directory
+```
+
+### Package Exports
+
+The package supports modern Node.js package exports:
+
+```json
+{
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "require": "./dist/index.js",
+      "import": "./dist/index.esm.js"
+    }
+  }
+}
+```
+
+This enables:
+- **CommonJS**: `const { SimpleSyncPeer } = require('@gitorial/sync-client')`
+- **ES Modules**: `import { SimpleSyncPeer } from '@gitorial/sync-client'`
+- **TypeScript**: Full type support in both formats
 
 ## License
 

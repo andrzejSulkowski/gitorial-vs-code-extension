@@ -1,32 +1,46 @@
 {
   "name": "@gitorial/sync-client",
   "version": "1.0.0",
-  "description": "Client library for integrating with Gitorial VS Code extension sync tunnel",
+  "description": "Client library for peer-to-peer synchronization of tutorial state",
   "main": "dist/index.js",
+  "module": "dist/index.esm.js",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "require": "./dist/index.js",
+      "import": "./dist/index.esm.js"
+    },
+    "./package.json": "./package.json"
+  },
   "files": [
     "dist/**/*",
     "README.md",
     "LICENSE"
   ],
   "scripts": {
-    "build": "tsc",
-    "build:watch": "tsc --watch",
+    "build": "node scripts/esbuild.js",
+    "build:watch": "node scripts/esbuild.js --watch",
+    "build:production": "node scripts/esbuild.js --production",
     "test": "mocha",
     "test:watch": "mocha --watch",
     "test:coverage": "nyc mocha",
     "lint": "eslint src/**/*.ts",
     "lint:fix": "eslint src/**/*.ts --fix",
-    "prepublishOnly": "npm run build"
+    "clean": "rm -rf dist",
+    "prepublishOnly": "npm run build:production",
+    "analyze": "node scripts/esbuild.js --production --analyze"
   },
   "keywords": [
     "gitorial",
-    "vscode",
+    "peer-to-peer",
+    "p2p",
     "tutorial",
     "sync",
     "websocket",
     "education",
-    "learning"
+    "learning",
+    "real-time"
   ],
   "author": "Andrzej Sulkowski",
   "license": "MIT",
@@ -58,7 +72,8 @@
     "ts-node": "^10.0.0",
     "nyc": "^15.1.0",
     "ws": "^8.18.0",
-    "typescript": "^5.0.0"
+    "typescript": "^5.0.0",
+    "esbuild": "^0.25.5"
   },
   "engines": {
     "node": ">=16.0.0"
@@ -66,4 +81,4 @@
   "publishConfig": {
     "access": "public"
   }
-} 
+}

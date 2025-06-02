@@ -4,17 +4,18 @@
 ![Status](https://img.shields.io/badge/status-preview-orange)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
-A TypeScript/JavaScript client library for integrating with the [Gitorial VS Code extension](https://github.com/AndrzejSulkowski/gitorial-vs-plugin) sync tunnel. This package enables web applications and other software to synchronize tutorial state with the VS Code extension in real-time.
+A TypeScript/JavaScript client library for peer-to-peer synchronization of tutorial state. This package enables applications to connect directly to each other and synchronize tutorial progress in real-time.
 
 ## Features
 
-- 🔄 **Real-time Sync**: Automatically synchronize tutorial state between VS Code and your application
-- 🔒 **Control Handoff**: Take control of the tutorial from VS Code or return control back
-- 🌐 **WebSocket Communication**: Fast, reliable communication using WebSocket protocol
+- 🔄 **Real-time Sync**: Automatically synchronize tutorial state between peers
+- 🔒 **Safe Control Model**: Peers can only offer control, not take it forcefully
+- 🌐 **Peer-to-Peer**: Direct connections between applications without central server
 - 🔁 **Auto-reconnection**: Automatic reconnection with configurable retry logic
 - 📘 **TypeScript Support**: Full TypeScript definitions included
 - 🎯 **Event-driven**: Clean event-based API for handling state changes
 - 🛡️ **Error Handling**: Comprehensive error handling with detailed error types
+- 🏗️ **Modular Architecture**: Simple, composable components
 
 ## Installation
 
@@ -24,78 +25,95 @@ npm install @gitorial/sync-client
 
 ## Quick Start
 
-```typescript
-import { GitorialSyncClient, ConnectionStatus } from '@gitorial/sync-client';
+### Simple Peer-to-Peer Connection
 
-// Create a client instance
-const client = new GitorialSyncClient({
-  url: 'ws://localhost:3001/gitorial-sync', // Default URL
-  autoReconnect: true,
-  maxReconnectAttempts: 5
-});
+```typescript
+import { SimpleSyncPeer } from '@gitorial/sync-client';
+
+// Create a peer that listens on port 3001
+const peer1 = new SimpleSyncPeer({ server: { port: 3001 } });
+await peer1.startListening();
+
+// Create another peer and connect to the first one
+const peer2 = new SimpleSyncPeer({ server: { port: 3002 } });
+await peer2.startListening();
+await peer2.connectToPeer('localhost', 3001);
 
 // Listen for tutorial state updates
-client.on('tutorialStateUpdated', (state) => {
+peer1.on('tutorialStateUpdated', (state) => {
   console.log(`Tutorial: ${state.tutorialTitle}`);
-  console.log(`Step: ${state.currentStepIndex + 1}/${state.totalSteps}`);
-  console.log(`Content: ${state.stepContent.title}`);
+  console.log(`Step: ${state.stepContent.index + 1}/${state.totalSteps}`);
 });
 
-// Listen for connection status changes
-client.on('connectionStatusChanged', (status) => {
-  console.log(`Connection status: ${status}`);
-});
+// Peer2 sends tutorial state to peer1
+const tutorialState = {
+  tutorialId: 'my-tutorial',
+  tutorialTitle: 'My Tutorial',
+  totalSteps: 5,
+  isShowingSolution: false,
+  stepContent: {
+    id: 'step-1',
+    title: 'Introduction',
+    commitHash: 'abc123',
+    type: 'section',
+    index: 0
+  },
+  repoUrl: 'https://github.com/user/tutorial'
+};
 
-// Connect to the Gitorial extension
-try {
-  await client.connect();
-  console.log('Connected to Gitorial!');
-  
-  // Request current tutorial state
-  await client.requestSync();
-  
-  // Take control of the extension
-  await client.lockExtension();
-  
-  // Later, return control back to VS Code
-  await client.unlockExtension();
-  
-} catch (error) {
-  console.error('Failed to connect:', error);
-}
+peer2.sendTutorialState(tutorialState);
+
+// Safe control model - peer2 offers control to peer1
+peer2.offerControl();
+// peer1 can accept or decline
+peer1.acceptControl(); // or peer1.declineControl()
 ```
 
-## Prerequisites
+### Using Individual Components
 
-Before using this client, ensure that:
+```typescript
+import { SyncClient, SyncServer } from '@gitorial/sync-client';
 
-1. **Gitorial VS Code Extension** is installed and active
-2. **Sync Tunnel is Started** in VS Code:
-   - Open Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`)
-   - Run "Gitorial: Start Sync Tunnel"
-   - Or click the sync icon in the status bar
+// Create a server
+const server = new SyncServer({ port: 3001 });
+await server.startListening();
+
+// Create a client and connect
+const client = new SyncClient();
+await client.connect('localhost', 3001);
+
+// Send tutorial state
+client.sendTutorialState(tutorialState);
+
+// Request sync from peer
+client.requestSync();
+```
 
 ## API Reference
 
-### GitorialSyncClient
+### SimpleSyncPeer
 
-The main client class for connecting to the Gitorial extension.
+The main peer-to-peer class that combines client and server functionality.
 
 #### Constructor
 
 ```typescript
-new GitorialSyncClient(config?: SyncClientConfig)
+new SimpleSyncPeer(config?: SimpleSyncPeerConfig)
 ```
 
 #### Configuration Options
 
 ```typescript
-interface SyncClientConfig {
-  url?: string;                    // WebSocket URL (default: ws://localhost:3001/gitorial-sync)
-  autoReconnect?: boolean;         // Enable auto-reconnection (default: true)
-  maxReconnectAttempts?: number;   // Max reconnection attempts (default: 5)
-  reconnectDelay?: number;         // Delay between attempts in ms (default: 1000)
-  connectionTimeout?: number;      // Connection timeout in ms (default: 5000)
+interface SimpleSyncPeerConfig {
+  server?: {
+    port?: number;  // Port to listen on (default: 0 for random)
+  };
+  client?: {
+    connectionTimeout?: number;      // Connection timeout in ms (default: 5000)
+    autoReconnect?: boolean;         // Enable auto-reconnection (default: false)
+    maxReconnectAttempts?: number;   // Max reconnection attempts (default: 3)
+    reconnectDelay?: number;         // Delay between attempts in ms (default: 1000)
+  };
 }
 ```
 
@@ -104,74 +122,110 @@ interface SyncClientConfig {
 ##### Connection Management
 
 ```typescript
-// Connect to the sync tunnel
-await client.connect(): Promise<void>
+// Start listening for incoming connections
+await peer.startListening(): Promise<number>  // Returns actual port
 
-// Disconnect from the sync tunnel
-client.disconnect(): void
+// Connect to another peer
+await peer.connectToPeer(host: string, port: number): Promise<void>
+
+// Disconnect from all peers and stop listening
+await peer.disconnect(): Promise<void>
 
 // Check connection status
-client.isConnected(): boolean
-client.getConnectionStatus(): ConnectionStatus
+peer.isConnected(): boolean
+peer.getConnectionStatus(): ConnectionStatus
 ```
 
-##### Tutorial Control
+##### Tutorial State
 
 ```typescript
-// Request current tutorial state
-await client.requestSync(): Promise<void>
+// Send tutorial state to connected peers
+peer.sendTutorialState(state: TutorialSyncState): void
 
-// Take control of the extension (lock it)
-await client.lockExtension(): Promise<void>
+// Request tutorial state from connected peer
+peer.requestSync(): void
 
-// Return control to the extension (unlock it)
-await client.unlockExtension(): Promise<void>
-
-// Check if extension is locked
-client.isLocked(): boolean
-```
-
-##### State Access
-
-```typescript
 // Get current tutorial state
-client.getCurrentTutorialState(): TutorialSyncState | null
-
-// Get assigned client ID
-client.getClientId(): string | null
+peer.getCurrentTutorialState(): TutorialSyncState | null
 ```
 
-##### Cleanup
+##### Safe Control Model
 
 ```typescript
-// Clean up resources
-client.dispose(): void
+// Offer control to connected peer (safer model - can only give away control)
+peer.offerControl(): void
+
+// Accept control offered by a peer
+peer.acceptControl(): void
+
+// Decline control offered by a peer
+peer.declineControl(): void
+
+// Return control back to the peer
+peer.returnControl(): void
 ```
 
-#### Events
+##### Information
 
-The client extends `EventEmitter` and emits the following events:
+```typescript
+// Get peer ID
+peer.getPeerId(): string
+
+// Get listening port
+peer.getListeningPort(): number
+
+// Get number of incoming connections
+peer.getIncomingConnectionCount(): number
+```
+
+### SyncClient
+
+Simple client for connecting to a peer.
+
+```typescript
+const client = new SyncClient(config?: SyncClientConfig);
+await client.connect(host: string, port: number);
+client.sendTutorialState(state);
+client.offerControl();
+client.acceptControl();
+client.declineControl();
+client.returnControl();
+```
+
+### SyncServer
+
+Simple server for accepting incoming connections.
+
+```typescript
+const server = new SyncServer(config?: SyncServerConfig);
+const port = await server.startListening();
+server.broadcastTutorialState(state);
+await server.stop();
+```
+
+### Events
+
+All classes extend `EventEmitter` and emit these events:
 
 ```typescript
 // Connection status changed
-client.on('connectionStatusChanged', (status: ConnectionStatus) => {
-  // Handle status change
-});
+peer.on('connectionStatusChanged', (status: ConnectionStatus) => {});
 
 // Tutorial state updated
-client.on('tutorialStateUpdated', (state: TutorialSyncState | null) => {
-  // Handle tutorial state update
-});
+peer.on('tutorialStateUpdated', (state: TutorialSyncState) => {});
 
-// Error occurred
-client.on('error', (error: SyncClientError) => {
-  // Handle error
-});
+// Control events (safer model)
+peer.on('peerControlOffered', () => {});
+peer.on('peerControlAccepted', () => {});
+peer.on('peerControlDeclined', () => {});
+peer.on('peerControlReturned', () => {});
 
-// Client ID assigned
-client.on('clientIdAssigned', (clientId: string) => {
-  // Handle client ID assignment
-});
+// Connection events
+peer.on('clientConnected', (clientId: string) => {});
+peer.on('clientDisconnected', (clientId: string) => {});
+
+// Error handling
+peer.on('error', (error: SyncClientError) => {});
 ```
 
 ### Types
@@ -182,19 +236,16 @@ client.on('clientIdAssigned', (clientId: string) => {
 interface TutorialSyncState {
   tutorialId: string;
   tutorialTitle: string;
-  currentStepId: string;
-  currentStepIndex: number;
   totalSteps: number;
   isShowingSolution: boolean;
   stepContent: {
+    id: string;
     title: string;
-    htmlContent: string;
-    type: string;
+    commitHash: string;
+    type: 'section' | 'action' | 'template';
+    index: number;
   };
-  openFiles: string[];
   repoUrl?: string;
-  localPath: string;
-  timestamp: number;
 }
 ```
 
@@ -205,325 +256,102 @@ enum ConnectionStatus {
   DISCONNECTED = 'disconnected',
   CONNECTING = 'connecting',
   CONNECTED = 'connected',
-  LOCKED = 'locked',
-  ERROR = 'error'
+  GIVEN_AWAY_CONTROL = 'given_away_control',
+  TAKEN_BACK_CONTROL = 'taken_back_control'
 }
 ```
 
-#### SyncClientError
+## Architecture
+
+The library follows a simple, modular architecture:
+
+- **SyncClient**: Handles outgoing connections to peers
+- **SyncServer**: Handles incoming connections from peers  
+- **SimpleSyncPeer**: Combines client and server for easy peer-to-peer usage
+
+### Safe Control Model
+
+The library implements a safer control model where:
+- Peers can only **offer** control to others
+- Receiving peers can **accept** or **decline** the offer
+- Control can be **returned** by the peer that has it
+- No peer can forcefully take control from another
+
+This prevents security vulnerabilities and ensures consensual control handoffs.
+
+## Examples
+
+### Basic Tutorial Sync
 
 ```typescript
-class SyncClientError extends Error {
-  type: SyncErrorType;
-  originalError?: Error;
+import { SimpleSyncPeer } from '@gitorial/sync-client';
+
+const peer1 = new SimpleSyncPeer();
+const peer2 = new SimpleSyncPeer();
+
+const port1 = await peer1.startListening();
+await peer2.connectToPeer('localhost', port1);
+
+// Sync tutorial state
+peer1.on('tutorialStateUpdated', (state) => {
+  console.log('Received tutorial update:', state.tutorialTitle);
+});
+
+peer2.sendTutorialState({
+  tutorialId: 'intro-tutorial',
+  tutorialTitle: 'Introduction to React',
+  totalSteps: 10,
+  isShowingSolution: false,
+  stepContent: {
+    id: 'step-1',
+    title: 'Setting up the project',
+    commitHash: 'abc123',
+    type: 'section',
+    index: 0
+  },
+  repoUrl: 'https://github.com/user/react-tutorial'
+});
+```
+
+### Multiple Peer Network
+
+```typescript
+// Create a hub peer
+const hub = new SimpleSyncPeer({ server: { port: 3001 } });
+await hub.startListening();
+
+// Create multiple client peers
+const peers = [];
+for (let i = 0; i < 3; i++) {
+  const peer = new SimpleSyncPeer();
+  await peer.connectToPeer('localhost', 3001);
+  peers.push(peer);
 }
 
-enum SyncErrorType {
-  CONNECTION_FAILED = 'connection_failed',
-  CONNECTION_LOST = 'connection_lost',
-  INVALID_MESSAGE = 'invalid_message',
-  SERVER_ERROR = 'server_error',
-  TIMEOUT = 'timeout',
-  MAX_RECONNECT_ATTEMPTS_EXCEEDED = 'max_reconnect_attempts_exceeded'
-}
-```
-
-## Usage Examples
-
-### React Integration
-
-```typescript
-import React, { useEffect, useState } from 'react';
-import { GitorialSyncClient, TutorialSyncState, ConnectionStatus } from '@gitorial/sync-client';
-
-function TutorialViewer() {
-  const [client] = useState(() => new GitorialSyncClient());
-  const [tutorialState, setTutorialState] = useState<TutorialSyncState | null>(null);
-  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>(ConnectionStatus.DISCONNECTED);
-
-  useEffect(() => {
-    // Set up event listeners
-    client.on('tutorialStateUpdated', setTutorialState);
-    client.on('connectionStatusChanged', setConnectionStatus);
-    client.on('error', (error) => console.error('Sync error:', error));
-
-    // Connect to Gitorial
-    client.connect().catch(console.error);
-
-    // Cleanup on unmount
-    return () => {
-      client.dispose();
-    };
-  }, [client]);
-
-  const handleTakeControl = async () => {
-    try {
-      await client.lockExtension();
-    } catch (error) {
-      console.error('Failed to take control:', error);
-    }
-  };
-
-  const handleReturnControl = async () => {
-    try {
-      await client.unlockExtension();
-    } catch (error) {
-      console.error('Failed to return control:', error);
-    }
-  };
-
-  return (
-    <div>
-      <div>Status: {connectionStatus}</div>
-      
-      {tutorialState && (
-        <div>
-          <h2>{tutorialState.tutorialTitle}</h2>
-          <p>Step {tutorialState.currentStepIndex + 1} of {tutorialState.totalSteps}</p>
-          <h3>{tutorialState.stepContent.title}</h3>
-          <div dangerouslySetInnerHTML={{ __html: tutorialState.stepContent.htmlContent }} />
-        </div>
-      )}
-      
-      <button onClick={handleTakeControl} disabled={!client.isConnected() || client.isLocked()}>
-        Take Control
-      </button>
-      <button onClick={handleReturnControl} disabled={!client.isLocked()}>
-        Return Control
-      </button>
-    </div>
-  );
-}
-```
-
-### Node.js Server Integration
-
-```typescript
-import { GitorialSyncClient } from '@gitorial/sync-client';
-import express from 'express';
-
-const app = express();
-const client = new GitorialSyncClient();
-
-// Store current tutorial state
-let currentTutorial: TutorialSyncState | null = null;
-
-client.on('tutorialStateUpdated', (state) => {
-  currentTutorial = state;
-  // Broadcast to connected websocket clients, etc.
-});
-
-// API endpoint to get current tutorial state
-app.get('/api/tutorial', (req, res) => {
-  res.json(currentTutorial);
-});
-
-// API endpoint to take control
-app.post('/api/tutorial/lock', async (req, res) => {
-  try {
-    await client.lockExtension();
-    res.json({ success: true });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Connect to Gitorial on startup
-client.connect().then(() => {
-  console.log('Connected to Gitorial');
-  client.requestSync();
-}).catch(console.error);
-
-app.listen(3000, () => {
-  console.log('Server running on port 3000');
-});
-```
-
-### Vue.js Integration
-
-```vue
-<template>
-  <div>
-    <div class="status">{{ connectionStatus }}</div>
-    
-    <div v-if="tutorialState" class="tutorial">
-      <h2>{{ tutorialState.tutorialTitle }}</h2>
-      <p>Step {{ tutorialState.currentStepIndex + 1 }} of {{ tutorialState.totalSteps }}</p>
-      <h3>{{ tutorialState.stepContent.title }}</h3>
-      <div v-html="tutorialState.stepContent.htmlContent"></div>
-    </div>
-    
-    <button @click="takeControl" :disabled="!canTakeControl">Take Control</button>
-    <button @click="returnControl" :disabled="!isLocked">Return Control</button>
-  </div>
-</template>
-
-<script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue';
-import { GitorialSyncClient, TutorialSyncState, ConnectionStatus } from '@gitorial/sync-client';
-
-const client = new GitorialSyncClient();
-const tutorialState = ref<TutorialSyncState | null>(null);
-const connectionStatus = ref<ConnectionStatus>(ConnectionStatus.DISCONNECTED);
-
-const canTakeControl = computed(() => 
-  client.isConnected() && !client.isLocked()
-);
-
-const isLocked = computed(() => client.isLocked());
-
-const takeControl = async () => {
-  try {
-    await client.lockExtension();
-  } catch (error) {
-    console.error('Failed to take control:', error);
-  }
-};
-
-const returnControl = async () => {
-  try {
-    await client.unlockExtension();
-  } catch (error) {
-    console.error('Failed to return control:', error);
-  }
-};
-
-onMounted(async () => {
-  client.on('tutorialStateUpdated', (state) => {
-    tutorialState.value = state;
-  });
-  
-  client.on('connectionStatusChanged', (status) => {
-    connectionStatus.value = status;
-  });
-  
-  try {
-    await client.connect();
-    await client.requestSync();
-  } catch (error) {
-    console.error('Failed to connect:', error);
-  }
-});
-
-onUnmounted(() => {
-  client.dispose();
-});
-</script>
-```
-
-## Scenarios
-
-### Scenario 1: Web App Takes Control
-
-```typescript
-const client = new GitorialSyncClient();
-
-// Connect and take control
-await client.connect();
-await client.requestSync(); // Get current state
-await client.lockExtension(); // Take control
-
-// Now the VS Code extension is locked
-// Your web app can display the tutorial and control navigation
-// All state changes will be synced back to VS Code
-
-// When done, return control
-await client.unlockExtension();
-```
-
-### Scenario 2: Passive State Monitoring
-
-```typescript
-const client = new GitorialSyncClient();
-
-// Just monitor state without taking control
-client.on('tutorialStateUpdated', (state) => {
-  // Display tutorial state in your app
-  updateUI(state);
-});
-
-await client.connect();
-await client.requestSync();
-
-// User continues working in VS Code
-// Your app shows synchronized state in real-time
+// Hub broadcasts to all connected peers
+hub.sendTutorialState(tutorialState);
 ```
 
 ## Error Handling
 
 ```typescript
-import { SyncClientError, SyncErrorType } from '@gitorial/sync-client';
-
-client.on('error', (error: SyncClientError) => {
+peer.on('error', (error) => {
   switch (error.type) {
-    case SyncErrorType.CONNECTION_FAILED:
-      console.error('Failed to connect to Gitorial extension');
-      // Show connection error UI
+    case 'CONNECTION_FAILED':
+      console.error('Failed to connect:', error.message);
       break;
-      
-    case SyncErrorType.CONNECTION_LOST:
-      console.error('Connection to Gitorial was lost');
-      // Show reconnecting UI
+    case 'PROTOCOL_VERSION':
+      console.error('Protocol mismatch:', error.message);
       break;
-      
-    case SyncErrorType.MAX_RECONNECT_ATTEMPTS_EXCEEDED:
-      console.error('Could not reconnect to Gitorial');
-      // Show manual reconnect option
+    case 'TIMEOUT':
+      console.error('Connection timeout:', error.message);
       break;
-      
-    case SyncErrorType.SERVER_ERROR:
-      console.error('Gitorial extension error:', error.message);
-      break;
-      
     default:
-      console.error('Unknown sync error:', error);
+      console.error('Unknown error:', error.message);
   }
 });
 ```
 
-## Troubleshooting
-
-### Connection Issues
-
-1. **Ensure Gitorial Extension is Running**
-   - Check that the Gitorial VS Code extension is installed and active
-   - Verify a tutorial is loaded in VS Code
-
-2. **Start the Sync Tunnel**
-   - Open Command Palette in VS Code (`Ctrl+Shift+P` / `Cmd+Shift+P`)
-   - Run "Gitorial: Start Sync Tunnel"
-   - Check the status bar for sync tunnel indicator
-
-3. **Check WebSocket URL**
-   - Default URL is `ws://localhost:3001/gitorial-sync`
-   - Ensure port 3001 is not blocked by firewall
-   - Verify no other application is using port 3001
-
-4. **Network Issues**
-   - The sync tunnel only accepts localhost connections by default
-   - Check VS Code Developer Console for error messages
-
-### State Sync Issues
-
-1. **No Tutorial State Received**
-   - Ensure a tutorial is loaded in VS Code
-   - Call `client.requestSync()` to manually request state
-   - Check that the tutorial has steps and is properly initialized
-
-2. **Outdated State**
-   - State updates are automatic when tutorial changes in VS Code
-   - Use `client.getCurrentTutorialState()` to get cached state
-   - Check connection status with `client.getConnectionStatus()`
-
-## Contributing
-
-Contributions are welcome! Please see the [main repository](https://github.com/AndrzejSulkowski/gitorial-vs-plugin) for contribution guidelines.
-
 ## License
 
-MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Related
-
-- [Gitorial VS Code Extension](https://github.com/AndrzejSulkowski/gitorial-vs-plugin) - The main VS Code extension
-- [Gitorial Documentation](https://github.com/AndrzejSulkowski/gitorial-vs-plugin#readme) - Complete documentation 
+MIT 

@@ -6,35 +6,32 @@ import {
   SyncMessageType,
   ConnectionStatus,
   SyncClientEvent,
-  SyncClientConfig,
   SyncErrorType,
   SyncClientError,
-  SyncMessageProtocolAck
+  SyncMessageProtocolAck,
+  SyncMessageProtocolHandshake
 } from './types';
 import { SYNC_PROTOCOL_VERSION } from './constants/protocol';
 
 /**
- * Main client class for connecting to and synchronizing with the Gitorial VS Code extension
- * 
- * @example
- * ```typescript
- * import { GitorialSyncClient } from '@gitorial/sync-client';
- * 
- * const client = new GitorialSyncClient({
- *   url: 'ws://localhost:3001/gitorial-sync'
- * });
- * 
- * client.on('tutorialStateUpdated', (state) => {
- *   console.log('Tutorial updated:', state.tutorialTitle);
- * });
- * 
- * await client.connect();
- * await client.requestSync();
- * ```
+ * Configuration for the sync client
  */
-export class GitorialSyncClient extends EventEmitter {
+export interface SyncClientConfig {
+  /** Connection timeout in milliseconds (default: 5000) */
+  connectionTimeout?: number;
+  /** Auto-reconnect on disconnection (default: false) */
+  autoReconnect?: boolean;
+  /** Maximum reconnection attempts (default: 3) */
+  maxReconnectAttempts?: number;
+  /** Delay between reconnection attempts in milliseconds (default: 1000) */
+  reconnectDelay?: number;
+}
+
+/**
+ * Simple sync client that connects to a peer
+ */
+export class SyncClient extends EventEmitter {
   private ws: WebSocket | null = null;
-  private clientId: string | null = null;
   private connectionStatus: ConnectionStatus = ConnectionStatus.DISCONNECTED;
   private currentTutorialState: TutorialSyncState | null = null;
   private reconnectAttempts = 0;
@@ -42,6 +39,8 @@ export class GitorialSyncClient extends EventEmitter {
   private connectionTimer: NodeJS.Timeout | null = null;
   private protocolHandshakeTimer: NodeJS.Timeout | null = null;
   private protocolValidated = false;
+  private lastConnectedHost: string | null = null;
+  private lastConnectedPort: number | null = null;
 
   private readonly config: Required<SyncClientConfig>;
 
@@ -49,24 +48,29 @@ export class GitorialSyncClient extends EventEmitter {
     super();
 
     this.config = {
-      url: config.url || 'ws://localhost:3001/gitorial-sync',
-      autoReconnect: config.autoReconnect ?? true,
-      maxReconnectAttempts: config.maxReconnectAttempts ?? 5,
-      reconnectDelay: config.reconnectDelay ?? 1000,
-      connectionTimeout: config.connectionTimeout ?? 5000
+      connectionTimeout: config.connectionTimeout ?? 5000,
+      autoReconnect: config.autoReconnect ?? false,
+      maxReconnectAttempts: config.maxReconnectAttempts ?? 3,
+      reconnectDelay: config.reconnectDelay ?? 1000
     };
+
+    // Handle errors to prevent uncaught exceptions
+    this.on(SyncClientEvent.ERROR, (error) => {
+      console.log('SyncClient error (handled):', error.message);
+    });
   }
 
   /**
-   * Connect to the Gitorial sync tunnel
-   * @returns Promise that resolves when connected
+   * Connect to a peer
    */
-  public async connect(): Promise<void> {
-    if (this.connectionStatus === ConnectionStatus.CONNECTED ||
-      this.connectionStatus === ConnectionStatus.CONNECTING) {
+  public async connect(host: string, port: number): Promise<void> {
+    if (this.connectionStatus === ConnectionStatus.CONNECTING || 
+        this.connectionStatus === ConnectionStatus.CONNECTED) {
       return;
     }
 
+    this.lastConnectedHost = host;
+    this.lastConnectedPort = port;
     this._setConnectionStatus(ConnectionStatus.CONNECTING);
     this.protocolValidated = false;
 
@@ -81,7 +85,8 @@ export class GitorialSyncClient extends EventEmitter {
       };
 
       try {
-        this.ws = new WebSocket(this.config.url);
+        const url = `ws://${host}:${port}`;
+        this.ws = new WebSocket(url);
 
         // Set connection timeout
         this.connectionTimer = setTimeout(() => {
@@ -110,7 +115,6 @@ export class GitorialSyncClient extends EventEmitter {
 
           // Send protocol handshake immediately upon connection
           this._sendProtocolHandshake();
-          
         };
 
         this.ws.onmessage = (event) => {
@@ -133,21 +137,20 @@ export class GitorialSyncClient extends EventEmitter {
         };
 
         this.ws.onclose = () => {
-          this._clearConnectionTimer();
-          this._clearProtocolHandshakeTimer();
+          this._clearTimers();
           this._setConnectionStatus(ConnectionStatus.DISCONNECTED);
           this.ws = null;
-          this.clientId = null;
           this.protocolValidated = false;
 
-          if (this.config.autoReconnect && this.reconnectAttempts < this.config.maxReconnectAttempts) {
+          if (this.config.autoReconnect && 
+              this.reconnectAttempts < this.config.maxReconnectAttempts &&
+              this.lastConnectedHost && this.lastConnectedPort) {
             this._scheduleReconnect();
           }
         };
 
         this.ws.onerror = (error) => {
-          this._clearConnectionTimer();
-          this._clearProtocolHandshakeTimer();
+          this._clearTimers();
           const connectionError = new SyncClientError(
             SyncErrorType.CONNECTION_FAILED,
             'WebSocket connection failed',
@@ -158,8 +161,7 @@ export class GitorialSyncClient extends EventEmitter {
         };
 
       } catch (error) {
-        this._clearConnectionTimer();
-        this._clearProtocolHandshakeTimer();
+        this._clearTimers();
         const syncError = new SyncClientError(
           SyncErrorType.CONNECTION_FAILED,
           'Failed to create WebSocket connection',
@@ -172,98 +174,103 @@ export class GitorialSyncClient extends EventEmitter {
   }
 
   /**
-   * Disconnect from the sync tunnel
+   * Disconnect from peer
    */
   public disconnect(): void {
     this._clearReconnectTimer();
-    this._clearConnectionTimer();
-    this._clearProtocolHandshakeTimer();
+    this._clearTimers();
 
     if (this.ws) {
       this.ws.close();
       this.ws = null;
     }
 
-    this.clientId = null;
     this.protocolValidated = false;
     this._setConnectionStatus(ConnectionStatus.DISCONNECTED);
   }
 
   /**
-   * Request current tutorial state from the extension
+   * Request tutorial state from peer
    */
-  public async requestSync(): Promise<void> {
+  public requestSync(): void {
     this._sendMessage(SyncMessageType.REQUEST_SYNC);
   }
 
   /**
-   * We lock our application and give control to the Receiver
+   * Offer control to the connected peer
    */
-  public async lockSender(): Promise<void> {
-    this._sendMessage(SyncMessageType.LOCK_SCREEN);
-    this._setConnectionStatus(ConnectionStatus.LOCKED);
+  public offerControl(): void {
+    this._sendMessage(SyncMessageType.OFFER_CONTROL);
+    this._setConnectionStatus(ConnectionStatus.GIVEN_AWAY_CONTROL);
   }
 
   /**
-   * Return control to the Receiver
+   * Accept control offered by the peer
    */
-  public async unlockReceiver(): Promise<void> {
-    this._sendMessage(SyncMessageType.UNLOCK_SCREEN);
+  public acceptControl(): void {
+    this._sendMessage(SyncMessageType.ACCEPT_CONTROL);
+    this._setConnectionStatus(ConnectionStatus.TAKEN_BACK_CONTROL);
+  }
+
+  /**
+   * Decline control offered by the peer
+   */
+  public declineControl(): void {
+    this._sendMessage(SyncMessageType.DECLINE_CONTROL);
+  }
+
+  /**
+   * Return control back to the peer
+   */
+  public returnControl(): void {
+    this._sendMessage(SyncMessageType.RETURN_CONTROL);
     this._setConnectionStatus(ConnectionStatus.CONNECTED);
   }
 
   /**
-   * Get the current connection status
+   * Send tutorial state to peer
+   */
+  public sendTutorialState(state: TutorialSyncState): void {
+    this.currentTutorialState = state;
+    this._sendMessage(SyncMessageType.STATE_UPDATE, state);
+  }
+
+  /**
+   * Get connection status
    */
   public getConnectionStatus(): ConnectionStatus {
     return this.connectionStatus;
   }
 
   /**
-   * Get the current tutorial state (if any)
+   * Get current tutorial state
    */
   public getCurrentTutorialState(): TutorialSyncState | null {
     return this.currentTutorialState;
   }
 
   /**
-   * Get the assigned client ID
-   */
-  public getClientId(): string | null {
-    return this.clientId;
-  }
-
-  /**
-   * Check if currently connected
+   * Check if connected
    */
   public isConnected(): boolean {
     return this.connectionStatus === ConnectionStatus.CONNECTED ||
-      this.connectionStatus === ConnectionStatus.LOCKED;
+           this.connectionStatus === ConnectionStatus.GIVEN_AWAY_CONTROL ||
+           this.connectionStatus === ConnectionStatus.TAKEN_BACK_CONTROL;
   }
 
-  /**
-   * Check if extension is locked (client has control)
-   */
-  public isLocked(): boolean {
-    return this.connectionStatus === ConnectionStatus.LOCKED;
-  }
-
-  /**
-   * Handle incoming messages from the sync tunnel
-   */
   private _handleMessage(message: SyncMessage): void {
     switch (message.type) {
       case SyncMessageType.CLIENT_CONNECTED:
-        //TODO: here in the future we can implement a handleV1(msg) and handleV2(msg) to provide a sliding window for upgrades
+        // Validate protocol version
         if (SYNC_PROTOCOL_VERSION !== message.protocol_version) {
           this._handleError(
             new SyncClientError(SyncErrorType.PROTOCOL_VERSION,
-              `Server speaks protocol version: ${SYNC_PROTOCOL_VERSION} but sender speaks version: ${message.protocol_version}\nPlease update your gitorial-sync-client`
-            ))
+              `Peer speaks protocol version: ${message.protocol_version} but we speak version: ${SYNC_PROTOCOL_VERSION}`
+            )
+          );
           return;
         }
-        this.clientId = message.clientId;
-        this.emit(SyncClientEvent.CLIENT_ID_ASSIGNED, this.clientId);
+        this.emit(SyncClientEvent.CLIENT_ID_ASSIGNED, message.clientId);
         break;
 
       case SyncMessageType.STATE_UPDATE:
@@ -271,21 +278,44 @@ export class GitorialSyncClient extends EventEmitter {
         this.emit(SyncClientEvent.TUTORIAL_STATE_UPDATED, this.currentTutorialState);
         break;
 
+      case SyncMessageType.OFFER_CONTROL:
+        this.emit(SyncClientEvent.PEER_CONTROL_OFFERED);
+        break;
+
+      case SyncMessageType.ACCEPT_CONTROL:
+        this._setConnectionStatus(ConnectionStatus.CONNECTED);
+        this.emit(SyncClientEvent.PEER_CONTROL_ACCEPTED);
+        break;
+
+      case SyncMessageType.DECLINE_CONTROL:
+        this._setConnectionStatus(ConnectionStatus.CONNECTED);
+        this.emit(SyncClientEvent.PEER_CONTROL_DECLINED);
+        break;
+
+      case SyncMessageType.RETURN_CONTROL:
+        this._setConnectionStatus(ConnectionStatus.CONNECTED);
+        this.emit(SyncClientEvent.PEER_CONTROL_RETURNED);
+        break;
+
+      case SyncMessageType.REQUEST_SYNC:
+        // If we have tutorial state, send it back
+        if (this.currentTutorialState) {
+          this._sendMessage(SyncMessageType.STATE_UPDATE, this.currentTutorialState);
+        }
+        break;
+
       case SyncMessageType.ERROR:
         this._handleError(new SyncClientError(
           SyncErrorType.SERVER_ERROR,
-          message.data?.error || 'Unknown server error'
+          message.data?.error || 'Unknown peer error'
         ));
         break;
 
       default:
-        console.warn(`GitorialSyncClient: Unknown message type: ${message.type}`);
+        console.warn(`SyncClient: Unknown message type: ${message.type}`);
     }
   }
 
-  /**
-   * Send protocol handshake immediately upon WebSocket connection
-   */
   private _sendProtocolHandshake(): void {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
       throw new SyncClientError(
@@ -294,7 +324,7 @@ export class GitorialSyncClient extends EventEmitter {
       );
     }
 
-    const handshakeMessage: SyncMessage = {
+    const handshakeMessage: SyncMessageProtocolHandshake = {
       type: SyncMessageType.PROTOCOL_HANDSHAKE,
       protocol_version: SYNC_PROTOCOL_VERSION,
       timestamp: Date.now()
@@ -311,34 +341,30 @@ export class GitorialSyncClient extends EventEmitter {
     }
   }
 
-  /**
-   * Handle protocol acknowledgment from server
-   */
   private _handleProtocolAck(
     message: SyncMessage & { type: SyncMessageType.PROTOCOL_ACK },
     resolve: () => void,
     reject: (error: Error) => void
   ): void {
-    this._clearConnectionTimer();
-    this._clearProtocolHandshakeTimer();
+    this._clearTimers();
 
     const ackMessage = message as SyncMessageProtocolAck;
 
     if (!ackMessage.accepted) {
       const error = new SyncClientError(
         SyncErrorType.PROTOCOL_VERSION,
-        ackMessage.error || `Protocol version ${SYNC_PROTOCOL_VERSION} not accepted by server`
+        ackMessage.error || `Protocol version ${SYNC_PROTOCOL_VERSION} not accepted by peer`
       );
       this._handleError(error);
       reject(error);
       return;
     }
 
-    // Validate server's protocol version
+    // Validate peer's protocol version
     if (SYNC_PROTOCOL_VERSION !== ackMessage.protocol_version) {
       const error = new SyncClientError(
         SyncErrorType.PROTOCOL_VERSION,
-        `Protocol version mismatch: client=${SYNC_PROTOCOL_VERSION}, server=${ackMessage.protocol_version}`
+        `Protocol version mismatch: our=${SYNC_PROTOCOL_VERSION}, peer=${ackMessage.protocol_version}`
       );
       this._handleError(error);
       reject(error);
@@ -352,69 +378,34 @@ export class GitorialSyncClient extends EventEmitter {
     resolve();
   }
 
-  /**
-   * Send a message to the sync tunnel
-   */
   private _sendMessage(type: SyncMessageType, data?: any): void {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-      throw new SyncClientError(
+      this._handleError(new SyncClientError(
         SyncErrorType.CONNECTION_FAILED,
-        'Not connected to sync tunnel'
-      );
-    }
-
-    // Protocol handshake and ack messages don't require clientId
-    if (type !== SyncMessageType.PROTOCOL_HANDSHAKE && 
-        type !== SyncMessageType.PROTOCOL_ACK && 
-        this.clientId === null) {
-          this.emit(SyncClientEvent.ERROR, new SyncClientError(
-            SyncErrorType.INVALID_MESSAGE,
-            "Can not send messsages without a recipient (clientId is missing)"
-          ));
+        'Not connected to peer'
+      ));
       return;
     }
 
-    // Handle different message types appropriately
-    let message: SyncMessage;
-    
-    if (type === SyncMessageType.PROTOCOL_HANDSHAKE) {
-      message = {
-        type,
-        protocol_version: SYNC_PROTOCOL_VERSION,
-        timestamp: Date.now()
-      };
-    } else if (type === SyncMessageType.PROTOCOL_ACK) {
-      message = {
-        type,
-        protocol_version: SYNC_PROTOCOL_VERSION,
-        timestamp: Date.now(),
-        accepted: data?.accepted ?? true,
-        error: data?.error
-      };
-    } else {
-      message = {
-        type,
-        clientId: this.clientId!,
-        data,
-        timestamp: Date.now(),
-        protocol_version: SYNC_PROTOCOL_VERSION
-      };
-    }
+    const message = {
+      type,
+      clientId: 'client',
+      data,
+      timestamp: Date.now(),
+      protocol_version: SYNC_PROTOCOL_VERSION
+    } as SyncMessage;
 
     try {
       this.ws.send(JSON.stringify(message));
     } catch (error) {
-      throw new SyncClientError(
+      this._handleError(new SyncClientError(
         SyncErrorType.CONNECTION_FAILED,
         'Failed to send message',
         error as Error
-      );
+      ));
     }
   }
 
-  /**
-   * Set connection status and emit event
-   */
   private _setConnectionStatus(status: ConnectionStatus): void {
     if (this.connectionStatus !== status) {
       this.connectionStatus = status;
@@ -422,16 +413,10 @@ export class GitorialSyncClient extends EventEmitter {
     }
   }
 
-  /**
-   * Handle errors and emit error events
-   */
   private _handleError(error: SyncClientError): void {
     this.emit(SyncClientEvent.ERROR, error);
   }
 
-  /**
-   * Schedule automatic reconnection
-   */
   private _scheduleReconnect(): void {
     this._clearReconnectTimer();
 
@@ -447,16 +432,15 @@ export class GitorialSyncClient extends EventEmitter {
 
     this.reconnectTimer = setTimeout(async () => {
       try {
-        await this.connect();
+        if (this.lastConnectedHost && this.lastConnectedPort) {
+          await this.connect(this.lastConnectedHost, this.lastConnectedPort);
+        }
       } catch (error) {
         // Error will be handled by connect() method
       }
     }, this.config.reconnectDelay);
   }
 
-  /**
-   * Clear reconnection timer
-   */
   private _clearReconnectTimer(): void {
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
@@ -464,29 +448,17 @@ export class GitorialSyncClient extends EventEmitter {
     }
   }
 
-  /**
-   * Clear connection timeout timer
-   */
-  private _clearConnectionTimer(): void {
+  private _clearTimers(): void {
     if (this.connectionTimer) {
       clearTimeout(this.connectionTimer);
       this.connectionTimer = null;
     }
-  }
-
-  /**
-   * Clear protocol handshake timer
-   */
-  private _clearProtocolHandshakeTimer(): void {
     if (this.protocolHandshakeTimer) {
       clearTimeout(this.protocolHandshakeTimer);
       this.protocolHandshakeTimer = null;
     }
   }
 
-  /**
-   * Clean up resources
-   */
   public dispose(): void {
     this.disconnect();
     this.removeAllListeners();

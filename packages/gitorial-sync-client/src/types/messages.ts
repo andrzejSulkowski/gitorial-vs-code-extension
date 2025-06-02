@@ -10,10 +10,14 @@ export enum SyncMessageType {
   CLIENT_CONNECTED = 'client_connected',
   /** Notification that a client has disconnected */
   CLIENT_DISCONNECTED = 'client_disconnected',
-  /** Request to lock the extension (client takes control) */
-  LOCK_SCREEN = 'lock_screen',
-  /** Request to unlock the extension (return control) */
-  UNLOCK_SCREEN = 'unlock_screen',
+  /** Offer to give control to the other peer */
+  OFFER_CONTROL = 'offer_control',
+  /** Accept control offered by the other peer */
+  ACCEPT_CONTROL = 'accept_control',
+  /** Decline control offered by the other peer */
+  DECLINE_CONTROL = 'decline_control',
+  /** Return control back to the original peer */
+  RETURN_CONTROL = 'return_control',
   /** Error message */
   ERROR = 'error',
   /** Protocol version handshake from client to server */

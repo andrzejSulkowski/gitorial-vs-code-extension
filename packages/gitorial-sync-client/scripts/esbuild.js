@@ -18,6 +18,16 @@ function cleanDist() {
 function postBuild() {
   const packageJson = JSON.parse(fs.readFileSync(path.join(__dirname, '../package.json'), 'utf8'));
   
+  // Filter out workspace dependencies (they should be bundled, not external)
+  const filteredDependencies = {};
+  if (packageJson.dependencies) {
+    for (const [name, version] of Object.entries(packageJson.dependencies)) {
+      if (!version.startsWith('workspace:')) {
+        filteredDependencies[name] = version;
+      }
+    }
+  }
+  
   // Create a minimal package.json for the dist
   const distPackageJson = {
     name: packageJson.name,
@@ -35,7 +45,7 @@ function postBuild() {
     homepage: packageJson.homepage,
     engines: packageJson.engines,
     publishConfig: packageJson.publishConfig,
-    dependencies: packageJson.dependencies
+    dependencies: filteredDependencies
   };
   
   fs.writeFileSync(
@@ -62,7 +72,7 @@ async function main() {
       platform: 'node',
       target: 'node16',
       outfile: 'dist/index.js',
-      external: ['ws', '@gitorial/shared-types'],
+      external: ['ws'],
       logLevel: 'info',
       metafile: true
     },
@@ -77,7 +87,7 @@ async function main() {
       platform: 'node',
       target: 'es2020',
       outfile: 'dist/index.esm.js',
-      external: ['ws', '@gitorial/shared-types', 'http', 'url'],
+      external: ['ws', 'http', 'url'],
       logLevel: 'info',
       metafile: production
     }

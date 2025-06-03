@@ -49,9 +49,9 @@ function postBuild() {
 async function main() {
   cleanDist();
   
-  // Build configurations for different output formats
+  // Build configurations for the universal RelayClient
   const configs = [
-    // CommonJS build (main)
+    // CommonJS build - for VS Code extensions and older Node.js applications
     {
       entryPoints: ['src/index.ts'],
       bundle: true,
@@ -66,7 +66,7 @@ async function main() {
       logLevel: 'info',
       metafile: true
     },
-    // ESM build
+    // ESM build - for modern applications (both Node.js and bundlers)
     {
       entryPoints: ['src/index.ts'],
       bundle: true,
@@ -75,9 +75,9 @@ async function main() {
       sourcemap: !production,
       sourcesContent: false,
       platform: 'node',
-      target: 'node16',
+      target: 'es2020',
       outfile: 'dist/index.esm.js',
-      external: ['ws', '@gitorial/shared-types'],
+      external: ['ws', '@gitorial/shared-types', 'http', 'url'],
       logLevel: 'info',
       metafile: production
     }
@@ -101,14 +101,15 @@ async function main() {
 
   // Build all configurations
   for (const config of configs) {
-    console.log(`🔨 Building ${config.format} bundle...`);
+    const buildType = config.format === 'cjs' ? 'CommonJS' : 'ESM';
+    console.log(`🔨 Building Universal RelayClient (${buildType}) bundle...`);
     
     if (watch) {
       const ctx = await esbuild.context({
         ...config,
         plugins: [esbuildProblemMatcherPlugin]
       });
-      console.log(`👀 Watching ${config.format} bundle...`);
+      console.log(`👀 Watching Universal RelayClient (${buildType}) bundle...`);
       await ctx.watch();
     } else {
       const result = await esbuild.build(config);
@@ -116,14 +117,18 @@ async function main() {
       if (result.metafile) {
         // Show bundle analysis
         const analysis = await esbuild.analyzeMetafile(result.metafile);
-        console.log(`📊 Bundle analysis for ${config.outfile}:\n${analysis}`);
+        console.log(`📊 Universal RelayClient (${buildType}) Bundle Analysis:\n${analysis}`);
       }
     }
   }
 
   if (!watch) {
     postBuild();
-    console.log('🎉 Build completed successfully!');
+    console.log('🎉 Universal Website-Extension Sync Package Built Successfully!');
+    console.log('📦 Ready for:');
+    console.log('   • VS Code Extensions: dist/index.js (CommonJS)');
+    console.log('   • Modern Applications: dist/index.esm.js (ESM)');
+    console.log('   • Both work in Node.js and Browser environments!');
   }
 }
 

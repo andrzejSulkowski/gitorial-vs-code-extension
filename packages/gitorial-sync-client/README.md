@@ -4,234 +4,211 @@
 ![Status](https://img.shields.io/badge/status-preview-orange)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
-A TypeScript/JavaScript client library for peer-to-peer synchronization of tutorial state. This package enables applications to connect directly to each other and synchronize tutorial progress in real-time.
+A TypeScript/JavaScript client library for **syncing tutorial state between educational websites and VS Code extensions**. This package enables websites like DotCodeSchool to connect with VS Code extensions for real-time tutorial synchronization.
 
-## Features
+## 🎯 Problem Solved
 
-- 🔄 **Real-time Sync**: Automatically synchronize tutorial state between peers
-- 🔒 **Safe Control Model**: Peers can only offer control, not take it forcefully
-- 🌐 **Peer-to-Peer**: Direct connections between applications without central server
-- 🔁 **Auto-reconnection**: Automatic reconnection with configurable retry logic
-- 📘 **TypeScript Support**: Full TypeScript definitions included
-- 🎯 **Event-driven**: Clean event-based API for handling state changes
-- 🛡️ **Error Handling**: Comprehensive error handling with detailed error types
-- 🏗️ **Modular Architecture**: Simple, composable components
-- 📦 **Multiple Formats**: CommonJS and ESM builds, minified for production
+**The Challenge**: Educational websites (like `dotcodeschool.com`) cannot directly connect to VS Code extensions running on `localhost` due to browser security restrictions (CORS, mixed content policies).
 
-## Installation
+**The Solution**: A relay server acts as a bridge, enabling secure, real-time synchronization between:
+- 🌐 **Educational Websites** (DotCodeSchool, CodeAcademy, etc.)
+- 🔧 **VS Code Extensions** (tutorial guides, code navigation)
 
-```bash
-npm install @gitorial/sync-client
+## 🏗️ How It Works
+
+```
+Educational Website  ←→  Relay Server  ←→  VS Code Extension
+(BrowserRelayClient)     (WebSocket)      (RelayClient)
 ```
 
-## Quick Start
+1. **VS Code Extension** connects to relay server with session token
+2. **Website** connects to same relay using shared session token  
+3. **Real-time sync** of tutorial progress, code navigation, control handoff
 
-### Simple Peer-to-Peer Connection
+## 🚀 Quick Start
+
+### For VS Code Extension Developers
 
 ```typescript
-import { SimpleSyncPeer } from '@gitorial/sync-client';
+import { RelayClient } from '@gitorial/sync-client';
 
-// Create a peer that listens on port 3001
-const peer1 = new SimpleSyncPeer({ server: { port: 3001 } });
-await peer1.startListening();
+const extension = new RelayClient();
+await extension.connectToRelay('wss://relay.gitorial.dev');
 
-// Create another peer and connect to the first one
-const peer2 = new SimpleSyncPeer({ server: { port: 3002 } });
-await peer2.startListening();
-await peer2.connectToPeer('localhost', 3001);
+// Share session with website
+const sessionToken = extension.getSessionToken();
+console.log(`Share: https://dotcodeschool.com/tutorial?session=${sessionToken}`);
 
-// Listen for tutorial state updates
-peer1.on('tutorialStateUpdated', (state) => {
+// Listen for tutorial updates from website
+extension.on('tutorialStateUpdated', (state) => {
   console.log(`Tutorial: ${state.tutorialTitle}`);
   console.log(`Step: ${state.stepContent.index + 1}/${state.totalSteps}`);
+  // Update VS Code UI, navigate to files, etc.
 });
 
-// Peer2 sends tutorial state to peer1
-const tutorialState = {
-  tutorialId: 'my-tutorial',
-  tutorialTitle: 'My Tutorial',
-  totalSteps: 5,
+// Send tutorial progress to website
+extension.sendTutorialState({
+  tutorialId: 'react-basics',
+  tutorialTitle: 'React Fundamentals',
+  totalSteps: 10,
   isShowingSolution: false,
   stepContent: {
-    id: 'step-1',
-    title: 'Introduction',
+    id: 'step-5',
+    title: 'useState Hook',
     commitHash: 'abc123',
-    type: 'section',
-    index: 0
-  },
-  repoUrl: 'https://github.com/user/tutorial'
-};
-
-peer2.sendTutorialState(tutorialState);
-
-// Safe control model - peer2 offers control to peer1
-peer2.offerControl();
-// peer1 can accept or decline
-peer1.acceptControl(); // or peer1.declineControl()
+    type: 'action',
+    index: 4
+  }
+});
 ```
 
-### Using Individual Components
+### For Educational Website Developers
 
-```typescript
-import { SyncClient, SyncServer } from '@gitorial/sync-client';
+```html
+<script type="module">
+import { BrowserRelayClient } from 'https://unpkg.com/@gitorial/sync-client@latest/dist/browser.js';
 
-// Create a server
-const server = new SyncServer({ port: 3001 });
-await server.startListening();
+const sync = new BrowserRelayClient();
 
-// Create a client and connect
-const client = new SyncClient();
-await client.connect('localhost', 3001);
-
-// Send tutorial state
-client.sendTutorialState(tutorialState);
-
-// Request sync from peer
-client.requestSync();
-```
-
-## API Reference
-
-### SimpleSyncPeer
-
-The main peer-to-peer class that combines client and server functionality.
-
-#### Constructor
-
-```typescript
-new SimpleSyncPeer(config?: SimpleSyncPeerConfig)
-```
-
-#### Configuration Options
-
-```typescript
-interface SimpleSyncPeerConfig {
-  server?: {
-    port?: number;  // Port to listen on (default: 0 for random)
-  };
-  client?: {
-    connectionTimeout?: number;      // Connection timeout in ms (default: 5000)
-    autoReconnect?: boolean;         // Enable auto-reconnection (default: false)
-    maxReconnectAttempts?: number;   // Max reconnection attempts (default: 3)
-    reconnectDelay?: number;         // Delay between attempts in ms (default: 1000)
-  };
+// Connect using session token from URL
+const sessionToken = new URLSearchParams(location.search).get('session');
+if (sessionToken) {
+  await sync.connectToRelay('wss://relay.gitorial.dev', sessionToken);
+  
+  // Listen for VS Code extension updates
+  sync.on('tutorialStateUpdated', (state) => {
+    // Update website UI
+    document.getElementById('tutorial-title').textContent = state.tutorialTitle;
+    document.getElementById('step-title').textContent = state.stepContent.title;
+    navigateToStep(state.stepContent.index);
+  });
+  
+  // Send website progress to VS Code
+  sync.sendTutorialState(getCurrentTutorialState());
 }
+</script>
 ```
 
-#### Methods
+## 📚 Use Cases
 
-##### Connection Management
+### 1. **Tutorial Synchronization**
+- Student follows tutorial on website
+- VS Code extension automatically navigates to relevant files
+- Code changes in VS Code reflect on website
 
-```typescript
-// Start listening for incoming connections
-await peer.startListening(): Promise<number>  // Returns actual port
+### 2. **Control Handoff**
+- Website offers control to VS Code extension
+- Extension can drive tutorial navigation
+- Seamless experience across platforms
 
-// Connect to another peer
-await peer.connectToPeer(host: string, port: number): Promise<void>
+### 3. **Progress Tracking**
+- Real-time sync of tutorial completion
+- Student can switch between website and VS Code
+- No lost progress
 
-// Disconnect from all peers and stop listening
-await peer.disconnect(): Promise<void>
+## 🔧 API Reference
 
-// Check connection status
-peer.isConnected(): boolean
-peer.getConnectionStatus(): ConnectionStatus
-```
-
-##### Tutorial State
-
-```typescript
-// Send tutorial state to connected peers
-peer.sendTutorialState(state: TutorialSyncState): void
-
-// Request tutorial state from connected peer
-peer.requestSync(): void
-
-// Get current tutorial state
-peer.getCurrentTutorialState(): TutorialSyncState | null
-```
-
-##### Safe Control Model
+### RelayClient (VS Code Extensions)
 
 ```typescript
-// Offer control to connected peer (safer model - can only give away control)
-peer.offerControl(): void
+import { RelayClient } from '@gitorial/sync-client';
 
-// Accept control offered by a peer
-peer.acceptControl(): void
+const client = new RelayClient({
+  connectionTimeout: 5000,      // Connection timeout in ms
+  autoReconnect: true,          // Auto-reconnect on disconnect  
+  maxReconnectAttempts: 5,      // Max reconnection attempts
+  reconnectDelay: 2000,         // Delay between attempts
+  sessionToken: 'custom-token'  // Optional custom session token
+});
 
-// Decline control offered by a peer
-peer.declineControl(): void
+// Connection
+await client.connectToRelay('wss://relay.gitorial.dev');
+client.disconnect();
 
-// Return control back to the peer
-peer.returnControl(): void
-```
+// Session management
+const token = client.getSessionToken();
+const qrUrl = client.getQRCodeUrl();
 
-##### Information
+// Tutorial state sync
+client.sendTutorialState(tutorialState);
+client.requestSync();
 
-```typescript
-// Get peer ID
-peer.getPeerId(): string
-
-// Get listening port
-peer.getListeningPort(): number
-
-// Get number of incoming connections
-peer.getIncomingConnectionCount(): number
-```
-
-### SyncClient
-
-Simple client for connecting to a peer.
-
-```typescript
-const client = new SyncClient(config?: SyncClientConfig);
-await client.connect(host: string, port: number);
-client.sendTutorialState(state);
+// Control management
 client.offerControl();
 client.acceptControl();
 client.declineControl();
 client.returnControl();
+
+// Status
+const isConnected = client.isConnected();
+const status = client.getConnectionStatus();
 ```
 
-### SyncServer
-
-Simple server for accepting incoming connections.
+### BrowserRelayClient (Educational Websites)
 
 ```typescript
-const server = new SyncServer(config?: SyncServerConfig);
-const port = await server.startListening();
-server.broadcastTutorialState(state);
-await server.stop();
+import { BrowserRelayClient } from '@gitorial/sync-client/browser';
+
+const client = new BrowserRelayClient({
+  connectionTimeout: 5000,
+  autoReconnect: true,
+  maxReconnectAttempts: 5,
+  reconnectDelay: 2000
+});
+
+// Connection with shared session token
+await client.connectToRelay('wss://relay.gitorial.dev', sessionToken);
+
+// Tutorial state sync (same API as RelayClient)
+client.sendTutorialState(state);
+client.requestSync();
+
+// Control management (same API)
+client.offerControl();
+client.acceptControl();
+
+// Utility methods
+const shareUrl = client.getShareableUrl();
+const qrUrl = client.getQRCodeUrl();
 ```
 
-### Events
+### Event Handling
 
-All classes extend `EventEmitter` and emit these events:
+Both clients emit the same events:
 
 ```typescript
-// Connection status changed
-peer.on('connectionStatusChanged', (status: ConnectionStatus) => {});
-
-// Tutorial state updated
-peer.on('tutorialStateUpdated', (state: TutorialSyncState) => {});
-
-// Control events (safer model)
-peer.on('peerControlOffered', () => {});
-peer.on('peerControlAccepted', () => {});
-peer.on('peerControlDeclined', () => {});
-peer.on('peerControlReturned', () => {});
+// Tutorial state updates
+client.on('tutorialStateUpdated', (state) => {
+  console.log('New tutorial state:', state);
+});
 
 // Connection events
-peer.on('clientConnected', (clientId: string) => {});
-peer.on('clientDisconnected', (clientId: string) => {});
+client.on('connectionStatusChanged', (status) => {
+  console.log('Status:', status); // 'connected', 'disconnected', etc.
+});
+
+// Control events
+client.on('peerControlOffered', () => {
+  // Other peer wants to give you control
+  client.acceptControl(); // or client.declineControl()
+});
+
+client.on('peerControlAccepted', () => {
+  // Your control offer was accepted
+});
+
+// Peer connections
+client.on('clientConnected', (peerId) => {
+  console.log('Peer connected:', peerId);
+});
 
 // Error handling
-peer.on('error', (error: SyncClientError) => {});
+client.on('error', (error) => {
+  console.error('Sync error:', error.message);
+});
 ```
 
-### Types
-
-#### TutorialSyncState
+### Tutorial State Type
 
 ```typescript
 interface TutorialSyncState {
@@ -250,180 +227,256 @@ interface TutorialSyncState {
 }
 ```
 
-#### ConnectionStatus
+## 🌐 Relay Server
 
-```typescript
-enum ConnectionStatus {
-  DISCONNECTED = 'disconnected',
-  CONNECTING = 'connecting',
-  CONNECTED = 'connected',
-  GIVEN_AWAY_CONTROL = 'given_away_control',
-  TAKEN_BACK_CONTROL = 'taken_back_control'
-}
-```
+### Quick Setup
 
-## Architecture
+```javascript
+const WebSocket = require('ws');
 
-The library follows a simple, modular architecture:
-
-- **SyncClient**: Handles outgoing connections to peers
-- **SyncServer**: Handles incoming connections from peers  
-- **SimpleSyncPeer**: Combines client and server for easy peer-to-peer usage
-
-### Safe Control Model
-
-The library implements a safer control model where:
-- Peers can only **offer** control to others
-- Receiving peers can **accept** or **decline** the offer
-- Control can be **returned** by the peer that has it
-- No peer can forcefully take control from another
-
-This prevents security vulnerabilities and ensures consensual control handoffs.
-
-## Examples
-
-### Basic Tutorial Sync
-
-```typescript
-import { SimpleSyncPeer } from '@gitorial/sync-client';
-
-const peer1 = new SimpleSyncPeer();
-const peer2 = new SimpleSyncPeer();
-
-const port1 = await peer1.startListening();
-await peer2.connectToPeer('localhost', port1);
-
-// Sync tutorial state
-peer1.on('tutorialStateUpdated', (state) => {
-  console.log('Received tutorial update:', state.tutorialTitle);
-});
-
-peer2.sendTutorialState({
-  tutorialId: 'intro-tutorial',
-  tutorialTitle: 'Introduction to React',
-  totalSteps: 10,
-  isShowingSolution: false,
-  stepContent: {
-    id: 'step-1',
-    title: 'Setting up the project',
-    commitHash: 'abc123',
-    type: 'section',
-    index: 0
-  },
-  repoUrl: 'https://github.com/user/react-tutorial'
-});
-```
-
-### Multiple Peer Network
-
-```typescript
-// Create a hub peer
-const hub = new SimpleSyncPeer({ server: { port: 3001 } });
-await hub.startListening();
-
-// Create multiple client peers
-const peers = [];
-for (let i = 0; i < 3; i++) {
-  const peer = new SimpleSyncPeer();
-  await peer.connectToPeer('localhost', 3001);
-  peers.push(peer);
-}
-
-// Hub broadcasts to all connected peers
-hub.sendTutorialState(tutorialState);
-```
-
-## Error Handling
-
-```typescript
-peer.on('error', (error) => {
-  switch (error.type) {
-    case 'CONNECTION_FAILED':
-      console.error('Failed to connect:', error.message);
-      break;
-    case 'PROTOCOL_VERSION':
-      console.error('Protocol mismatch:', error.message);
-      break;
-    case 'TIMEOUT':
-      console.error('Connection timeout:', error.message);
-      break;
-    default:
-      console.error('Unknown error:', error.message);
+class EducationalRelayServer {
+  constructor(port = 8080) {
+    this.wss = new WebSocket.Server({ port });
+    this.sessions = new Map();
+    
+    this.wss.on('connection', this.handleConnection.bind(this));
+    console.log(`🚀 Educational Relay Server running on port ${port}`);
   }
-});
+
+  handleConnection(ws, req) {
+    const url = new URL(req.url, `http://${req.headers.host}`);
+    const sessionToken = url.searchParams.get('session');
+    
+    if (!sessionToken) {
+      ws.close(1008, 'Missing session token');
+      return;
+    }
+
+    // Track sessions and forward messages between clients
+    // Full implementation in examples/relay-usage.js
+  }
+}
+
+new EducationalRelayServer(8080);
 ```
 
-## Development
+### Deployment Options
 
-### Building the Package
+- **Self-hosted**: Deploy to Heroku, Railway, DigitalOcean
+- **Community**: Use public relay servers (when available)  
+- **Development**: Run locally for testing
 
-The package uses [esbuild](https://esbuild.github.io/) for fast, optimized bundling:
+## 📦 Installation & Integration
+
+### For VS Code Extensions
 
 ```bash
-# Development build (with source maps)
-npm run build
-
-# Production build (minified, no source maps)
-npm run build:production
-
-# Watch mode for development
-npm run build:watch
-
-# Clean build artifacts
-npm run clean
+npm install @gitorial/sync-client
 ```
 
-### Build Outputs
+```typescript
+// CommonJS
+const { RelayClient } = require('@gitorial/sync-client');
 
-The build produces multiple formats for maximum compatibility:
+// ES Modules
+import { RelayClient } from '@gitorial/sync-client';
+```
 
-- **`dist/index.js`** - CommonJS build (Node.js)
-- **`dist/index.esm.js`** - ES Module build (modern Node.js/bundlers)
-- **`dist/*.d.ts`** - TypeScript declaration files
+### For Educational Websites
 
-### Size Analysis
+#### Option 1: CDN (Recommended)
 
-| Build Type | CommonJS | ESM |
-|------------|----------|-----|
-| Development | 28.2kb | 26.3kb |
-| Production | 14.3kb | 13.5kb |
+```html
+<script type="module">
+import { BrowserRelayClient } from 'https://unpkg.com/@gitorial/sync-client@latest/dist/browser.js';
+</script>
+```
 
-The production build achieves ~50% size reduction through minification.
+#### Option 2: npm + Build Tool
 
-### Scripts
+```bash
+npm install @gitorial/sync-client
+```
+
+```typescript
+import { BrowserRelayClient } from '@gitorial/sync-client/browser';
+```
+
+## 🎯 Integration Examples
+
+### DotCodeSchool Integration
+
+```typescript
+class DotCodeSchoolSync {
+  constructor() {
+    this.sync = new BrowserRelayClient();
+    this.setupSync();
+  }
+
+  async setupSync() {
+    // Auto-connect if session token in URL
+    const params = new URLSearchParams(location.search);
+    const sessionToken = params.get('session');
+    
+    if (sessionToken) {
+      await this.sync.connectToRelay('wss://relay.gitorial.dev', sessionToken);
+      this.showSyncStatus('connected');
+    }
+
+    // Listen for VS Code updates
+    this.sync.on('tutorialStateUpdated', (state) => {
+      this.updateTutorialProgress(state);
+    });
+
+    // Handle control offers
+    this.sync.on('peerControlOffered', () => {
+      this.showControlDialog();
+    });
+  }
+
+  // Send tutorial progress to VS Code
+  sendProgress(stepIndex) {
+    this.sync.sendTutorialState({
+      tutorialId: this.currentTutorial.id,
+      tutorialTitle: this.currentTutorial.title,
+      totalSteps: this.currentTutorial.steps.length,
+      isShowingSolution: this.isShowingSolution,
+      stepContent: {
+        id: this.currentTutorial.steps[stepIndex].id,
+        title: this.currentTutorial.steps[stepIndex].title,
+        commitHash: this.currentTutorial.steps[stepIndex].commit,
+        type: this.currentTutorial.steps[stepIndex].type,
+        index: stepIndex
+      },
+      repoUrl: this.currentTutorial.repoUrl
+    });
+  }
+
+  // Update UI from VS Code
+  updateTutorialProgress(state) {
+    this.navigateToStep(state.stepContent.index);
+    this.updateProgressBar(state.stepContent.index, state.totalSteps);
+  }
+}
+
+// Initialize
+window.dotCodeSchoolSync = new DotCodeSchoolSync();
+```
+
+### VS Code Extension Integration
+
+```typescript
+import * as vscode from 'vscode';
+import { RelayClient } from '@gitorial/sync-client';
+
+export class TutorialSyncExtension {
+  private sync: RelayClient;
+  
+  constructor(private context: vscode.ExtensionContext) {
+    this.sync = new RelayClient({ autoReconnect: true });
+    this.setupSync();
+    this.registerCommands();
+  }
+
+  private async setupSync() {
+    await this.sync.connectToRelay('wss://relay.gitorial.dev');
+    
+    // Show session token to user
+    const token = this.sync.getSessionToken();
+    vscode.window.showInformationMessage(
+      `Share with website: ${token}`,
+      'Copy to Clipboard'
+    ).then(selection => {
+      if (selection) {
+        vscode.env.clipboard.writeText(token);
+      }
+    });
+
+    // Listen for website updates
+    this.sync.on('tutorialStateUpdated', (state) => {
+      this.navigateToFile(state.stepContent.commitHash);
+      this.updateStatusBar(state);
+    });
+  }
+
+  private registerCommands() {
+    // Send current state to website
+    const sendState = vscode.commands.registerCommand('tutorial.sendState', () => {
+      this.sync.sendTutorialState(this.getCurrentState());
+    });
+
+    this.context.subscriptions.push(sendState);
+  }
+
+  private getCurrentState() {
+    // Get current tutorial state from VS Code context
+    return {
+      tutorialId: this.currentTutorial?.id,
+      tutorialTitle: this.currentTutorial?.title,
+      // ... rest of state
+    };
+  }
+}
+```
+
+## 🛡️ Security & Privacy
+
+- **Session Tokens**: Random, temporary, user-controlled
+- **No Data Storage**: Relay only forwards messages, doesn't persist data
+- **Self-Hostable**: Run your own relay server for full control
+- **Open Protocol**: Public specification for interoperability
+- **Opt-in**: Users explicitly connect via session tokens
+
+## 🔨 Development
+
+### Building
 
 ```bash
 npm run build              # Development build
 npm run build:production   # Production build (minified)
 npm run build:watch        # Watch mode
-npm run build:legacy       # TypeScript-only build (fallback)
-npm run test               # Run tests
-npm run test:watch         # Watch tests
-npm run lint               # Lint code
-npm run clean              # Clean dist directory
+npm test                   # Run tests
 ```
 
-### Package Exports
+### Package Structure
 
-The package supports modern Node.js package exports:
+- **`dist/index.js`** (13.2kb) - CommonJS for VS Code extensions
+- **`dist/index.esm.js`** (12.8kb) - ES Modules for Node.js
+- **`dist/browser.js`** (7.5kb) - Browser build for websites
 
-```json
-{
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "require": "./dist/index.js",
-      "import": "./dist/index.esm.js"
-    }
-  }
-}
+### Testing
+
+```bash
+npm test              # Run all tests
+npm run test:watch    # Watch mode
 ```
 
-This enables:
-- **CommonJS**: `const { SimpleSyncPeer } = require('@gitorial/sync-client')`
-- **ES Modules**: `import { SimpleSyncPeer } from '@gitorial/sync-client'`
-- **TypeScript**: Full type support in both formats
+All tests focused on website-extension sync scenarios ✅
 
-## License
+## 🤝 For Educational Platform Developers
 
-MIT 
+This package is specifically designed to make it easy for educational platforms to integrate with VS Code:
+
+### Quick Integration Checklist
+
+- [ ] Add session token detection from URL parameters
+- [ ] Connect `BrowserRelayClient` when token is present
+- [ ] Listen for `tutorialStateUpdated` events
+- [ ] Send tutorial progress via `sendTutorialState()`
+- [ ] Handle control offers from VS Code extensions
+- [ ] Show connection status to users
+
+### Benefits for Educational Platforms
+
+- **Enhanced User Experience**: Seamless code navigation
+- **Increased Engagement**: Students can use their preferred editor
+- **No Infrastructure**: Just include the browser client
+- **Open Standard**: Works with any relay server
+
+## 📋 License
+
+MIT - Free for educational and commercial use
+
+---
+
+**Perfect for**: DotCodeSchool, CodeAcademy, FreeCodeCamp, Udemy, Coursera, and any educational platform wanting to integrate with VS Code extensions. 

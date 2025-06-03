@@ -1,7 +1,7 @@
 {
   "name": "@gitorial/sync-client",
   "version": "0.1.0",
-  "description": "Client library for peer-to-peer synchronization of tutorial state",
+  "description": "Universal client library for syncing tutorial state between websites and VS Code extensions via relay server",
   "main": "dist/index.js",
   "module": "dist/index.esm.js",
   "types": "dist/index.d.ts",
@@ -33,14 +33,15 @@
   },
   "keywords": [
     "gitorial",
-    "peer-to-peer",
-    "p2p",
     "tutorial",
     "sync",
     "websocket",
+    "website",
+    "vscode",
+    "extension",
     "education",
     "learning",
-    "real-time"
+    "relay"
   ],
   "author": "Andrzej Sulkowski",
   "license": "MIT",
@@ -55,25 +56,28 @@
   "homepage": "https://github.com/AndrzejSulkowski/gitorial-vs-plugin#readme",
   "dependencies": {
     "@gitorial/shared-types": "workspace:*",
-    "ws": "^8.18.0"
+    "uuid": "^11.1.0"
   },
   "devDependencies": {
-    "@types/ws": "^8.5.12",
+    "@types/chai": "^4.3.0",
+    "@types/express": "^5.0.2",
+    "@types/mocha": "^10.0.0",
     "@types/node": "^20.0.0",
+    "@types/node-fetch": "^2.6.12",
+    "@types/sinon": "^17.0.0",
+    "@types/ws": "^8.5.12",
     "@typescript-eslint/eslint-plugin": "^6.0.0",
     "@typescript-eslint/parser": "^6.0.0",
-    "eslint": "^8.0.0",
-    "mocha": "^10.0.0",
-    "@types/mocha": "^10.0.0",
     "chai": "^4.3.0",
-    "@types/chai": "^4.3.0",
-    "sinon": "^17.0.0",
-    "@types/sinon": "^17.0.0",
-    "ts-node": "^10.0.0",
+    "esbuild": "^0.25.5",
+    "eslint": "^8.0.0",
+    "express": "^5.1.0",
+    "mocha": "^10.0.0",
+    "node-fetch": "^3.3.2",
     "nyc": "^15.1.0",
-    "ws": "^8.18.0",
-    "typescript": "^5.0.0",
-    "esbuild": "^0.25.5"
+    "sinon": "^20.0.0",
+    "ts-node": "^10.0.0",
+    "typescript": "^5.0.0"
   },
   "engines": {
     "node": ">=16.0.0"

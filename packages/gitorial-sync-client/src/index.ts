@@ -1,20 +1,23 @@
-// Simple architecture exports
-export { SyncClient, SyncClientConfig as SimpleSyncClientConfig } from './SyncClient';
-export { SyncServer, SyncServerConfig } from './SyncServer';
-export { SimpleSyncPeer, SimpleSyncPeerConfig } from './SimpleSyncPeer';
+// Universal relay client that works in both Node.js and browser environments
+export { RelayClient, type RelayClientConfig } from './client/RelayClient';
 
-// Type exports
-export {
-  TutorialSyncState,
-  SyncMessage,
-  SyncMessageType,
-  ConnectionStatus,
-  SyncClientEvent,
-  SyncErrorType,
-  SyncClientError
-} from './types';
+// Relay session manager for Node.js environments
+export { 
+  RelaySessionManager, 
+  type RelaySessionManagerConfig, 
+  type CreateSessionOptions,
+  type SessionData
+} from './server/RelaySessionManager';
 
-// Convenience re-exports for common usage patterns
+// Socket factory and types
+export { createWebSocketClient, type ISyncSocket } from './client/socket';
+
+// Types and constants
+export * from './client/types';
+export * from './client/types/messages';
+export * from './constants/protocol-version';
+
+// Convenience re-exports
 export type {
   TutorialSyncState as TutorialState
-} from './types'; 
+} from './client/types'; 

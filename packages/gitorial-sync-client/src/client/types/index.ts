@@ -3,4 +3,5 @@ export * from "./error";
 export * from "./event";
 export * from "./messages";
 export * from "./state";
+export * from './roles';
 

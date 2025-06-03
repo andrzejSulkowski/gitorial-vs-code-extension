@@ -23,7 +23,15 @@ export enum SyncMessageType {
   /** Protocol version handshake from client to server */
   PROTOCOL_HANDSHAKE = 'protocol_handshake',
   /** Protocol version acknowledgment from server to client */
-  PROTOCOL_ACK = 'protocol_ack'
+  PROTOCOL_ACK = 'protocol_ack',
+  /** Request to take control of the other peer */
+  REQUEST_CONTROL = 'request_control',
+  /** Release control back to the original peer */
+  RELEASE_CONTROL = 'release_control',
+  /** Confirm transfer of control */
+  CONFIRM_TRANSFER = 'confirm_transfer',
+  /** Role changed notification */
+  ROLE_CHANGED = 'role_changed'
 }
 
 /**
@@ -71,3 +79,13 @@ export interface SyncMessageProtocolAck {
  * Unified message type for all sync messages
  */
 export type SyncMessage = SyncMessageBase | SyncMessageClientConnected | SyncMessageProtocolHandshake | SyncMessageProtocolAck;
+
+export interface StateTransferPackage {
+  tutorialState: any;
+  metadata: {
+    transferTimestamp: number;
+    fromClientId: string;
+    toClientId: string;
+    stateChecksum: string;
+  };
+}

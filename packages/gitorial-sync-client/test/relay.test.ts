@@ -95,7 +95,7 @@ describe('Gitorial Website-Extension Sync', () => {
 
     it('should handle control events', () => {
       let controlOffered = false;
-      client.on(SyncClientEvent.PEER_CONTROL_OFFERED, () => {
+      client.on('controlOffered', () => {
         controlOffered = true;
       });
 
@@ -103,7 +103,7 @@ describe('Gitorial Website-Extension Sync', () => {
       (client as any).handleMessage({
         type: SyncMessageType.OFFER_CONTROL,
         clientId: 'test-client',
-        data: {},
+        data: { tutorialState: null, metadata: { transferTimestamp: Date.now(), fromClientId: 'test-client', toClientId: 'other', stateChecksum: 'test' }},
         timestamp: Date.now(),
         protocol_version: 1
       });
@@ -111,7 +111,7 @@ describe('Gitorial Website-Extension Sync', () => {
       expect(controlOffered).to.be.true;
     });
 
-    it('should generate unique client IDs for messages', () => {
+    it('should generate unique client IDs for messages', async () => {
       // Mock socket connection
       const mockSocket = {
         send: sinon.stub(),
@@ -119,6 +119,9 @@ describe('Gitorial Website-Extension Sync', () => {
       };
       (client as any).socket = mockSocket;
       (client as any).connectionStatus = ConnectionStatus.CONNECTED;
+      
+      // Make client active so it can send tutorial state
+      (client as any).currentRole = 'active';
 
       const tutorialState: TutorialSyncState = {
         tutorialId: asTutorialId('test-tutorial'),
@@ -139,7 +142,7 @@ describe('Gitorial Website-Extension Sync', () => {
 
       expect(mockSocket.send.calledOnce).to.be.true;
       const sentMessage = mockSocket.send.firstCall.args[0];
-      expect(sentMessage.clientId).to.match(/^client_[a-z0-9-]+$/);
+      expect(sentMessage.clientId).to.match(/^client_[a-z0-9]+$/);
     });
   });
 
@@ -230,8 +233,11 @@ describe('Gitorial Website-Extension Sync', () => {
       (vscodeExtensionClient as any).socket = { send: sinon.stub(), close: sinon.stub() };
       (dotCodeSchoolClient as any).connectionStatus = ConnectionStatus.CONNECTED;
       (vscodeExtensionClient as any).connectionStatus = ConnectionStatus.CONNECTED;
+      
+      // Make VS Code extension active (it drives the tutorial)
+      (vscodeExtensionClient as any).currentRole = 'active';
 
-      const initialState: TutorialSyncState = {
+      const initialState = {
         tutorialId: asTutorialId('javascript-basics'),
         tutorialTitle: 'JavaScript Basics',
         totalSteps: 10,
@@ -240,22 +246,27 @@ describe('Gitorial Website-Extension Sync', () => {
           id: 'step-5',
           title: 'Functions',
           commitHash: 'func123',
-          type: 'template',
+          type: 'template' as const,
           index: 4
         },
         repoUrl: 'https://github.com/dotcodeschool/javascript-basics'
       };
 
-      // DotCodeSchool.com sends state update
-      dotCodeSchoolClient.sendTutorialState(initialState);
+      // VS Code Extension (active) sends state update
+      vscodeExtensionClient.sendTutorialState(initialState);
       
-      // VS Code Extension can also send state updates
-      const updatedState = { ...initialState, isShowingSolution: true };
-      vscodeExtensionClient.sendTutorialState(updatedState);
-
-      // Verify both clients can send messages
-      expect((dotCodeSchoolClient as any).socket.send.calledOnce).to.be.true;
+      // Verify VS Code can send messages (it's active)
       expect((vscodeExtensionClient as any).socket.send.calledOnce).to.be.true;
+
+      // DotCodeSchool.com can become active too through role transfer
+      (dotCodeSchoolClient as any).currentRole = 'active';
+      (vscodeExtensionClient as any).currentRole = 'passive';
+      
+      const updatedState = { ...initialState, isShowingSolution: true };
+      dotCodeSchoolClient.sendTutorialState(updatedState);
+      
+      // Verify both clients can send messages when active
+      expect((dotCodeSchoolClient as any).socket.send.calledOnce).to.be.true;
 
       // Cleanup
       dotCodeSchoolClient.disconnect();

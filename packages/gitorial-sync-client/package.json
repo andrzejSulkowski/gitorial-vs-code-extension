@@ -1,7 +1,7 @@
 {
   "name": "@gitorial/sync-client",
-  "version": "0.1.0",
-  "description": "Universal client library for syncing tutorial state between websites and VS Code extensions via relay server",
+  "version": "0.2.0",
+  "description": "Universal client library for syncing tutorial state between websites and VS Code extensions via relay server with dynamic role management",
   "main": "dist/index.js",
   "module": "dist/index.esm.js",
   "types": "dist/index.d.ts",
@@ -41,7 +41,10 @@
     "extension",
     "education",
     "learning",
-    "relay"
+    "relay",
+    "role-management",
+    "dynamic-roles",
+    "real-time"
   ],
   "author": "Andrzej Sulkowski",
   "license": "MIT",

@@ -15,7 +15,11 @@ export enum SyncErrorType {
   /** Maximum reconnection attempts exceeded */
   MAX_RECONNECT_ATTEMPTS_EXCEEDED = 'max_reconnect_attempts_exceeded',
   /** Mismatching protocol version */
-  PROTOCOL_VERSION = "protocol_version"
+  PROTOCOL_VERSION = "protocol_version",
+  /** Invalid state transition attempted */
+  INVALID_STATE_TRANSITION = 'invalid_state_transition',
+  /** Invalid operation for current state */
+  INVALID_OPERATION = 'invalid_operation'
 }
 
 /**

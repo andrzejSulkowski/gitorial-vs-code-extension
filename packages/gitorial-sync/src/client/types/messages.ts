@@ -31,7 +31,11 @@ export enum SyncMessageType {
   /** Confirm transfer of control */
   CONFIRM_TRANSFER = 'confirm_transfer',
   /** Role changed notification */
-  ROLE_CHANGED = 'role_changed'
+  ROLE_CHANGED = 'role_changed',
+  /** Request sync direction coordination (want to be ACTIVE/PASSIVE) */
+  COORDINATE_SYNC_DIRECTION = 'coordinate_sync_direction',
+  /** Server assigns sync direction to client */
+  ASSIGN_SYNC_DIRECTION = 'assign_sync_direction'
 }
 
 /**
@@ -88,4 +92,14 @@ export interface StateTransferPackage {
     toClientId: string;
     stateChecksum: string;
   };
+}
+
+export interface SyncDirectionRequest {
+  preferredDirection: 'ACTIVE' | 'PASSIVE';
+  reason: string;
+}
+
+export interface SyncDirectionAssignment {
+  assignedDirection: 'ACTIVE' | 'PASSIVE';
+  reason: string;
 }

@@ -34,7 +34,7 @@
     "lint:fix": "eslint src --fix",
     "// Testing": "=== Testing Commands ===",
     "test": "pnpm run build && pnpm run lint && vscode-test",
-    "test:sync-client": "cd packages/gitorial-sync-client && pnpm run test",
+    "test:sync": "cd packages/gitorial-sync && pnpm run test",
     "test:unit": "mocha --require ts-node/register \"src/**/*.test.ts\" --exclude \"src/test/**/*.test.ts\"",
     "// Publishing": "=== VS Code Extension ===",
     "vscode:prepublish": "pnpm run build:extension:production",

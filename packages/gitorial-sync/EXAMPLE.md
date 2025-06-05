@@ -8,7 +8,7 @@ This example demonstrates the correct flow between DotCodeSchool and the VS Code
 
 ```typescript
 // DotCodeSchool website code
-const dotCodeSchoolClient = new RefactoredRelayClient({
+const dotCodeSchoolClient = new RelayClient({
   baseUrl: 'http://localhost:3000',
   wsUrl: 'ws://localhost:3000', 
   sessionEndpoint: '/api/sessions'
@@ -38,7 +38,7 @@ dotCodeSchoolClient.on('tutorialStateUpdated', (state) => {
 
 ```typescript
 // VS Code Extension code
-const extensionClient = new RefactoredRelayClient({
+const extensionClient = new RelayClient({
   baseUrl: 'http://localhost:3000',
   wsUrl: 'ws://localhost:3000',
   sessionEndpoint: '/api/sessions'

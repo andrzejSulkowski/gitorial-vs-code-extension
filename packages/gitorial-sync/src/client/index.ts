@@ -1,5 +1,5 @@
 // Refactored RelayClient (recommended)
-export { RelayClient } from './RefactoredRelayClient';
+export { RelayClient } from './RelayClient';
 
 // Core components (can be used independently)
 export { ConnectionManager } from './connection/ConnectionManager';

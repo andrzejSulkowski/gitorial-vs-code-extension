@@ -20,9 +20,10 @@
   "scripts": {
     "// Development": "=== Development Commands ===",
     "dev": "pnpm run build:shared && pnpm run build:watch",
-    "build": "pnpm run build:shared && pnpm run typecheck && pnpm run build:webview && pnpm run build:extension",
+    "build": "pnpm run build:shared && pnpm run build:sync && pnpm run typecheck && pnpm run build:webview && pnpm run build:extension",
     "build:watch": "concurrently \"pnpm run build:extension:watch\" \"pnpm run build:webview:watch\"",
     "build:shared": "cd packages/shared-types && pnpm run build && cd ../webview-contracts && pnpm run build && cd ../..",
+    "build:sync": "cd packages/gitorial-sync && pnpm run build && cd ../..",
     "build:webview": "cd webview-ui && pnpm run build",
     "build:webview:watch": "cd webview-ui && pnpm run dev",
     "build:extension": "node ./scripts/esbuild.js",
@@ -78,16 +79,16 @@
         "title": "Gitorial: Open Tutorial"
       },
       {
-        "command": "gitorial.startSyncTunnel",
-        "title": "Gitorial: Start Sync Tunnel"
+        "command": "gitorial.connectToRelay",
+        "title": "Gitorial: Connect to Relay Server"
       },
       {
-        "command": "gitorial.stopSyncTunnel",
-        "title": "Gitorial: Stop Sync Tunnel"
+        "command": "gitorial.disconnectFromRelay",
+        "title": "Gitorial: Disconnect from Relay Server"
       },
       {
-        "command": "gitorial.toggleSyncTunnel",
-        "title": "Gitorial: Toggle Sync Tunnel"
+        "command": "gitorial.toggleSyncConnection",
+        "title": "Gitorial: Toggle Sync Connection"
       },
       {
         "command": "gitorial.showSyncStatus",
@@ -108,6 +109,7 @@
   "dependencies": {
     "@gitorial/shared-types": "workspace:*",
     "@gitorial/webview-contracts": "workspace:*",
+    "@gitorial/sync": "workspace:*",
     "markdown-it": "^14.1.0",
     "simple-git": "^3.27.0",
     "ws": "^8.18.0"
@@ -120,7 +122,7 @@
     "@types/markdown-it": "^14.1.2",
     "@types/mdurl": "^2.0.0",
     "@types/mocha": "^10.0.10",
-    "@types/node": "20.x",
+    "@types/node": "~20.17.51",
     "@types/sinon": "^17.0.4",
     "@types/sinonjs__fake-timers": "^8.1.5",
     "@types/vscode": "^1.87.0",

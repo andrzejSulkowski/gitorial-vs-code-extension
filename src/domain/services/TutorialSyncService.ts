@@ -1,11 +1,11 @@
-import { ISyncTunnel, TutorialSyncState } from '../ports/ISyncTunnel';
+import { ISyncClient, TutorialSyncState, SyncConnectionInfo } from '../ports/ISyncClient';
 import { Tutorial } from '../models/Tutorial';
 import { EnrichedStep } from '../models/EnrichedStep';
 import { Step } from '../models/Step';
 
 /**
- * Domain service for managing tutorial state synchronization with external web applications.
- * This service orchestrates the sync tunnel and manages the tutorial state broadcasting.
+ * Domain service for managing tutorial state synchronization with external relay servers.
+ * This service orchestrates the sync client and manages the tutorial state sharing.
  */
 export class TutorialSyncService {
   private readonly connectedClients = new Set<string>();
@@ -14,9 +14,9 @@ export class TutorialSyncService {
   private tutorialServiceRef: (() => Readonly<Tutorial> | null) | null = null;
 
   constructor(
-    private readonly syncTunnel: ISyncTunnel
+    private readonly syncClient: ISyncClient
   ) {
-    this._setupTunnelEventHandlers();
+    this._setupClientEventHandlers();
   }
 
   /**
@@ -28,44 +28,45 @@ export class TutorialSyncService {
   }
 
   /**
-   * Start the sync tunnel on the specified port
-   * @param port The port to listen on (default: 3001)
+   * Connect to a relay server with the given URL and session ID
+   * @param relayUrl The relay server WebSocket URL
+   * @param sessionId The session ID to join
    */
-  public async startTunnel(port: number = 3001): Promise<void> {
-    if (this.syncTunnel.isActive()) {
-      throw new Error('Sync tunnel is already active');
+  public async connectToRelay(relayUrl: string, sessionId: string): Promise<void> {
+    if (this.syncClient.isConnected()) {
+      throw new Error('Already connected to a relay server');
     }
 
-    await this.syncTunnel.start(port);
-    console.log(`TutorialSyncService: Sync tunnel started on port ${port}`);
+    await this.syncClient.connect(relayUrl, sessionId);
+    console.log(`TutorialSyncService: Connected to relay ${relayUrl} with session ${sessionId}`);
   }
 
   /**
-   * Stop the sync tunnel
+   * Disconnect from the current relay server
    */
-  public async stopTunnel(): Promise<void> {
-    if (!this.syncTunnel.isActive()) {
+  public async disconnectFromRelay(): Promise<void> {
+    if (!this.syncClient.isConnected()) {
       return;
     }
 
-    await this.syncTunnel.stop();
+    await this.syncClient.disconnect();
     this.connectedClients.clear();
     this.isLocked = false;
-    console.log('TutorialSyncService: Sync tunnel stopped');
+    console.log('TutorialSyncService: Disconnected from relay server');
   }
 
   /**
-   * Check if the sync tunnel is currently active
+   * Check if currently connected to a relay server
    */
-  public isTunnelActive(): boolean {
-    return this.syncTunnel.isActive();
+  public isConnectedToRelay(): boolean {
+    return this.syncClient.isConnected();
   }
 
   /**
-   * Get the current tunnel WebSocket URL
+   * Get the current connection information
    */
-  public getTunnelUrl(): string | null {
-    return this.syncTunnel.getTunnelUrl();
+  public getConnectionInfo(): SyncConnectionInfo | null {
+    return this.syncClient.getConnectionInfo();
   }
 
   /**
@@ -83,19 +84,19 @@ export class TutorialSyncService {
   }
 
   /**
-   * Sync the current tutorial state to all connected clients
+   * Sync the current tutorial state to the relay server
    * @param tutorial The tutorial to sync
    */
   public async syncTutorialState(tutorial: Readonly<Tutorial>): Promise<void> {
-    if (!this.syncTunnel.isActive() || this.connectedClients.size === 0) {
-      return;
+    if (!this.syncClient.isConnected()) {
+      throw new Error('Not connected to relay server');
     }
 
     this.currentTutorial = tutorial as Tutorial;
     const syncState = this._createTutorialSyncState(tutorial);
-    await this.syncTunnel.broadcastTutorialState(syncState);
+    await this.syncClient.sendTutorialState(syncState);
     
-    console.log(`TutorialSyncService: Synced tutorial state for "${tutorial.title}" to ${this.connectedClients.size} clients`);
+    console.log(`TutorialSyncService: Synced tutorial state for "${tutorial.title}" to relay server`);
   }
 
   /**
@@ -115,41 +116,49 @@ export class TutorialSyncService {
   }
 
   /**
-   * Setup event handlers for the sync tunnel
+   * Setup event handlers for the sync client
    */
-  private _setupTunnelEventHandlers(): void {
-    this.syncTunnel.onClientConnected((clientId: string) => {
-      this.connectedClients.add(clientId);
-      console.log(`TutorialSyncService: Client connected: ${clientId} (${this.connectedClients.size} total)`);
+  private _setupClientEventHandlers(): void {
+    this.syncClient.onConnected((sessionId: string) => {
+      console.log(`TutorialSyncService: Connected to session: ${sessionId}`);
       
-      // Send current tutorial state to newly connected client if available
+      // Send current tutorial state to newly connected session if available
       const currentTutorial = this.tutorialServiceRef ? this.tutorialServiceRef() : this.currentTutorial;
       if (currentTutorial) {
-        this.syncTutorialState(currentTutorial);
+        this.syncTutorialState(currentTutorial).catch(console.error);
       }
     });
 
-    this.syncTunnel.onClientDisconnected((clientId: string) => {
-      this.connectedClients.delete(clientId);
-      console.log(`TutorialSyncService: Client disconnected: ${clientId} (${this.connectedClients.size} total)`);
+    this.syncClient.onDisconnected((reason?: string) => {
+      console.log(`TutorialSyncService: Disconnected from relay server${reason ? `: ${reason}` : ''}`);
+      this.connectedClients.clear();
+      this.unlockExtension();
+    });
+
+    this.syncClient.onError((error: Error) => {
+      console.error('TutorialSyncService: Sync client error:', error);
+    });
+
+    this.syncClient.onClientListChanged((clients: string[]) => {
+      this.connectedClients.clear();
+      clients.forEach(clientId => this.connectedClients.add(clientId));
+      console.log(`TutorialSyncService: Connected clients updated: ${this.connectedClients.size} total`);
       
       // If no clients are connected, unlock the extension
       if (this.connectedClients.size === 0) {
         this.unlockExtension();
+      } else {
+        this.lockExtension();
       }
     });
 
-    this.syncTunnel.onSyncRequested(async (clientId: string) => {
-      console.log(`TutorialSyncService: Sync requested by client: ${clientId}`);
+    this.syncClient.onTutorialStateReceived((state: TutorialSyncState | null, fromClientId: string) => {
+      console.log(`TutorialSyncService: Received tutorial state from client: ${fromClientId}`);
       
-      // Get current tutorial from TutorialService if available
-      const currentTutorial = this.tutorialServiceRef ? this.tutorialServiceRef() : this.currentTutorial;
-      
-      if (currentTutorial) {
-        await this.syncTutorialState(currentTutorial);
-      } else {
-        console.log("TutorialSyncService: No tutorial state available");
-        await this.syncTunnel.broadcastTutorialState(null);
+      // Here we could update the local tutorial state based on received state
+      // For now, we'll just log it
+      if (state) {
+        console.log(`Received state for tutorial: ${state.tutorialTitle} (step ${state.currentStepIndex + 1}/${state.totalSteps})`);
       }
     });
   }
@@ -185,5 +194,36 @@ export class TutorialSyncService {
       htmlContent: '', // HTML content will be generated by the UI layer when needed
       type: step.type
     };
+  }
+
+  // Legacy methods for compatibility - these now work with relay connections
+  
+  /**
+   * @deprecated Use connectToRelay instead
+   */
+  public async startTunnel(_port?: number): Promise<void> {
+    throw new Error('startTunnel is deprecated. Use connectToRelay instead.');
+  }
+
+  /**
+   * @deprecated Use disconnectFromRelay instead
+   */
+  public async stopTunnel(): Promise<void> {
+    return this.disconnectFromRelay();
+  }
+
+  /**
+   * @deprecated Use isConnectedToRelay instead
+   */
+  public isTunnelActive(): boolean {
+    return this.isConnectedToRelay();
+  }
+
+  /**
+   * @deprecated Use getConnectionInfo instead
+   */
+  public getTunnelUrl(): string | null {
+    const connectionInfo = this.getConnectionInfo();
+    return connectionInfo ? connectionInfo.relayUrl : null;
   }
 } 

@@ -1,5 +1,5 @@
 // Refactored relay client with modular architecture
-export { RelayClient, type RelayClientConfig } from './client/RefactoredRelayClient';
+export { RelayClient, type RelayClientConfig } from './client/RelayClient';
 
 // New refactored session management components
 export { RelaySessionOrchestrator } from './server/RelaySessionOrchestrator';

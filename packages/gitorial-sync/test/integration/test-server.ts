@@ -19,6 +19,22 @@ export async function getTestServer() {
   // Create WebSocket server
   const wss = new WebSocketServer({ server });
 
+  // Setup WebSocket upgrade handling
+  wss.on('connection', (socket, request) => {
+    const url = new URL(request.url!, `http://${request.headers.host}`);
+    const sessionId = url.searchParams.get('session');
+
+    if (!sessionId) {
+      socket.close(1008, 'Session ID required');
+      return;
+    }
+
+    const success = sessionManager.handleUpgrade(sessionId, socket, request);
+    if (!success) {
+      socket.close(1008, 'Failed to join session');
+    }
+  });
+
   // Create session orchestrator
   const sessionManager = new RelaySessionOrchestrator({
     sessionTimeoutMs: 60000, // 1 minute for testing
@@ -62,23 +78,6 @@ export async function getTestServer() {
       res.status(404).json({ error: 'Session not found' });
     }
   });
-
-
-    // Setup WebSocket upgrade handling
-    wss.on('connection', (socket, request) => {
-      const url = new URL(request.url!, `http://${request.headers.host}`);
-      const sessionId = url.searchParams.get('session');
-
-      if (!sessionId) {
-        socket.close(1008, 'Session ID required');
-        return;
-      }
-
-      const success = sessionManager.handleUpgrade(sessionId, socket, request);
-      if (!success) {
-        socket.close(1008, 'Failed to join session');
-      }
-    });
 
 
   const start = () => new Promise<void>((resolve) => {

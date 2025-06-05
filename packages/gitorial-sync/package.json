@@ -19,17 +19,17 @@
     "LICENSE"
   ],
   "scripts": {
-    "build": "node scripts/esbuild.js",
-    "build:watch": "node scripts/esbuild.js --watch",
-    "build:production": "node scripts/esbuild.js --production",
+    "build": "rollup -c && node scripts/post-build.js",
+    "build:watch": "rollup -c -w",
+    "build:production": "NODE_ENV=production rollup -c && node scripts/post-build.js",
     "test": "mocha",
     "test:watch": "mocha --watch",
     "test:coverage": "nyc mocha",
     "lint": "eslint src/**/*.ts",
     "lint:fix": "eslint src/**/*.ts --fix",
     "clean": "rm -rf dist",
-    "prepublishOnly": "npm run build:production",
-    "analyze": "node scripts/esbuild.js --production --analyze"
+    "prepublishOnly": "pnpm run build:production",
+    "analyze": "pnpm run build:production && ls -la dist/ && echo '📊 Bundle analysis:' && wc -c dist/*"
   },
   "keywords": [
     "gitorial",
@@ -62,10 +62,14 @@
   },
   "homepage": "https://github.com/AndrzejSulkowski/gitorial-vs-plugin#readme",
   "dependencies": {
+    "@gitorial/shared-types": "workspace:*",
     "uuid": "^11.1.0"
   },
   "devDependencies": {
-    "@gitorial/shared-types": "workspace:*",
+    "@rollup/plugin-alias": "^5.1.1",
+    "@rollup/plugin-commonjs": "^28.0.3",
+    "@rollup/plugin-node-resolve": "^16.0.1",
+    "@rollup/plugin-typescript": "^12.1.2",
     "@types/chai": "^4.3.0",
     "@types/express": "^5.0.2",
     "@types/mocha": "^10.0.0",
@@ -82,8 +86,12 @@
     "mocha": "^10.0.0",
     "node-fetch": "^3.3.2",
     "nyc": "^15.1.0",
+    "rollup": "^4.41.1",
+    "rollup-plugin-delete": "^3.0.1",
+    "rollup-plugin-dts": "^6.2.1",
     "sinon": "^20.0.0",
     "ts-node": "^10.0.0",
+    "tslib": "^2.8.1",
     "typescript": "^5.0.0"
   },
   "engines": {

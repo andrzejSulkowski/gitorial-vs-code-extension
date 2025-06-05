@@ -30,7 +30,7 @@ import { DiffViewService } from "./ui/services/DiffViewService";
 import { GitChangesFactory } from "./infrastructure/factories/GitChangesFactory";
 import { TabTrackingService } from "./ui/services/TabTrackingService";
 import { TutorialSyncService } from "./domain/services/TutorialSyncService";
-import { WebSocketSyncTunnel } from "./infrastructure/adapters/WebSocketSyncTunnel";
+import { RelaySyncClient } from "./infrastructure/adapters/RelaySyncClient";
 import { SyncController } from "./ui/controllers/SyncController";
 import { SyncCommandHandler } from "./ui/handlers/SyncCommandHandler";
 
@@ -137,8 +137,8 @@ async function bootstrapApplication(context: vscode.ExtensionContext): Promise<B
 
 
   // --- Sync Infrastructure ---
-  const syncTunnel = new WebSocketSyncTunnel();
-  const tutorialSyncService = new TutorialSyncService(syncTunnel);
+  	const relaySyncClient = new RelaySyncClient();
+	const tutorialSyncService = new TutorialSyncService(relaySyncClient);
   
   // Set up reference to get current tutorial from TutorialService
   tutorialSyncService.setTutorialServiceRef(() => tutorialService.tutorial);

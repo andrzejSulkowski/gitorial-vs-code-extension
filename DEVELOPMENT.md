@@ -341,7 +341,7 @@ npm run compile
 # Create .vsix package
 npm run vscode:package
 
-# The package will be created as gitorial-0.1.7.vsix
+# The package will be created as gitorial-0.1.8.vsix
 ```
 
 ### Build Process

@@ -51,7 +51,16 @@ export class GitAdapter implements IGitOperations, IGitChanges {
   //                           | |                                         
   //                           |_|                                         
   public async ensureGitorialBranch(): Promise<void> {
-    const branches = await this.git.branch();
+    // Fetch latest remote information first to ensure we see all remote branches
+    console.log("GitAdapter: Fetching latest remote information...");
+    try {
+      await this.git.fetch();
+    } catch (fetchError) {
+      console.warn("GitAdapter: Warning - could not fetch latest remote information:", fetchError);
+      // Continue anyway - the gitorial branch might still be locally available
+    }
+
+    const branches = await this.git.branch(['-a']); // -a flag includes remote branches
 
     // 1. Check if current branch is already 'gitorial'
     // Handle both normal branch state and detached HEAD state
@@ -76,6 +85,7 @@ export class GitAdapter implements IGitOperations, IGitChanges {
     }
 
     // 3. Look for a remote 'gitorial' branch and set up tracking
+    console.log("GitAdapter: Searching for remote gitorial branches in:", branches.all);
     const remoteGitorialCandidate = branches.all.find(branch =>
       branch.startsWith('remotes/') && GitAdapter._isGitorialBranchNamePattern(branch)
     );
@@ -120,8 +130,53 @@ export class GitAdapter implements IGitOperations, IGitChanges {
         }
       }
     } else {
-      console.error("GitAdapter: No suitable local or remote 'gitorial' branch found to set up.");
-      throw new Error("No suitable local or remote 'gitorial' branch found to set up.");
+      // 4. If we still can't find a gitorial branch, try the more comprehensive approach from isValidGitorialRepository
+      console.log("GitAdapter: No gitorial branch found in branches.all, trying comprehensive remote search...");
+      const { remotes } = await this.getRepoInfo();
+      
+      let foundRemoteGitorial = false;
+      let targetRemoteName = 'origin';
+      let targetBranchName = 'gitorial';
+      
+      // Check remote-tracking branches via remotes info
+      for (const remote of remotes) {
+        if (remote.refs && remote.refs.fetch) {
+          // Check if there's a gitorial branch on this remote
+          try {
+            const remoteRefs = await this.git.listRemote(['--heads', remote.name]);
+            const gitorialRef = remoteRefs.split('\n').find(ref => 
+              ref.includes('\trefs/heads/gitorial') || 
+              ref.split('\t')[1]?.includes('gitorial')
+            );
+            
+            if (gitorialRef) {
+              foundRemoteGitorial = true;
+              targetRemoteName = remote.name;
+              targetBranchName = 'gitorial';
+              console.log(`GitAdapter: Found gitorial branch on remote ${targetRemoteName}`);
+              break;
+            }
+          } catch (remoteError) {
+            console.warn(`GitAdapter: Could not check remote ${remote.name} for gitorial branch:`, remoteError);
+          }
+        }
+      }
+      
+      if (foundRemoteGitorial) {
+        try {
+          console.log(`GitAdapter: Attempting to fetch and checkout gitorial from ${targetRemoteName}/${targetBranchName}...`);
+          await this.git.fetch(targetRemoteName, `${targetBranchName}:gitorial`);
+          await this.git.checkout(['-f', 'gitorial']);
+          console.log("GitAdapter: Successfully set up gitorial branch from remote.");
+          return;
+        } catch (setupError) {
+          console.error(`GitAdapter: Failed to set up gitorial branch from ${targetRemoteName}/${targetBranchName}:`, setupError);
+          throw new Error(`Failed to set up 'gitorial' branch from remote '${targetRemoteName}/${targetBranchName}': ${setupError instanceof Error ? setupError.message : String(setupError)}`);
+        }
+      } else {
+        console.error("GitAdapter: No suitable local or remote 'gitorial' branch found to set up.");
+        throw new Error("No suitable local or remote 'gitorial' branch found to set up.");
+      }
     }
   }
 
@@ -138,9 +193,15 @@ export class GitAdapter implements IGitOperations, IGitChanges {
     // Case 2: Detached HEAD state - check if current commit belongs to gitorial branch
     // Get all commits from gitorial branch and see if current commit hash matches any of them
     if (branches.all.includes('gitorial')) {
-      const commits = await this.getCommits('gitorial');
-      const currentCommitHash = branches.current;
-      return !!commits.find(c => c.hash.startsWith(currentCommitHash));
+      try {
+        const commits = await this.getCommits('gitorial');
+        const currentCommitHash = branches.current;
+        return !!commits.find(c => c.hash.startsWith(currentCommitHash));
+      } catch (error) {
+        // If we can't get commits from gitorial branch, we're probably not on it
+        console.warn("GitAdapter: Could not get commits from gitorial branch in detached HEAD check:", error);
+        return false;
+      }
     }
 
     return false;

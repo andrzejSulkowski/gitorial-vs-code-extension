@@ -42,7 +42,7 @@ describe('Dynamic Sync Phase Management', () => {
       eventHandler: new TestEventHandler()
     };
 
-    await server.start()
+    await server.start();
   });
 
   after(async () => await server.stop());
@@ -61,7 +61,8 @@ describe('Dynamic Sync Phase Management', () => {
         expect(client.is.connected()).to.be.false;
 
         // After connecting becomes CONNECTED_IDLE
-        await client.session.create();
+        const session = await client.session.create();
+        await client.connect(session.id);
         await new Promise(resolve => setTimeout(resolve, 100));
 
         expect(client.getCurrentPhase()).to.equal(SyncPhase.CONNECTED_IDLE);
@@ -80,7 +81,8 @@ describe('Dynamic Sync Phase Management', () => {
       });
 
       try {
-        await client.session.create();
+        const session = await client.session.create();
+        await client.connect(session.id);
         await new Promise(resolve => setTimeout(resolve, 100));
 
         // Choose to push state to peer (become PASSIVE)
@@ -125,7 +127,8 @@ describe('Dynamic Sync Phase Management', () => {
       });
 
       try {
-        await client.session.create();
+        const session = await client.session.create();
+        await client.connect(session.id);
         await new Promise(resolve => setTimeout(resolve, 100));
 
         // Choose to pull state from peer (become ACTIVE)
@@ -172,7 +175,8 @@ describe('Dynamic Sync Phase Management', () => {
       });
 
       try {
-        await client.session.create();
+        const session = await client.session.create();
+        await client.connect(session.id);
         await new Promise(resolve => setTimeout(resolve, 100));
 
         const tutorialState: TutorialSyncState = {
@@ -214,7 +218,8 @@ describe('Dynamic Sync Phase Management', () => {
       });
 
       try {
-        await client.session.create();
+        const session = await client.session.create();
+        await client.connect(session.id);
         await new Promise(resolve => setTimeout(resolve, 100));
 
         // Start as ACTIVE
@@ -232,7 +237,7 @@ describe('Dynamic Sync Phase Management', () => {
         client.control.release();
         
         // Should be passive now
-        expect(client.is.passive()).to.be.true;
+        expect(client.is.idle()).to.be.true;
 
       } finally {
         client.disconnect();
@@ -285,7 +290,8 @@ describe('Dynamic Sync Phase Management', () => {
       });
 
       try {
-        await client.session.create();
+        const session = await client.session.create();
+        await client.connect(session.id);
         await new Promise(resolve => setTimeout(resolve, 100));
 
         // Check that connection events were fired
@@ -317,7 +323,9 @@ describe('Dynamic Sync Phase Management', () => {
 
       try {
         // Create session with client1, connect client2 to same session
-        const session = await client1.session.create();
+        const session = await client1.session.create();;
+        await new Promise(resolve => setTimeout(resolve, 100));
+        await client1.connect(session.id);
         await client2.connect(session.id);
         
         await new Promise(resolve => setTimeout(resolve, 100));

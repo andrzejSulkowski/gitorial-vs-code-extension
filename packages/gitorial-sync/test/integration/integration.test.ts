@@ -57,6 +57,12 @@ describe('Integration Test: RelaySessionOrchestrator + RelayClient', () => {
 
       expect(session.clientCount).to.equal(0);
       expect(session.metadata.tutorial).to.equal('javascript-basics');
+
+      await client.connect(session.id);
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      expect(client.is.connected()).to.be.true;
+      expect(client.getCurrentPhase()).to.equal(SyncPhase.CONNECTED_IDLE);
       
       // Verify connection events
       const connectedEvent = eventHandler.getEvent('connected');
@@ -89,6 +95,11 @@ describe('Integration Test: RelaySessionOrchestrator + RelayClient', () => {
 
       expect(session).to.be.an('object');
       expect(session.id).to.be.a('string');
+
+      await dotCodeSchoolClient.connect(session.id);
+      expect(dotCodeSchoolClient.is.connected()).to.be.true;
+      expect(dotCodeSchoolClient.getCurrentPhase()).to.equal(SyncPhase.CONNECTED_IDLE);
+
       expect(dotCodeSchoolClient.getCurrentPhase()).to.equal(SyncPhase.CONNECTED_IDLE);
 
       // Extension connects to existing session
@@ -237,6 +248,9 @@ describe('Integration Test: RelaySessionOrchestrator + RelayClient', () => {
     try {
       // Create and connect to session
       const session = await client.session.create({ tutorial: 'lifecycle-test' });
+      await client.connect(session.id);
+      await new Promise(resolve => setTimeout(resolve, 100));
+
       expect(client.is.connected()).to.be.true;
       expect(client.getCurrentPhase()).to.equal(SyncPhase.CONNECTED_IDLE);
 
@@ -293,8 +307,8 @@ describe('Integration Test: RelaySessionOrchestrator + RelayClient', () => {
       expect(() => client.tutorial.sendState(tutorialState)).to.throw('Only active clients can send tutorial state');
 
       // Connect and become IDLE
-      await client.session.create({ tutorial: 'phase-test' });
-      
+      const session = await client.session.create({ tutorial: 'phase-test' });
+      await client.connect(session.id);
       // CONNECTED_IDLE: Cannot send state
       expect(() => client.tutorial.sendState(tutorialState)).to.throw('Only active clients can send tutorial state');
 

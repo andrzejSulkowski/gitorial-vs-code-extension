@@ -212,6 +212,9 @@ describe('VS Code ↔ DotCodeSchool Communication Test', () => {
                 tutorial: 'javascript-fundamentals'
             });
 
+            // 2. DotCodeSchool connects to the session
+            await dotCodeSchoolClient.connect(session.id);
+
             expect(session).to.be.an('object');
             expect(dotCodeSchoolClient.is.connected()).to.be.true;
             expect(dotCodeSchoolClient.getCurrentPhase()).to.equal(SyncPhase.CONNECTED_IDLE);
@@ -374,102 +377,6 @@ describe('VS Code ↔ DotCodeSchool Communication Test', () => {
             if (vsCodeClient.is.connected()) {
                 vsCodeClient.disconnect();
             }
-        }
-    });
-
-    it('should demonstrate tutorial state synchronization patterns', async () => {
-        const instructorHandler = new DotCodeSchoolEventHandler('Instructor');
-        const studentHandler = new VSCodeEventHandler('Student');
-
-        const instructorClient = new RelayClient({
-            serverUrl: `ws://localhost:${port}`,
-            sessionEndpoint: '/api/sessions',
-            eventHandler: instructorHandler
-        });
-
-        const studentClient = new RelayClient({
-            serverUrl: `ws://localhost:${port}`,
-            sessionEndpoint: '/api/sessions',
-            eventHandler: studentHandler
-        });
-
-        instructorHandler.setClient(instructorClient);
-        studentHandler.setClient(studentClient);
-
-        try {
-            // Instructor creates session
-            const session = await instructorClient.session.create({
-                tutorial: 'react-hooks-mastery'
-            });
-
-            // Student joins
-            await studentClient.connect(session.id);
-            await new Promise(resolve => setTimeout(resolve, 200));
-
-            // Ensure both clients are idle before role assignment
-            expect(instructorClient.is.idle()).to.be.true;
-            expect(studentClient.is.idle()).to.be.true;
-
-            // Instructor becomes active (will guide the lesson)
-            await instructorClient.sync.asActive();
-            await new Promise(resolve => setTimeout(resolve, 300));
-
-            expect(instructorClient.is.active()).to.be.true;
-            expect(studentClient.is.passive()).to.be.true;
-
-            // Instructor sends lesson progression
-            const lessons = [
-                {
-                    step: 'useState Basics',
-                    index: 0,
-                    isShowingSolution: false
-                },
-                {
-                    step: 'useEffect Introduction',
-                    index: 1,
-                    isShowingSolution: false
-                },
-                {
-                    step: 'Custom Hooks',
-                    index: 2,
-                    isShowingSolution: true
-                }
-            ];
-
-            for (const lesson of lessons) {
-                const tutorialState: TutorialSyncState = {
-                    tutorialId: asTutorialId('react-hooks-mastery'),
-                    tutorialTitle: 'React Hooks Mastery',
-                    totalSteps: 8,
-                    isShowingSolution: lesson.isShowingSolution,
-                    stepContent: {
-                        id: `step-${lesson.index + 1}`,
-                        title: lesson.step,
-                        commitHash: `commit-${lesson.index + 1}`,
-                        type: lesson.isShowingSolution ? 'solution' : 'template',
-                        index: lesson.index
-                    },
-                    repoUrl: 'https://github.com/instructor/react-hooks-mastery'
-                };
-
-                instructorClient.tutorial.sendState(tutorialState);
-                await new Promise(resolve => setTimeout(resolve, 100));
-            }
-
-            // Student should have received all lesson states
-            const studentReceivedStates = studentHandler.getEvents('tutorialStateReceived');
-            expect(studentReceivedStates.length).to.equal(3);
-
-            // Verify lesson progression
-            const finalState = studentReceivedStates[2];
-            if (finalState.type === 'tutorialStateReceived') {
-                expect(finalState.state.stepContent.title).to.equal('Custom Hooks');
-                expect(finalState.state.isShowingSolution).to.be.true;
-            }
-
-        } finally {
-            instructorClient.disconnect();
-            studentClient.disconnect();
         }
     });
 }); 

@@ -139,7 +139,8 @@ describe('Integration Test: RelaySessionOrchestrator + RelayClient', () => {
       // 1. DotCodeSchool creates session and connects
       const session = await dotCodeSchoolClient.session.create({ tutorial: 'js-fundamentals' });
       
-      // 2. Extension connects to the session
+      // 2. DotCodeSchool & Extension connect to the session
+      await dotCodeSchoolClient.connect(session.id);
       await extensionClient.connect(session.id);
 
       // Wait for connections to stabilize
@@ -189,11 +190,23 @@ describe('Integration Test: RelaySessionOrchestrator + RelayClient', () => {
       if (extensionStateEvent?.type === 'tutorialStateReceived') {
         expect(extensionStateEvent.state.tutorialId).to.equal('javascript-fundamentals');
         expect(extensionStateEvent.state.stepContent.title).to.equal('Variables and Functions');
+      }else {
+        throw new Error('Extension did not receive the state');
       }
 
       // 6. DotCodeSchool can also request state sync explicitly
       dotCodeSchoolClient.tutorial.requestState();
       await new Promise(resolve => setTimeout(resolve, 100));
+
+      // Now we check the events if we actually received the state
+      const dotCodeSchoolStateEvent = dotCodeSchoolHandler.getEvent('tutorialStateReceived');
+      expect(dotCodeSchoolStateEvent).to.not.be.undefined;
+      if (dotCodeSchoolStateEvent?.type === 'tutorialStateReceived') {
+        expect(dotCodeSchoolStateEvent.state.tutorialId).to.equal('javascript-fundamentals');
+        expect(dotCodeSchoolStateEvent.state.stepContent.title).to.equal('Variables and Functions');
+      }else {
+        throw new Error('DotCodeSchool did not receive the state');
+      }
 
       // Test control release: ACTIVE can release control
       dotCodeSchoolClient.control.release();
@@ -201,10 +214,8 @@ describe('Integration Test: RelaySessionOrchestrator + RelayClient', () => {
       // Wait for control transfer to complete
       await new Promise(resolve => setTimeout(resolve, 300));
 
-      // After releasing control, client returns to idle/connected state
       expect(dotCodeSchoolClient.is.idle()).to.be.true;
-      // The other client remains passive
-      expect(extensionClient.is.passive()).to.be.true;
+      expect(extensionClient.is.idle()).to.be.true;
 
       // Verify that the basic sync functionality worked
       expect(extensionStateEvent).to.not.be.undefined;

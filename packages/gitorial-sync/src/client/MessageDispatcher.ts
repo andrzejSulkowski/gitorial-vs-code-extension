@@ -39,6 +39,7 @@ export interface MessageDispatcherEventHandler {
   onControlOffered(event: ControlOfferEvent): void;
   onControlAccepted(fromClientId: string): void;
   onControlTransferConfirmed(): void;
+  onControlReleased(fromClientId: string): void;
   
   // Sync coordination events
   onSyncDirectionAssigned(assignment: SyncDirectionAssignment): void;
@@ -316,7 +317,10 @@ export class MessageDispatcher {
   }
 
   private handleControlRelease(message: SyncMessage): void {
-    // Handle released control
+    if ('clientId' in message) {
+      // Notify that the peer has released control
+      this.config.eventHandler.onControlReleased(message.clientId);
+    }
   }
 
   private handleTransferConfirm(message: SyncMessage): void {

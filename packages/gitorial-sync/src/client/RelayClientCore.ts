@@ -1,4 +1,4 @@
-import { 
+import {
   TutorialSyncState,
   ConnectionStatus,
   SyncClientError,
@@ -10,18 +10,18 @@ import { SyncMessage } from './types/messages';
 
 import { ConnectionManager, ConnectionManagerEventHandler } from './ConnectionManager';
 import { SessionManager } from './SessionManager';
-import { 
-  MessageDispatcher, 
+import {
+  MessageDispatcher,
   MessageDispatcherEventHandler,
-  ControlRequestEvent, 
-  ControlOfferEvent 
+  ControlRequestEvent,
+  ControlOfferEvent
 } from './MessageDispatcher';
 
 // ==============================================
 // CORE EVENT SYSTEM
 // ==============================================
 
-export type RelayClientCoreEvent = 
+export type RelayClientCoreEvent =
   | { type: 'connected' }
   | { type: 'disconnected' }
   | { type: 'connectionStatusChanged'; status: ConnectionStatus }
@@ -29,6 +29,7 @@ export type RelayClientCoreEvent =
   | { type: 'tutorialStateReceived'; state: TutorialSyncState }
   | { type: 'controlRequested'; event: ControlRequestEvent }
   | { type: 'controlOffered'; event: ControlOfferEvent }
+  | { type: 'controlReleased'; fromClientId: string }
   | { type: 'clientConnected'; clientId: string }
   | { type: 'clientDisconnected'; clientId: string }
   | { type: 'error'; error: SyncClientError };
@@ -59,12 +60,12 @@ export interface RelayClientCoreConfig {
 export class RelayClientCore implements ConnectionManagerEventHandler, MessageDispatcherEventHandler {
   private readonly config: RelayClientCoreConfig;
   private readonly clientId: string;
-  
+
   // Core components (no bloated state machines)
   private readonly connectionManager: ConnectionManager;
   private readonly sessionManager: SessionManager;
   private readonly messageDispatcher: MessageDispatcher;
-  
+
   // Simple state tracking
   private currentPhase: SyncPhase = SyncPhase.DISCONNECTED;
   private lastTutorialState: TutorialSyncState | null = null;
@@ -72,7 +73,7 @@ export class RelayClientCore implements ConnectionManagerEventHandler, MessageDi
   constructor(config: RelayClientCoreConfig) {
     this.config = config;
     this.clientId = `client_${Math.random().toString(36).substring(2, 15)}`;
-    
+
     // Initialize components with dependency injection
     this.connectionManager = new ConnectionManager({
       wsUrl: config.serverUrl,
@@ -164,6 +165,14 @@ export class RelayClientCore implements ConnectionManagerEventHandler, MessageDi
     }
   }
 
+  onControlReleased(fromClientId: string): void {
+    // When the active client releases control, passive clients can become idle
+    if (this.currentPhase === SyncPhase.PASSIVE) {
+      this.setPhase(SyncPhase.CONNECTED_IDLE, `Control released by ${fromClientId}`);
+    }
+    this.config.onEvent({ type: 'controlReleased', fromClientId });
+  }
+
   onSyncDirectionAssigned(assignment: any): void {
     // Handle server sync direction assignment
     if (assignment.assignedDirection === 'ACTIVE') {
@@ -189,9 +198,8 @@ export class RelayClientCore implements ConnectionManagerEventHandler, MessageDi
     if (this.currentPhase !== SyncPhase.DISCONNECTED) {
       throw new SyncClientError(SyncErrorType.INVALID_OPERATION, 'Cannot create session while connected');
     }
-    
+
     const session = await this.sessionManager.createSession(options);
-    await this.connectToSession(session.id);
     return session;
   }
 
@@ -199,9 +207,9 @@ export class RelayClientCore implements ConnectionManagerEventHandler, MessageDi
     if (this.currentPhase !== SyncPhase.DISCONNECTED) {
       throw new SyncClientError(SyncErrorType.INVALID_OPERATION, 'Cannot connect while already connected');
     }
-    
+
     this.setPhase(SyncPhase.CONNECTING, 'Establishing connection');
-    
+
     try {
       await this.connectionManager.connect(sessionId);
       // onConnected will be called automatically
@@ -237,10 +245,10 @@ export class RelayClientCore implements ConnectionManagerEventHandler, MessageDi
     if (this.currentPhase !== SyncPhase.CONNECTED_IDLE) {
       throw new SyncClientError(SyncErrorType.INVALID_OPERATION, 'Can only pull state when idle');
     }
-    
+
     this.setPhase(SyncPhase.INITIALIZING_PULL, 'Requesting to become active');
     this.messageDispatcher.requestSyncDirectionCoordination('ACTIVE', 'User requested pull');
-    
+
     // Phase will be updated when server responds
   }
 
@@ -248,15 +256,15 @@ export class RelayClientCore implements ConnectionManagerEventHandler, MessageDi
     if (this.currentPhase !== SyncPhase.CONNECTED_IDLE) {
       throw new SyncClientError(SyncErrorType.INVALID_OPERATION, 'Can only push state when idle');
     }
-    
+
     this.setPhase(SyncPhase.INITIALIZING_PUSH, 'Requesting to become passive');
-    
+
     if (initialState) {
       this.lastTutorialState = initialState;
     }
-    
+
     this.messageDispatcher.requestSyncDirectionCoordination('PASSIVE', 'User requested push');
-    
+
     // Phase will be updated when server responds
   }
 
@@ -269,7 +277,7 @@ export class RelayClientCore implements ConnectionManagerEventHandler, MessageDi
 
   releaseControl(): void {
     if (this.currentPhase === SyncPhase.ACTIVE) {
-      this.setPhase(SyncPhase.PASSIVE, 'Released control voluntarily');
+      this.setPhase(SyncPhase.CONNECTED_IDLE, 'Released control voluntarily');
       this.messageDispatcher.releaseControl();
     }
   }
@@ -300,7 +308,7 @@ export class RelayClientCore implements ConnectionManagerEventHandler, MessageDi
   async deleteCurrentSession(): Promise<boolean> {
     const sessionId = this.getCurrentSessionId();
     if (!sessionId) return false;
-    
+
     this.disconnect();
     return this.sessionManager.deleteSession(sessionId);
   }

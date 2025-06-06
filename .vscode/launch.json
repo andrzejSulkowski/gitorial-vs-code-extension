@@ -18,13 +18,15 @@
 			"preLaunchTask": "${defaultBuildTask}"
 		},
 		{
-			"name": "Debug Gitorial-Sync Integration Tests",
+			"name": "Debug Gitorial-Sync Integration Tests (No Timeout)",
 			"type": "node",
 			"request": "launch",
 			"program": "${workspaceFolder}/packages/gitorial-sync/node_modules/mocha/bin/mocha.js",
 			"args": [
 				"--config",
-				".mocharc.integration.json"
+				".mocharc.integration.json",
+				"--timeout",
+				"0"
 			],
 			"cwd": "${workspaceFolder}/packages/gitorial-sync",
 			"runtimeArgs": ["--inspect-brk"],
@@ -54,13 +56,15 @@
 			}
 		},
 		{
-			"name": "Debug Single Integration Test",
+			"name": "Debug Single Test (No Timeout)",
 			"type": "node",
 			"request": "launch",
 			"program": "${workspaceFolder}/packages/gitorial-sync/node_modules/mocha/bin/mocha.js",
 			"args": [
 				"--config",
 				".mocharc.integration.json",
+				"--timeout",
+				"0",
 				"--grep",
 				"should handle sync direction assignment"
 			],

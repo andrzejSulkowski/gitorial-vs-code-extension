@@ -1,7 +1,28 @@
-// Refactored relay client with modular architecture
-export { RelayClient, type RelayClientConfig } from './client/RelayClient';
+// Modern relay client with clean API
+export { 
+  RelayClient, 
+  type RelayClientConfig, 
+  type RelayClientEvent,
+  type RelayClientEventHandler 
+} from './client/RelayClient';
 
-// New refactored session management components
+// Core relay client (internal implementation)
+export { 
+  RelayClientCore,
+  type RelayClientCoreEvent,
+  type RelayClientCoreConfig
+} from './client/RelayClientCore';
+
+// Message dispatcher with dependency injection
+export { 
+  MessageDispatcher, 
+  type MessageDispatcherConfig, 
+  type MessageDispatcherEventHandler,
+  type ControlRequestEvent,
+  type ControlOfferEvent 
+} from './client/MessageDispatcher';
+
+// Server components
 export { RelaySessionOrchestrator } from './server/RelaySessionOrchestrator';
 export { SessionStore } from './server/stores/SessionStore';
 export { SessionLifecycleManager } from './server/manager/SessionLifecycleManager';
@@ -21,7 +42,7 @@ export type {
 } from './server/types/session';
 
 // Socket factory and types
-export { createWebSocketClient, type ISyncSocket } from './client/socket';
+export { createWebSocketClient, type ISyncSocket } from './client/adapters';
 
 // Types and constants
 export * from './client/types';

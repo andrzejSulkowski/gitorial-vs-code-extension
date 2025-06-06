@@ -52,8 +52,9 @@ export class SyncController {
         return;
       }
 
-      // Connect to relay
-      await this.tutorialSyncService.connectToRelay(relayUrl.trim(), sessionId);
+      // Connect to relay with session ID stripped from URL
+      const relayUrlWithoutSession = relayUrl.split('?')[0].trim();
+      await this.tutorialSyncService.connectToRelay(relayUrlWithoutSession, sessionId);
       this._updateStatusBar();
       
       this.userInteraction.showInformationMessage(`Connected to relay server. Session: ${sessionId}`);

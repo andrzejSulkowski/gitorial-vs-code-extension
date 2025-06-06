@@ -92,7 +92,7 @@ export class TutorialViewService {
     }
 
     // Sync tutorial state if sync service is available
-    if (this.tutorialSyncService && this.tutorialSyncService.isTunnelActive()) {
+    if (this.tutorialSyncService && this.tutorialSyncService.isConnectedToRelay()) {
       try {
         await this.tutorialSyncService.syncTutorialState(tutorial);
       } catch (error) {

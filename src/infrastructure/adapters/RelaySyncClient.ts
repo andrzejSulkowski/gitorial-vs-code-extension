@@ -1,10 +1,10 @@
-import { RelayClient } from '@gitorial/sync';
-import { ISyncClient, TutorialSyncState, SyncConnectionInfo } from '../../domain/ports/ISyncClient';
+import { RelayClient, RelayClientEvent, RelayClientEventHandler, TutorialSyncState, ConnectionStatus } from '@gitorial/sync';
+import { ISyncClient, SyncConnectionInfo } from '../../domain/ports/ISyncClient';
 
 /**
  * Relay-based implementation of sync client for connecting to external relay servers
  */
-export class RelaySyncClient implements ISyncClient {
+export class RelaySyncClient implements ISyncClient, RelayClientEventHandler {
   private relayClient: RelayClient | null = null;
   private connectionInfo: SyncConnectionInfo | null = null;
   
@@ -19,27 +19,24 @@ export class RelaySyncClient implements ISyncClient {
    * Connect to a relay server with the given URL and session ID
    */
   public async connect(relayUrl: string, sessionId: string): Promise<void> {
-    if (this.relayClient && this.relayClient.isConnected()) {
+    if (this.relayClient && this.relayClient.is.connected()) {
       throw new Error('Already connected to a relay server. Disconnect first.');
     }
 
     try {
-      // Create new relay client - need to provide config
       this.relayClient = new RelayClient({
-        sessionEndpoint: '/sessions',
-        baseUrl: relayUrl.replace('ws://', 'http://').replace('wss://', 'https://'),
-        wsUrl: relayUrl
+        serverUrl: relayUrl,
+        sessionEndpoint: '/api/sessions', //TODO: Make this configurable as the relay server might have a different endpoint
+        eventHandler: this // We implement RelayClientEventHandler
       });
-      this._setupRelayEventHandlers();
 
-      // Connect to relay server
-      await this.relayClient.connectToSession(sessionId);
+      await this.relayClient.connect(sessionId);
 
       // Store connection info
       this.connectionInfo = {
         relayUrl,
         sessionId,
-        clientId: this.relayClient.getClientId(),
+        clientId: this.relayClient.session.id() || 'unknown',
         connectedClients: [],
         connectedAt: Date.now()
       };
@@ -62,7 +59,7 @@ export class RelaySyncClient implements ISyncClient {
     }
 
     try {
-      await this.relayClient.disconnect();
+      this.relayClient.disconnect();
       console.log('RelaySyncClient: Disconnected from relay server');
     } catch (error) {
       console.error('RelaySyncClient: Error during disconnect:', error);
@@ -76,7 +73,7 @@ export class RelaySyncClient implements ISyncClient {
    * Check if currently connected to a relay server
    */
   public isConnected(): boolean {
-    return this.relayClient?.isConnected() ?? false;
+    return this.relayClient?.is.connected() ?? false;
   }
 
   /**
@@ -89,15 +86,14 @@ export class RelaySyncClient implements ISyncClient {
   /**
    * Send tutorial state to the relay server
    */
-  public async sendTutorialState(state: TutorialSyncState | null): Promise<void> {
-    if (!this.relayClient || !this.relayClient.isConnected()) {
+  public async sendTutorialState(state: TutorialSyncState): Promise<void> {
+    if (!this.relayClient || !this.relayClient.is.connected()) {
       throw new Error('Not connected to relay server');
     }
 
     try {
-      // For now, we'll emit this through the relay's internal event system
-      // TODO: Implement proper state conversion between domain and sync package types
-      console.log('RelaySyncClient: Tutorial state would be sent to relay server', state);
+      this.relayClient.tutorial.sendState(state);
+      console.log('RelaySyncClient: Tutorial state sent to relay server', state);
     } catch (error) {
       console.error('RelaySyncClient: Failed to send tutorial state:', error);
       throw error;
@@ -139,72 +135,90 @@ export class RelaySyncClient implements ISyncClient {
     this.onClientListChangedCallback = callback;
   }
 
+  // ==============================================
+  // RELAY CLIENT EVENT HANDLER IMPLEMENTATION
+  // ==============================================
+
   /**
-   * Setup event handlers for the relay client
+   * Handle events from the SimplifiedRelayClient
    */
-  private _setupRelayEventHandlers(): void {
-    if (!this.relayClient) return;
+  onEvent(event: RelayClientEvent): void {
+    switch (event.type) {
+      case 'connected':
+        console.log('RelaySyncClient: Connected to relay server');
+        if (this.onConnectedCallback && this.connectionInfo) {
+          this.onConnectedCallback(this.connectionInfo.sessionId);
+        }
+        break;
 
-    // Handle connection events
-    this.relayClient.on('connected', (sessionId: string) => {
-      console.log(`RelaySyncClient: Connected to session ${sessionId}`);
-      if (this.onConnectedCallback) {
-        this.onConnectedCallback(sessionId);
-      }
-    });
+      case 'disconnected':
+        console.log('RelaySyncClient: Disconnected from relay server');
+        if (this.onDisconnectedCallback) {
+          this.onDisconnectedCallback();
+        }
+        break;
 
-    this.relayClient.on('disconnected', (reason?: string) => {
-      console.log(`RelaySyncClient: Disconnected from relay server${reason ? `: ${reason}` : ''}`);
-      if (this.onDisconnectedCallback) {
-        this.onDisconnectedCallback(reason);
-      }
-    });
+      case 'error':
+        console.error('RelaySyncClient: Relay client error:', event.error);
+        if (this.onErrorCallback) {
+          this.onErrorCallback(new Error(event.error.message));
+        }
+        break;
 
-    this.relayClient.on('error', (error: Error) => {
-      console.error('RelaySyncClient: Relay client error:', error);
-      if (this.onErrorCallback) {
-        this.onErrorCallback(error);
-      }
-    });
+      case 'tutorialStateReceived':
+        console.log('RelaySyncClient: Received tutorial state update');
+        if (this.onTutorialStateReceivedCallback) {
+          this.onTutorialStateReceivedCallback(event.state, 'unknown');
+        }
+        break;
 
-         // Handle session events
-     this.relayClient.on('clientConnected', (clientId: string) => {
-       console.log(`RelaySyncClient: Client ${clientId} connected`);
-       this._updateClientList().catch(console.error);
-     });
+      case 'clientConnected':
+        console.log(`RelaySyncClient: Client ${event.clientId} connected`);
+        this._updateClientList();
+        break;
 
-     this.relayClient.on('clientDisconnected', (clientId: string) => {
-       console.log(`RelaySyncClient: Client ${clientId} disconnected`);
-       this._updateClientList().catch(console.error);
-     });
+      case 'clientDisconnected':
+        console.log(`RelaySyncClient: Client ${event.clientId} disconnected`);
+        this._updateClientList();
+        break;
 
-         // Handle tutorial state updates
-     this.relayClient.on('tutorialStateUpdated', (state: any) => {
-       if (this.onTutorialStateReceivedCallback) {
-         console.log('RelaySyncClient: Received tutorial state update');
-         this.onTutorialStateReceivedCallback(state, 'unknown');
-       }
-     });
+      case 'phaseChanged':
+        console.log(`RelaySyncClient: Phase changed to ${event.phase}${event.reason ? ` (${event.reason})` : ''}`);
+        break;
+
+      case 'connectionStatusChanged':
+        console.log(`RelaySyncClient: Connection status changed to ${event.status}`);
+        break;
+
+      case 'controlRequested':
+        console.log('RelaySyncClient: Control requested by peer');
+        break;
+
+      case 'controlOffered':
+        console.log('RelaySyncClient: Control offered by peer');
+        break;
+
+      default:
+        console.log('RelaySyncClient: Unhandled event:', event);
+        break;
+    }
   }
 
   /**
    * Update the client list in connection info
    */
-  private async _updateClientList(): Promise<void> {
+  private _updateClientList(): void {
     if (this.relayClient && this.connectionInfo) {
       try {
-        const sessionInfo = await this.relayClient.getSessionInfo();
-        if (sessionInfo) {
-          // For now, we don't have direct access to connected clients list
-          // This would need to be tracked through session events
-          console.log('RelaySyncClient: Session info updated', sessionInfo);
-          
-          if (this.onClientListChangedCallback) {
-            this.onClientListChangedCallback([]);
-          }
+        // For now, we don't have direct access to connected clients list
+        // This would need to be tracked through session events
+        console.log('RelaySyncClient: Client list updated');
+        
+        if (this.onClientListChangedCallback) {
+          this.onClientListChangedCallback([]);
         }
       } catch (error) {
-        console.error('RelaySyncClient: Failed to get session info:', error);
+        console.error('RelaySyncClient: Failed to update client list:', error);
       }
     }
   }

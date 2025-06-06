@@ -1,16 +1,33 @@
-import { EventEmitter } from 'events';
 import { RelayConnection, SessionLifecycleEvents } from '../types/session';
 import { ClientRole } from '../../client/types/roles';
 
 /**
- * Manages WebSocket connections for relay sessions
+ * Event handler interface for ConnectionManager events
+ * This provides type-safe event handling with compile-time guarantees
  */
-export class ConnectionManager extends EventEmitter {
+export interface ConnectionManagerEventHandler {
+  onClientConnected(sessionId: string, connectionId: string): void;
+  onClientDisconnected(sessionId: string, connectionId: string): void;
+}
+
+/**
+ * Configuration interface for ConnectionManager
+ */
+export interface ConnectionManagerConfig {
+  eventHandler: ConnectionManagerEventHandler;
+}
+
+/**
+ * Manages WebSocket connections for relay sessions
+ * Uses dependency injection for type-safe event handling
+ */
+export class ConnectionManager {
   private connections = new Map<string, RelayConnection>();
   private sessionConnections = new Map<string, Set<string>>(); // sessionId -> Set<connectionId>
+  private readonly config: ConnectionManagerConfig;
 
-  constructor() {
-    super();
+  constructor(config: ConnectionManagerConfig) {
+    this.config = config;
   }
 
   /**
@@ -29,7 +46,7 @@ export class ConnectionManager extends EventEmitter {
     }
     this.sessionConnections.get(sessionId)!.add(connection.id);
 
-    this.emit('clientConnected', sessionId, connection.id);
+    this.config.eventHandler.onClientConnected(sessionId, connection.id);
     return true;
   }
 
@@ -61,7 +78,7 @@ export class ConnectionManager extends EventEmitter {
       connection.socket.close();
     }
 
-    this.emit('clientDisconnected', sessionId, connectionId);
+    this.config.eventHandler.onClientDisconnected(sessionId, connectionId);
     return true;
   }
 
@@ -202,20 +219,5 @@ export class ConnectionManager extends EventEmitter {
 
     this.connections.clear();
     this.sessionConnections.clear();
-  }
-
-  // Type-safe event emitter methods
-  on<K extends keyof SessionLifecycleEvents>(
-    event: K, 
-    listener: SessionLifecycleEvents[K]
-  ): this {
-    return super.on(event, listener);
-  }
-
-  emit<K extends keyof SessionLifecycleEvents>(
-    event: K, 
-    ...args: Parameters<SessionLifecycleEvents[K]>
-  ): boolean {
-    return super.emit(event, ...args);
   }
 } 

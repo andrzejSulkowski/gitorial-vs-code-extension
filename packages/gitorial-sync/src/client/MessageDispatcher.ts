@@ -1,5 +1,4 @@
-import { createEventEmitter, type IEventEmitter } from '../events/EventEmitterFactory'; //TODO: This is not available in browser based environments
-import { ConnectionManager } from '../connection/ConnectionManager';
+import { ConnectionManager } from './ConnectionManager';
 import { 
   TutorialSyncState,
   SyncClientError,
@@ -8,21 +7,11 @@ import {
   RoleTransferRequest,
   StateTransferPackage,
   RoleChangeEvent
-} from '../types';
-import { SyncMessage, SyncMessageType, SyncDirectionRequest, SyncDirectionAssignment } from '../types/messages';
-import { SYNC_PROTOCOL_VERSION } from '../../constants/protocol-version';
+} from './types';
+import { SyncMessage, SyncMessageType, SyncDirectionRequest, SyncDirectionAssignment } from './types/messages';
+import { SYNC_PROTOCOL_VERSION } from '../constants/protocol-version';
 
-export interface MessageDispatcherEvents {
-  tutorialStateReceived: (state: TutorialSyncState) => void;
-  controlRequested: (event: ControlRequestEvent) => void;
-  controlOffered: (event: ControlOfferEvent) => void;
-  controlAccepted: (fromClientId: string) => void;
-  controlTransferConfirmed: () => void;
-  syncDirectionAssigned: (assignment: SyncDirectionAssignment) => void;
-  clientConnected: (clientId: string) => void;
-  clientDisconnected: (clientId: string) => void;
-}
-
+// Event data interfaces
 export interface ControlRequestEvent {
   fromClientId: string;
   request: RoleTransferRequest;
@@ -38,48 +27,46 @@ export interface ControlOfferEvent {
 }
 
 /**
+ * Event handler interface that must be implemented by MessageDispatcher consumers
+ * This provides type-safe event handling with compile-time guarantees
+ */
+export interface MessageDispatcherEventHandler {
+  // State synchronization events
+  onTutorialStateReceived(state: TutorialSyncState): void;
+  
+  // Control transfer events
+  onControlRequested(event: ControlRequestEvent): void;
+  onControlOffered(event: ControlOfferEvent): void;
+  onControlAccepted(fromClientId: string): void;
+  onControlTransferConfirmed(): void;
+  
+  // Sync coordination events
+  onSyncDirectionAssigned(assignment: SyncDirectionAssignment): void;
+  
+  // Client connection events  
+  onClientConnected(clientId: string): void;
+  onClientDisconnected(clientId: string): void;
+}
+
+/**
+ * Configuration interface for MessageDispatcher
+ */
+export interface MessageDispatcherConfig {
+  connectionManager: ConnectionManager;
+  clientId: string;
+  eventHandler: MessageDispatcherEventHandler;
+}
+
+/**
  * Handles message routing and protocol communication
+ * Uses dependency injection for type-safe event handling
  */
 export class MessageDispatcher {
-  private readonly eventEmitter: IEventEmitter;
-  private clientId: string;
+  private readonly config: MessageDispatcherConfig;
   private lastSynchronizedState: TutorialSyncState | null = null;
 
-  constructor(
-    private connectionManager: ConnectionManager,
-    clientId: string
-  ) {
-    this.eventEmitter = createEventEmitter();
-    this.clientId = clientId;
-    this.setupMessageHandling();
-  }
-
-  // ===============================
-  // EVENT EMITTER DELEGATION
-  // ===============================
-
-  on(event: string, listener: (...args: any[]) => void): this {
-    this.eventEmitter.on(event, listener);
-    return this;
-  }
-
-  off(event: string, listener: (...args: any[]) => void): this {
-    this.eventEmitter.off(event, listener);
-    return this;
-  }
-
-  emit(event: string, ...args: any[]): boolean {
-    return this.eventEmitter.emit(event, ...args);
-  }
-
-  once(event: string, listener: (...args: any[]) => void): this {
-    this.eventEmitter.once(event, listener);
-    return this;
-  }
-
-  removeAllListeners(event?: string): this {
-    this.eventEmitter.removeAllListeners(event);
-    return this;
+  constructor(config: MessageDispatcherConfig) {
+    this.config = config;
   }
 
   // ===============================
@@ -93,7 +80,7 @@ export class MessageDispatcher {
     this.lastSynchronizedState = state;
     this.sendMessage({
       type: SyncMessageType.STATE_UPDATE,
-      clientId: this.clientId,
+      clientId: this.config.clientId,
       data: state,
       timestamp: Date.now(),
       protocol_version: SYNC_PROTOCOL_VERSION
@@ -106,7 +93,7 @@ export class MessageDispatcher {
   requestStateSync(): void {
     this.sendMessage({
       type: SyncMessageType.REQUEST_SYNC,
-      clientId: this.clientId,
+      clientId: this.config.clientId,
       data: {},
       timestamp: Date.now(),
       protocol_version: SYNC_PROTOCOL_VERSION
@@ -119,7 +106,7 @@ export class MessageDispatcher {
   sendControlRequest(request: RoleTransferRequest): void {
     this.sendMessage({
       type: SyncMessageType.REQUEST_CONTROL,
-      clientId: this.clientId,
+      clientId: this.config.clientId,
       data: request,
       timestamp: Date.now(),
       protocol_version: SYNC_PROTOCOL_VERSION
@@ -134,7 +121,7 @@ export class MessageDispatcher {
       tutorialState: this.lastSynchronizedState,
       metadata: {
         transferTimestamp: Date.now(),
-        fromClientId: this.clientId,
+        fromClientId: this.config.clientId,
         toClientId: 'other',
         stateChecksum: this.generateStateChecksum(this.lastSynchronizedState)
       }
@@ -142,7 +129,7 @@ export class MessageDispatcher {
 
     this.sendMessage({
       type: SyncMessageType.OFFER_CONTROL,
-      clientId: this.clientId,
+      clientId: this.config.clientId,
       data: transferPackage,
       timestamp: Date.now(),
       protocol_version: SYNC_PROTOCOL_VERSION
@@ -155,7 +142,7 @@ export class MessageDispatcher {
   announceRoleChange(role: ClientRole): void {
     this.sendMessage({
       type: SyncMessageType.ROLE_CHANGED,
-      clientId: this.clientId,
+      clientId: this.config.clientId,
       data: { role, timestamp: Date.now() },
       timestamp: Date.now(),
       protocol_version: SYNC_PROTOCOL_VERSION
@@ -168,7 +155,7 @@ export class MessageDispatcher {
   releaseControl(): void {
     this.sendMessage({
       type: SyncMessageType.RELEASE_CONTROL,
-      clientId: this.clientId,
+      clientId: this.config.clientId,
       data: { timestamp: Date.now() },
       timestamp: Date.now(),
       protocol_version: SYNC_PROTOCOL_VERSION
@@ -186,7 +173,7 @@ export class MessageDispatcher {
 
     this.sendMessage({
       type: SyncMessageType.COORDINATE_SYNC_DIRECTION,
-      clientId: this.clientId,
+      clientId: this.config.clientId,
       data: request,
       timestamp: Date.now(),
       protocol_version: SYNC_PROTOCOL_VERSION
@@ -194,16 +181,13 @@ export class MessageDispatcher {
   }
 
   // ===============================
-  // INCOMING MESSAGE HANDLING
+  // MESSAGE HANDLING (PUBLIC)
   // ===============================
 
-  private setupMessageHandling(): void {
-    this.connectionManager.on('message', (message: SyncMessage) => {
-      this.handleIncomingMessage(message);
-    });
-  }
-
-  private handleIncomingMessage(message: SyncMessage): void {
+  /**
+   * Handle incoming message - called by RelayClient from its onMessage handler
+   */
+  handleIncomingMessage(message: SyncMessage): void {
     switch (message.type) {
       case SyncMessageType.STATE_UPDATE:
         this.handleStateUpdate(message);
@@ -262,10 +246,14 @@ export class MessageDispatcher {
     }
   }
 
+  // ===============================
+  // INCOMING MESSAGE HANDLING
+  // ===============================
+
   private handleStateUpdate(message: SyncMessage): void {
     if ('data' in message) {
       this.lastSynchronizedState = message.data;
-      this.emit('tutorialStateReceived', message.data);
+      this.config.eventHandler.onTutorialStateReceived(message.data);
     }
   }
 
@@ -280,7 +268,7 @@ export class MessageDispatcher {
     if ('clientId' in message && 'data' in message) {
       const request = message.data as RoleTransferRequest;
       
-      this.emit('controlRequested', {
+      this.config.eventHandler.onControlRequested({
         fromClientId: message.clientId,
         request: request,
         accept: () => this.acceptControlTransfer(message.clientId),
@@ -293,7 +281,7 @@ export class MessageDispatcher {
     if ('clientId' in message && 'data' in message) {
       const transferPackage = message.data as StateTransferPackage;
       
-      this.emit('controlOffered', {
+      this.config.eventHandler.onControlOffered({
         fromClientId: message.clientId,
         state: transferPackage.tutorialState,
         accept: () => this.acceptControlTransfer(message.clientId, transferPackage),
@@ -306,16 +294,16 @@ export class MessageDispatcher {
     if ('clientId' in message && 'data' in message) {
       // Check if this is a server confirmation for immediate role grant
       if (message.clientId === 'relay-server' && message.data?.granted) {
-        this.emit('controlTransferConfirmed');
+        this.config.eventHandler.onControlTransferConfirmed();
         return;
       }
       
       // Handle normal peer-to-peer control accept
-      this.emit('controlAccepted', message.clientId);
+      this.config.eventHandler.onControlAccepted(message.clientId);
       
       this.sendMessage({
         type: SyncMessageType.CONFIRM_TRANSFER,
-        clientId: this.clientId,
+        clientId: this.config.clientId,
         data: { toClientId: message.clientId, timestamp: Date.now() },
         timestamp: Date.now(),
         protocol_version: SYNC_PROTOCOL_VERSION
@@ -333,7 +321,7 @@ export class MessageDispatcher {
 
   private handleTransferConfirm(message: SyncMessage): void {
     // Handle confirmed control transfer
-    this.emit('controlTransferConfirmed');
+    this.config.eventHandler.onControlTransferConfirmed();
   }
 
   private handleRoleChanged(message: SyncMessage): void {
@@ -345,13 +333,13 @@ export class MessageDispatcher {
 
   private handleClientConnected(message: SyncMessage): void {
     if ('clientId' in message) {
-      this.emit('clientConnected', message.clientId);
+      this.config.eventHandler.onClientConnected(message.clientId);
     }
   }
 
   private handleClientDisconnected(message: SyncMessage): void {
     if ('clientId' in message) {
-      this.emit('clientDisconnected', message.clientId);
+      this.config.eventHandler.onClientDisconnected(message.clientId);
     }
   }
 
@@ -365,7 +353,7 @@ export class MessageDispatcher {
   private handleSyncDirectionAssignment(message: SyncMessage): void {
     if ('data' in message) {
       const assignment = message.data as SyncDirectionAssignment;
-      this.emit('syncDirectionAssigned', assignment);
+      this.config.eventHandler.onSyncDirectionAssigned(assignment);
     }
   }
 
@@ -380,7 +368,7 @@ export class MessageDispatcher {
 
     this.sendMessage({
       type: SyncMessageType.ACCEPT_CONTROL,
-      clientId: this.clientId,
+      clientId: this.config.clientId,
       data: { fromClientId, timestamp: Date.now() },
       timestamp: Date.now(),
       protocol_version: SYNC_PROTOCOL_VERSION
@@ -390,7 +378,7 @@ export class MessageDispatcher {
   private declineControlTransfer(fromClientId: string): void {
     this.sendMessage({
       type: SyncMessageType.DECLINE_CONTROL,
-      clientId: this.clientId,
+      clientId: this.config.clientId,
       data: { fromClientId, timestamp: Date.now() },
       timestamp: Date.now(),
       protocol_version: SYNC_PROTOCOL_VERSION
@@ -402,7 +390,7 @@ export class MessageDispatcher {
   // ===============================
 
   private sendMessage(message: SyncMessage): void {
-    this.connectionManager.sendMessage(message);
+    this.config.connectionManager.sendMessage(message);
   }
 
   private generateStateChecksum(state: any): string {

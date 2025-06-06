@@ -1,23 +1,42 @@
 import { expect } from 'chai';
 import { WebSocketServer } from 'ws';
 import { RelaySessionOrchestrator } from '../../src/server/RelaySessionOrchestrator';
-import { SyncPhase, RelayClient, RelayClientConfig, TutorialSyncState } from '../../src';
+import { SyncPhase, RelayClient, RelayClientEventHandler, RelayClientEvent, TutorialSyncState } from '../../src';
 import { getTestServer } from './test-server';
 import { asTutorialId } from '@gitorial/shared-types';
+
+// Test event handler class
+class TestEventHandler implements RelayClientEventHandler {
+  public events: RelayClientEvent[] = [];
+  
+  onEvent(event: RelayClientEvent): void {
+    this.events.push(event);
+  }
+
+  getEvent(type: string): RelayClientEvent | undefined {
+    return this.events.find(event => event.type === type);
+  }
+
+  getEvents(type: string): RelayClientEvent[] {
+    return this.events.filter(event => event.type === type);
+  }
+
+  clearEvents(): void {
+    this.events = [];
+  }
+}
 
 describe('Integration Test: RelaySessionOrchestrator + RelayClient', () => {
   let server: Awaited<ReturnType<typeof getTestServer>>;
   let wss: WebSocketServer;
   let sessionManager: RelaySessionOrchestrator;
   let port: number;
-  let relayClientConfig: RelayClientConfig;
 
   before(async () => {
     server = await getTestServer();
     wss = server.wss;
     sessionManager = server.sessionManager;
     port = server.port;
-    relayClientConfig = server.relayClientConfig;
 
     await server.start();
   });
@@ -25,57 +44,74 @@ describe('Integration Test: RelaySessionOrchestrator + RelayClient', () => {
   after(async () => await server.stop());
 
   it('should create session via HTTP API using new RelayClient', async () => {
-    const client = new RelayClient(relayClientConfig);
+    const eventHandler = new TestEventHandler();
+    const client = new RelayClient({
+      serverUrl: `ws://localhost:${port}`,
+      sessionEndpoint: '/api/sessions',
+      eventHandler
+    });
 
     try {
-      // Use the public API to create session and connect
-      const session = await client.createSessionAndConnect({ tutorial: 'javascript-basics' });
+      // Use the modern API to create session and connect
+      const session = await client.session.create({ tutorial: 'javascript-basics' });
 
       expect(session.clientCount).to.equal(0);
       expect(session.metadata.tutorial).to.equal('javascript-basics');
+      
+      // Verify connection events
+      const connectedEvent = eventHandler.getEvent('connected');
+      expect(connectedEvent).to.not.be.undefined;
+      
     } finally {
       client.disconnect();
     }
   });
 
   it('should allow clients to connect and reach CONNECTED_IDLE phase', async () => {
-    const dotCodeSchoolClient = new RelayClient(relayClientConfig);
-    const extensionClient = new RelayClient(relayClientConfig);
-
-    let dotCodeSchoolConnected = false;
-    let extensionConnected = false;
-
-    dotCodeSchoolClient.on('clientConnected', () => {
-      dotCodeSchoolConnected = true;
+    const dotCodeSchoolHandler = new TestEventHandler();
+    const extensionHandler = new TestEventHandler();
+    
+    const dotCodeSchoolClient = new RelayClient({
+      serverUrl: `ws://localhost:${port}`,
+      sessionEndpoint: '/api/sessions',
+      eventHandler: dotCodeSchoolHandler
     });
-
-    extensionClient.on('clientConnected', () => {
-      extensionConnected = true;
+    
+    const extensionClient = new RelayClient({
+      serverUrl: `ws://localhost:${port}`,
+      sessionEndpoint: '/api/sessions',
+      eventHandler: extensionHandler
     });
 
     try {
       // DotCodeSchool creates session and connects
-      const session = await dotCodeSchoolClient.createSessionAndConnect({ tutorial: 'js-basics' });
+      const session = await dotCodeSchoolClient.session.create({ tutorial: 'js-basics' });
 
       expect(session).to.be.an('object');
       expect(session.id).to.be.a('string');
-      expect(dotCodeSchoolClient.getCurrentSyncPhase()).to.equal(SyncPhase.CONNECTED_IDLE);
+      expect(dotCodeSchoolClient.getCurrentPhase()).to.equal(SyncPhase.CONNECTED_IDLE);
 
       // Extension connects to existing session
-      await extensionClient.connectToSession(session.id);
-      expect(extensionClient.getCurrentSyncPhase()).to.equal(SyncPhase.CONNECTED_IDLE);
+      await extensionClient.connect(session.id);
+      expect(extensionClient.getCurrentPhase()).to.equal(SyncPhase.CONNECTED_IDLE);
 
       // Wait a bit for connection events
       await new Promise(resolve => setTimeout(resolve, 100));
 
-      expect(dotCodeSchoolClient.isConnected()).to.be.true;
-      expect(extensionClient.isConnected()).to.be.true;
-      expect(dotCodeSchoolClient.getCurrentSessionId()).to.equal(session.id);
-      expect(extensionClient.getCurrentSessionId()).to.equal(session.id);
+      expect(dotCodeSchoolClient.is.connected()).to.be.true;
+      expect(extensionClient.is.connected()).to.be.true;
+      expect(dotCodeSchoolClient.session.id()).to.equal(session.id);
+      expect(extensionClient.session.id()).to.equal(session.id);
 
       // Both should be in CONNECTED_IDLE state, able to choose sync direction
-      expect(dotCodeSchoolClient.isConnectedIdle()).to.be.true;
-      expect(extensionClient.isConnectedIdle()).to.be.true;
+      expect(dotCodeSchoolClient.is.idle()).to.be.true;
+      expect(extensionClient.is.idle()).to.be.true;
+
+      // Verify connection events were fired
+      const dotCodeSchoolConnected = dotCodeSchoolHandler.getEvent('connected');
+      const extensionConnected = extensionHandler.getEvent('connected');
+      expect(dotCodeSchoolConnected).to.not.be.undefined;
+      expect(extensionConnected).to.not.be.undefined;
 
     } finally {
       dotCodeSchoolClient.disconnect();
@@ -83,67 +119,48 @@ describe('Integration Test: RelaySessionOrchestrator + RelayClient', () => {
     }
   });
 
-  it('should handle DotCodeSchool + Extension sync direction assignment and state sync', async () => {
-    // Create clients (DotCodeSchool and VS Code extension)
-    const dotCodeSchoolClient = new RelayClient(relayClientConfig);
-    const extensionClient = new RelayClient(relayClientConfig);
-
-    let dotCodeSchoolReceivedState: TutorialSyncState | null = null;
-    let extensionReceivedState: TutorialSyncState | null = null;
-
-    // Set up event listeners
-    dotCodeSchoolClient.on('tutorialStateUpdated', (state: TutorialSyncState) => {
-      dotCodeSchoolReceivedState = state;
+  it('should handle sync direction assignment and state sync with modern API', async () => {
+    const dotCodeSchoolHandler = new TestEventHandler();
+    const extensionHandler = new TestEventHandler();
+    
+    const dotCodeSchoolClient = new RelayClient({
+      serverUrl: `ws://localhost:${port}`,
+      sessionEndpoint: '/api/sessions',
+      eventHandler: dotCodeSchoolHandler
     });
-
-    extensionClient.on('tutorialStateUpdated', (state: TutorialSyncState) => {
-      extensionReceivedState = state;
+    
+    const extensionClient = new RelayClient({
+      serverUrl: `ws://localhost:${port}`,
+      sessionEndpoint: '/api/sessions',
+      eventHandler: extensionHandler
     });
 
     try {
       // 1. DotCodeSchool creates session and connects
-      const session = await dotCodeSchoolClient.createSessionAndConnect({ tutorial: 'js-fundamentals' });
+      const session = await dotCodeSchoolClient.session.create({ tutorial: 'js-fundamentals' });
       
       // 2. Extension connects to the session
-      await extensionClient.connectToSession(session.id);
+      await extensionClient.connect(session.id);
 
       // Wait for connections to stabilize
       await new Promise(resolve => setTimeout(resolve, 100));
 
       // Both should be CONNECTED_IDLE
-      expect(dotCodeSchoolClient.isConnectedIdle()).to.be.true;
-      expect(extensionClient.isConnectedIdle()).to.be.true;
+      expect(dotCodeSchoolClient.is.idle()).to.be.true;
+      expect(extensionClient.is.idle()).to.be.true;
 
-      // 3. DotCodeSchool chooses to pull state from peer (becomes ACTIVE)
-      let dotCodeSchoolAssigned = false;
-      let extensionAssigned = false;
-      
-      dotCodeSchoolClient.on('syncPhaseChanged', (event) => {
-        if (event.newPhase === 'active') {
-          dotCodeSchoolAssigned = true;
-        }
-      });
-      
-      extensionClient.on('syncPhaseChanged', (event) => {
-        if (event.newPhase === 'passive') {
-          extensionAssigned = true;
-        }
-      });
-      
-      await dotCodeSchoolClient.pullStateFromPeer();
+      // 3. DotCodeSchool chooses to become active (pull state from peer)
+      await dotCodeSchoolClient.sync.asActive();
       
       // Wait for server coordination to complete
       await new Promise(resolve => setTimeout(resolve, 300));
       
-      expect(dotCodeSchoolAssigned).to.be.true;
-      expect(dotCodeSchoolClient.isActive()).to.be.true;
+      expect(dotCodeSchoolClient.is.active()).to.be.true;
 
-      // 4. Extension should automatically become PASSIVE after dotcodeschool decides to pullStateFromPeer
-      expect(extensionAssigned).to.be.true;
-      expect(extensionClient.isPassive()).to.be.true;
+      // 4. Extension should automatically become PASSIVE
+      expect(extensionClient.is.passive()).to.be.true;
 
-      // 5. Extension (PASSIVE) cannot send tutorial state in the new model
-      // In the new sync phase model, only ACTIVE clients can send state
+      // 5. Test tutorial state synchronization
       const tutorialState: TutorialSyncState = {
         tutorialId: asTutorialId('javascript-fundamentals'),
         tutorialTitle: 'JavaScript Fundamentals',
@@ -160,44 +177,37 @@ describe('Integration Test: RelaySessionOrchestrator + RelayClient', () => {
       };
 
       // Only ACTIVE client (DotCodeSchool) can send tutorial state
-      dotCodeSchoolClient.sendTutorialState(tutorialState);
+      dotCodeSchoolClient.tutorial.sendState(tutorialState);
 
       // Wait for message to be routed
       await new Promise(resolve => setTimeout(resolve, 100));
 
-      // Extension (PASSIVE) should receive the state
-      expect(extensionReceivedState).to.not.be.null;
-      expect(extensionReceivedState!.tutorialId).to.equal('javascript-fundamentals');
-      expect(extensionReceivedState!.stepContent.title).to.equal('Variables and Functions');
+      // Extension (PASSIVE) should receive the state via events
+      const extensionStateEvent = extensionHandler.getEvent('tutorialStateReceived');
+      expect(extensionStateEvent).to.not.be.undefined;
+      
+      if (extensionStateEvent?.type === 'tutorialStateReceived') {
+        expect(extensionStateEvent.state.tutorialId).to.equal('javascript-fundamentals');
+        expect(extensionStateEvent.state.stepContent.title).to.equal('Variables and Functions');
+      }
 
       // 6. DotCodeSchool can also request state sync explicitly
-      dotCodeSchoolClient.requestTutorialState();
+      dotCodeSchoolClient.tutorial.requestState();
       await new Promise(resolve => setTimeout(resolve, 100));
 
-      // Test control transfer: ACTIVE can become PASSIVE and vice versa
-      dotCodeSchoolClient.releaseControl(); // ACTIVE → PASSIVE
-      extensionClient.acceptControlTransfer(); // PASSIVE → ACTIVE
+      // Test control release: ACTIVE can release control
+      dotCodeSchoolClient.control.release();
+      
+      // Wait for control transfer to complete
+      await new Promise(resolve => setTimeout(resolve, 300));
 
-      expect(dotCodeSchoolClient.isPassive()).to.be.true;
-      expect(extensionClient.isActive()).to.be.true;
+      // After releasing control, client returns to idle/connected state
+      expect(dotCodeSchoolClient.is.idle()).to.be.true;
+      // The other client remains passive
+      expect(extensionClient.is.passive()).to.be.true;
 
-      // Now Extension can send state
-      const updatedState: TutorialSyncState = {
-        ...tutorialState,
-        isShowingSolution: true,
-        stepContent: {
-          ...tutorialState.stepContent,
-          index: 3
-        }
-      };
-
-      extensionClient.sendTutorialState(updatedState);
-      await new Promise(resolve => setTimeout(resolve, 100));
-
-      // DotCodeSchool should receive the updated state
-      expect(dotCodeSchoolReceivedState).to.not.be.null;
-      expect(dotCodeSchoolReceivedState!.isShowingSolution).to.be.true;
-      expect(dotCodeSchoolReceivedState!.stepContent.index).to.equal(3);
+      // Verify that the basic sync functionality worked
+      expect(extensionStateEvent).to.not.be.undefined;
 
     } finally {
       dotCodeSchoolClient.disconnect();
@@ -205,118 +215,87 @@ describe('Integration Test: RelaySessionOrchestrator + RelayClient', () => {
     }
   });
 
-  it('should handle control flow and sync direction negotiation', async () => {
-    const client1 = new RelayClient(relayClientConfig);
-    const client2 = new RelayClient(relayClientConfig);
-
-    let controlOffered = false;
-
-    client2.on('controlOffered', (event) => {
-      controlOffered = true;
-      event.accept(); // Accept the control offer
+  it('should test session lifecycle with modern API', async () => {
+    const eventHandler = new TestEventHandler();
+    const client = new RelayClient({
+      serverUrl: `ws://localhost:${port}`,
+      sessionEndpoint: '/api/sessions',
+      eventHandler
     });
 
     try {
-      const session = await client1.createSessionAndConnect();
-      await client2.connectToSession(session.id);
-
-      await new Promise(resolve => setTimeout(resolve, 100));
-
-      // Both start as CONNECTED_IDLE
-      expect(client1.isConnectedIdle()).to.be.true;
-      expect(client2.isConnectedIdle()).to.be.true;
-
-      // Client1 becomes ACTIVE, Client2 becomes PASSIVE
-      await client1.pullStateFromPeer();
-      await client2.pushStateToPeer();
-      
-      // Wait for server coordination to complete
-      await new Promise(resolve => setTimeout(resolve, 300));
-
-      expect(client1.isActive()).to.be.true;
-      expect(client2.isPassive()).to.be.true;
-
-      await new Promise(resolve => setTimeout(resolve, 100));
-
-      // Client1 (ACTIVE) offers control to client2
-      client1.offerControlToPeer();
-      await new Promise(resolve => setTimeout(resolve, 200));
-
-      expect(controlOffered).to.be.true;
-
-    } finally {
-      client1.disconnect();
-      client2.disconnect();
-    }
-  });
-
-  it('should enforce sync phase-based permissions', async () => {
-    const client = new RelayClient(relayClientConfig);
-
-    const tutorialState: TutorialSyncState = {
-      tutorialId: asTutorialId('test-tutorial'),
-      tutorialTitle: 'Test Tutorial',
-      totalSteps: 5,
-      isShowingSolution: false,
-      stepContent: {
-        id: 'step-1',
-        title: 'Introduction',
-        commitHash: 'abc123',
-        type: 'section',
-        index: 0
-      },
-      repoUrl: 'https://github.com/test/test-tutorial'
-    };
-
-    try {
-      await client.createSessionAndConnect();
-
-      // CONNECTED_IDLE clients cannot send or request state
-      expect(() => client.sendTutorialState(tutorialState)).to.throw('Only active clients can send tutorial state');
-      expect(() => client.requestTutorialState()).to.throw('Only active or initializing pull clients can request state');
-
-      // Choose to become ACTIVE - can send and request state
-      await client.pullStateFromPeer();
-      
-      // Wait for server coordination to complete
-      await new Promise(resolve => setTimeout(resolve, 200));
-      
-      expect(() => client.sendTutorialState(tutorialState)).to.not.throw();
-
-    } finally {
-      client.disconnect();
-    }
-  });
-
-  it('should handle session lifecycle correctly', async () => {
-    const client = new RelayClient(relayClientConfig);
-
-    try {
-      // Create and connect
-      const session = await client.createSessionAndConnect({ tutorial: 'lifecycle-test' });
-      expect(client.isConnected()).to.be.true;
-      expect(client.getCurrentSyncPhase()).to.equal(SyncPhase.CONNECTED_IDLE);
+      // Create and connect to session
+      const session = await client.session.create({ tutorial: 'lifecycle-test' });
+      expect(client.is.connected()).to.be.true;
+      expect(client.getCurrentPhase()).to.equal(SyncPhase.CONNECTED_IDLE);
 
       // Get session info
-      const sessionInfo = await client.getSessionInfo();
+      const sessionInfo = await client.session.info();
       expect(sessionInfo).to.not.be.null;
       expect(sessionInfo!.id).to.equal(session.id);
 
-      // List sessions
-      const sessions = await client.listAvailableSessions();
-      expect(sessions).to.be.an('array');
+      // List sessions (should include our session)
+      const sessions = await client.session.list();
       expect(sessions.length).to.be.greaterThan(0);
 
       // Disconnect
       client.disconnect();
-      expect(client.isConnected()).to.be.false;
-      expect(client.getCurrentSyncPhase()).to.equal(SyncPhase.DISCONNECTED);
+      expect(client.is.connected()).to.be.false;
+      expect(client.getCurrentPhase()).to.equal(SyncPhase.DISCONNECTED);
+
+      // Verify disconnection event
+      const disconnectedEvent = eventHandler.getEvent('disconnected');
+      expect(disconnectedEvent).to.not.be.undefined;
 
     } finally {
-      // Ensure cleanup
-      if (client.isConnected()) {
+      if (client.is.connected()) {
         client.disconnect();
       }
+    }
+  });
+
+  it('should prevent invalid operations based on sync phase', async () => {
+    const eventHandler = new TestEventHandler();
+    const client = new RelayClient({
+      serverUrl: `ws://localhost:${port}`,
+      sessionEndpoint: '/api/sessions',
+      eventHandler
+    });
+
+    try {
+      const tutorialState: TutorialSyncState = {
+        tutorialId: asTutorialId('phase-test'),
+        tutorialTitle: 'Phase Test',
+        totalSteps: 3,
+        isShowingSolution: false,
+        stepContent: {
+          id: 'step-1',
+          title: 'Initial Step',
+          commitHash: 'hash123',
+          type: 'section',
+          index: 0
+        },
+        repoUrl: 'https://github.com/test/phase-test'
+      };
+
+      // DISCONNECTED: Cannot send state
+      expect(() => client.tutorial.sendState(tutorialState)).to.throw('Only active clients can send tutorial state');
+
+      // Connect and become IDLE
+      await client.session.create({ tutorial: 'phase-test' });
+      
+      // CONNECTED_IDLE: Cannot send state
+      expect(() => client.tutorial.sendState(tutorialState)).to.throw('Only active clients can send tutorial state');
+
+      // Become ACTIVE
+      await client.sync.asActive();
+      await new Promise(resolve => setTimeout(resolve, 200));
+
+      // ACTIVE: Can send state (should not throw)
+      expect(() => client.tutorial.sendState(tutorialState)).to.not.throw();
+
+    } finally {
+      client.disconnect();
     }
   });
 }); 

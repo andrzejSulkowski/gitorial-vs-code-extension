@@ -5,7 +5,7 @@ import { v4 as uuidv4 } from 'uuid';
 
 import { SessionStore } from './stores/SessionStore';
 import { SessionLifecycleManager } from './manager/SessionLifecycleManager';
-import { ConnectionManager } from './manager/ConnectionManager';
+import { ConnectionManager, ConnectionManagerEventHandler } from './manager/ConnectionManager';
 
 import { 
   SessionOrchestratorConfig, 
@@ -23,7 +23,7 @@ import { SYNC_PROTOCOL_VERSION } from '../constants/protocol-version';
  * Orchestrates relay sessions using focused components
  * Acts as the main coordinator between SessionStore, SessionLifecycleManager, and ConnectionManager
  */
-export class RelaySessionOrchestrator extends EventEmitter {
+export class RelaySessionOrchestrator extends EventEmitter implements ConnectionManagerEventHandler {
   private readonly config: Required<SessionOrchestratorConfig>;
   private readonly sessionStore: SessionStore;
   private readonly lifecycleManager: SessionLifecycleManager;
@@ -54,7 +54,9 @@ export class RelaySessionOrchestrator extends EventEmitter {
       this.config.cleanupIntervalMs
     );
 
-    this.connectionManager = new ConnectionManager();
+    this.connectionManager = new ConnectionManager({
+      eventHandler: this // RelaySessionOrchestrator implements ConnectionManagerEventHandler
+    });
 
     // Wire up event forwarding
     this.setupEventForwarding();
@@ -193,14 +195,8 @@ export class RelaySessionOrchestrator extends EventEmitter {
       this.emit('sessionDeleted', sessionId);
     });
 
-    // Forward connection events
-    this.connectionManager.on('clientConnected', (sessionId, connectionId) => {
-      this.emit('clientConnected', sessionId, connectionId);
-    });
-
-    this.connectionManager.on('clientDisconnected', (sessionId, connectionId) => {
-      this.emit('clientDisconnected', sessionId, connectionId);
-    });
+    // Note: Connection events are now handled via dependency injection
+    // through the ConnectionManagerEventHandler interface
   }
 
   /**
@@ -519,6 +515,10 @@ export class RelaySessionOrchestrator extends EventEmitter {
       session.activeClientId = null;
     }
     
+    // Remove connection from session store for client count tracking
+    // This must be done BEFORE calling removeConnection() which triggers onClientDisconnected
+    this.sessionStore.removeClientConnection(connection.sessionId, connection);
+    
     this.connectionManager.removeConnection(connection.id);
   }
 
@@ -590,5 +590,77 @@ export class RelaySessionOrchestrator extends EventEmitter {
     ...args: Parameters<SessionOrchestratorEvents[K]>
   ): boolean {
     return super.emit(event, ...args);
+  }
+
+  // ===============================
+  // CONNECTION MANAGER EVENT HANDLER IMPLEMENTATION
+  // ===============================
+
+  onClientConnected(sessionId: string, connectionId: string): void {
+    this.emit('clientConnected', sessionId, connectionId);
+    
+    // Get all connections in the session
+    const connections = this.connectionManager.getSessionConnections(sessionId);
+    const newConnection = this.connectionManager.getConnection(connectionId);
+    
+    // Add connection to session store for client count tracking
+    if (newConnection) {
+      this.sessionStore.addClientConnection(sessionId, newConnection);
+    }
+    
+    if (newConnection) {
+      // 1. Notify all existing clients about the new connection
+      const newClientConnectedMessage: SyncMessage = {
+        type: SyncMessageType.CLIENT_CONNECTED,
+        clientId: newConnection.clientId || connectionId,
+        timestamp: Date.now(),
+        protocol_version: SYNC_PROTOCOL_VERSION
+      };
+      
+      // Send to all other clients in the session
+      for (const connection of connections) {
+        if (connection.id !== connectionId && connection.socket.readyState === WebSocket.OPEN) {
+          this.sendToConnection(connection, newClientConnectedMessage);
+        }
+      }
+      
+      // 2. Notify the new client about all existing clients
+      for (const connection of connections) {
+        if (connection.id !== connectionId && connection.socket.readyState === WebSocket.OPEN) {
+          const existingClientMessage: SyncMessage = {
+            type: SyncMessageType.CLIENT_CONNECTED,
+            clientId: connection.clientId || connection.id,
+            timestamp: Date.now(),
+            protocol_version: SYNC_PROTOCOL_VERSION
+          };
+          
+          this.sendToConnection(newConnection, existingClientMessage);
+        }
+      }
+    }
+  }
+
+  onClientDisconnected(sessionId: string, connectionId: string): void {
+    this.emit('clientDisconnected', sessionId, connectionId);
+    
+    // Notify all remaining clients in the session about the disconnection
+    const connections = this.connectionManager.getSessionConnections(sessionId);
+    
+    if (connections.length > 0) {
+      const clientDisconnectedMessage: SyncMessage = {
+        type: SyncMessageType.CLIENT_DISCONNECTED,
+        clientId: connectionId, // Use connectionId since the connection is already removed
+        data: {},
+        timestamp: Date.now(),
+        protocol_version: SYNC_PROTOCOL_VERSION
+      };
+      
+      // Send to all remaining clients in the session
+      for (const connection of connections) {
+        if (connection.socket.readyState === WebSocket.OPEN) {
+          this.sendToConnection(connection, clientDisconnectedMessage);
+        }
+      }
+    }
   }
 } 

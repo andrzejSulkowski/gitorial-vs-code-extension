@@ -1,7 +1,6 @@
-import { createEventEmitter, type IEventEmitter } from '../events/EventEmitterFactory'; //TODO: This won't work in browser based environemnts
-import { createWebSocketClient, type ISyncSocket } from '../socket/WebSocketClientFactory';
-import { SyncMessage } from '../types/messages';
-import { ConnectionStatus, SyncClientError, SyncErrorType } from '../types';
+import { createWebSocketClient, type ISyncSocket } from './adapters/WebSocketClientFactory';
+import { SyncMessage } from './types/messages';
+import { ConnectionStatus, SyncClientError, SyncErrorType } from './types';
 
 export interface ConnectionManagerConfig {
   wsUrl: string;
@@ -9,21 +8,27 @@ export interface ConnectionManagerConfig {
   autoReconnect: boolean;
   maxReconnectAttempts: number;
   reconnectDelay: number;
+  eventHandler: ConnectionManagerEventHandler;
 }
 
-export interface ConnectionManagerEvents {
-  connected: () => void;
-  disconnected: () => void;
-  statusChanged: (status: ConnectionStatus) => void;
-  error: (error: SyncClientError) => void;
+/**
+ * Event handler interface for ConnectionManager events
+ * This provides type-safe event handling with compile-time guarantees
+ */
+export interface ConnectionManagerEventHandler {
+  onConnected(): void;
+  onDisconnected(): void;
+  onStatusChanged(status: ConnectionStatus): void;
+  onError(error: SyncClientError): void;
+  onMessage(message: SyncMessage): void;
 }
 
 /**
  * Manages WebSocket connections with automatic reconnection logic
+ * Uses dependency injection for type-safe event handling
  */
 export class ConnectionManager {
   private readonly config: ConnectionManagerConfig;
-  private readonly eventEmitter: IEventEmitter;
   private socket: ISyncSocket | null = null;
   private connectionStatus: ConnectionStatus = ConnectionStatus.DISCONNECTED;
   private currentSessionId: string | null = null;
@@ -34,35 +39,6 @@ export class ConnectionManager {
 
   constructor(config: ConnectionManagerConfig) {
     this.config = config;
-    this.eventEmitter = createEventEmitter();
-  }
-
-  // ===============================
-  // EVENT EMITTER DELEGATION
-  // ===============================
-
-  on(event: string, listener: (...args: any[]) => void): this {
-    this.eventEmitter.on(event, listener);
-    return this;
-  }
-
-  off(event: string, listener: (...args: any[]) => void): this {
-    this.eventEmitter.off(event, listener);
-    return this;
-  }
-
-  emit(event: string, ...args: any[]): boolean {
-    return this.eventEmitter.emit(event, ...args);
-  }
-
-  once(event: string, listener: (...args: any[]) => void): this {
-    this.eventEmitter.once(event, listener);
-    return this;
-  }
-
-  removeAllListeners(event?: string): this {
-    this.eventEmitter.removeAllListeners(event);
-    return this;
   }
 
   async connect(sessionId: string): Promise<void> {
@@ -84,7 +60,7 @@ export class ConnectionManager {
         this.isConnecting = false;
         this.reconnectAttempts = 0;
         this.setStatus(ConnectionStatus.CONNECTED);
-        this.emit('connected');
+        this.config.eventHandler.onConnected();
       });
 
       this.socket.onMessage((data: any) => {
@@ -97,7 +73,7 @@ export class ConnectionManager {
             throw new Error('Message missing type field');
           }
           
-          this.emit('message', message);
+          this.config.eventHandler.onMessage(message);
         } catch (error) {
           console.warn('Invalid message received:', data, error);
           this.handleError(new SyncClientError(SyncErrorType.INVALID_MESSAGE, `Invalid message received: ${error}`));
@@ -112,7 +88,7 @@ export class ConnectionManager {
         if (this.config.autoReconnect && this.reconnectAttempts < this.config.maxReconnectAttempts) {
           this.scheduleReconnect();
         } else {
-          this.emit('disconnected');
+          this.config.eventHandler.onDisconnected();
         }
       });
 
@@ -146,7 +122,7 @@ export class ConnectionManager {
     this.clearConnectionTimeout();
     this.cleanup();
     this.setStatus(ConnectionStatus.DISCONNECTED);
-    this.emit('disconnected');
+    this.config.eventHandler.onDisconnected();
   }
 
   sendMessage(message: SyncMessage): void {
@@ -176,12 +152,12 @@ export class ConnectionManager {
   private setStatus(status: ConnectionStatus): void {
     if (this.connectionStatus !== status) {
       this.connectionStatus = status;
-      this.emit('statusChanged', status);
+      this.config.eventHandler.onStatusChanged(status);
     }
   }
 
   private handleError(error: SyncClientError): void {
-    this.emit('error', error);
+    this.config.eventHandler.onError(error);
   }
 
   private scheduleReconnect(): void {
@@ -204,7 +180,7 @@ export class ConnectionManager {
           this.scheduleReconnect();
         } else {
           this.setStatus(ConnectionStatus.DISCONNECTED);
-          this.emit('disconnected');
+          this.config.eventHandler.onDisconnected();
         }
       }
     }, this.config.reconnectDelay);

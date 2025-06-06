@@ -3,10 +3,8 @@ import express from 'express';
 import { WebSocketServer } from 'ws';
 import { RelaySessionOrchestrator } from '../../src/server/RelaySessionOrchestrator';
 import { SessionOrchestratorConfig } from '../../src/server/types/session';
-import { RelayClientConfig } from '../../src';
 
 const port = 9999;
-const relayClientConfig: RelayClientConfig = { baseUrl: `http://localhost:${port}`, wsUrl: `ws://localhost:${port}`, sessionEndpoint: '/api/sessions' }
 
 export async function getTestServer() {
   // Create Express app
@@ -43,7 +41,7 @@ export async function getTestServer() {
   } as SessionOrchestratorConfig);
 
   // Setup HTTP routes for session management
-  app.post(relayClientConfig.sessionEndpoint, (req, res) => {
+  app.post('/api/sessions', (req, res) => {
     const { metadata } = req.body;
     try {
       const session = sessionManager.createSession({
@@ -56,7 +54,7 @@ export async function getTestServer() {
     }
   });
 
-  app.get(`${relayClientConfig.sessionEndpoint}/:sessionId`, (req, res) => {
+  app.get('/api/sessions/:sessionId', (req, res) => {
     const session = sessionManager.getSession(req.params.sessionId);
     if (session) {
       res.json(session);
@@ -65,12 +63,12 @@ export async function getTestServer() {
     }
   });
 
-  app.get(`${relayClientConfig.sessionEndpoint}`, (_req, res) => {
+  app.get('/api/sessions', (_req, res) => {
     //This is dangerous to expose and used for testing reasons only
     res.json(sessionManager.listSessions());
   });
 
-  app.delete(`${relayClientConfig.sessionEndpoint}/:sessionId`, (req, res) => {
+  app.delete('/api/sessions/:sessionId', (req, res) => {
     const deleted = sessionManager.deleteSession(req.params.sessionId);
     if (deleted) {
       res.json({ message: 'Session deleted' });
@@ -83,7 +81,7 @@ export async function getTestServer() {
   const start = () => new Promise<void>((resolve) => {
     sessionManager.start();
     server.listen(port, () => {
-      console.log(`🧪 Role management test server running on ${relayClientConfig.baseUrl}`);
+      console.log(`🧪 Role management test server running on http://localhost:${port}`);
       resolve();
     });
   });
@@ -97,5 +95,5 @@ export async function getTestServer() {
   });
 
 
-  return { wss, sessionManager, relayClientConfig, port, start, stop }
+  return { wss, sessionManager, port, start, stop }
 }

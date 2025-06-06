@@ -1,5 +1,5 @@
-import { SyncClientError, SyncErrorType } from '../types';
-import { SessionData } from '../../server/types/session';
+import { SyncClientError, SyncErrorType } from './types';
+import { SessionData } from '../server/types/session';
 
 export interface SessionConfig {
   baseUrl: string;
@@ -33,7 +33,7 @@ export class SessionManager {
   /**
    * Get current session information
    */
-  async getSessionInfo(sessionId: string): Promise<SessionData | null> {
+  async getSession(sessionId: string): Promise<SessionData | null> {
     if (!sessionId) {
       return null;
     }
@@ -45,7 +45,7 @@ export class SessionManager {
 
     if (!response.ok) {
       if (response.status === 404) {
-        return null
+        return null;
       }
       throw new SyncClientError(SyncErrorType.CONNECTION_FAILED, 'Failed to get session info');
     }

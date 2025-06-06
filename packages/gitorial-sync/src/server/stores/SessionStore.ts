@@ -1,5 +1,5 @@
 import { EventEmitter } from 'events';
-import { Session, SessionData, CreateSessionOptions, SessionStatus, SessionLifecycleEvents } from '../types/session';
+import { Session, SessionData, CreateSessionOptions, SessionStatus, SessionLifecycleEvents, RelayConnection } from '../types/session';
 import { ConflictResolution } from '../../client/types/roles';
 
 /**
@@ -85,6 +85,30 @@ export class SessionStore extends EventEmitter {
       return false;
     }
     session.metadata = metadata;
+    return true;
+  }
+
+  /**
+   * Add a client connection to the session
+   */
+  addClientConnection(sessionId: string, connection: RelayConnection): boolean {
+    const session = this.sessions.get(sessionId);
+    if (!session || session.status !== SessionStatus.ACTIVE) {
+      return false;
+    }
+    session.clientConnections.add(connection);
+    return true;
+  }
+
+  /**
+   * Remove a client connection from the session
+   */
+  removeClientConnection(sessionId: string, connection: RelayConnection): boolean {
+    const session = this.sessions.get(sessionId);
+    if (!session || session.status !== SessionStatus.ACTIVE) {
+      return false;
+    }
+    session.clientConnections.delete(connection);
     return true;
   }
 

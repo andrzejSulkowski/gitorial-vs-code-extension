@@ -2,10 +2,10 @@
 export { RelayClient } from './RelayClient';
 
 // Core components (can be used independently)
-export { ConnectionManager } from './connection/ConnectionManager';
-export { SessionManager } from './session/SessionManager';
-export { MessageDispatcher } from './messaging/MessageDispatcher';
+export { ConnectionManager } from './ConnectionManager';
+export { SessionManager } from './SessionManager';
+export { MessageDispatcher } from './MessageDispatcher';
 
 // Re-export types
 export * from './types';
-export * from './socket'; 
+export * from './adapters'; 

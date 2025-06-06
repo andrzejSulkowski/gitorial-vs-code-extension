@@ -30,7 +30,6 @@ import { DiffViewService } from "./ui/services/DiffViewService";
 import { GitChangesFactory } from "./infrastructure/factories/GitChangesFactory";
 import { TabTrackingService } from "./ui/services/TabTrackingService";
 import { TutorialSyncService } from "./domain/services/TutorialSyncService";
-import { RelaySyncClient } from "./infrastructure/adapters/RelaySyncClient";
 import { SyncController } from "./ui/controllers/SyncController";
 import { SyncCommandHandler } from "./ui/handlers/SyncCommandHandler";
 
@@ -52,15 +51,16 @@ export async function activate(context: vscode.ExtensionContext): Promise<vscode
     tutorialRepository,
     workspaceId,
     syncController,
+    tutorialSyncService,
   } = await bootstrapApplication(context);
 
   // --- VS Code Specific Registrations (Infrastructure concern, performed here) ---
   const commandHandler = new CommandHandler(tutorialController);
-  const syncCommandHandler = new SyncCommandHandler(syncController);
+  const syncCommandHandler = new SyncCommandHandler(syncController, tutorialSyncService);
   const uriHandler = new TutorialUriHandler(tutorialController);
 
   commandHandler.register(context);
-  syncCommandHandler.register(context);
+  syncCommandHandler.registerCommands(context);
   uriHandler.register(context);
 
 
@@ -91,6 +91,7 @@ interface BootstrappedDependencies {
   tutorialRepository: ITutorialRepository;
   workspaceId: string | undefined;
   syncController: SyncController;
+  tutorialSyncService: TutorialSyncService;
 }
 
 async function bootstrapApplication(context: vscode.ExtensionContext): Promise<BootstrappedDependencies> {
@@ -137,16 +138,23 @@ async function bootstrapApplication(context: vscode.ExtensionContext): Promise<B
 
 
   // --- Sync Infrastructure ---
-  	const relaySyncClient = new RelaySyncClient();
-	const tutorialSyncService = new TutorialSyncService(relaySyncClient);
+  const useMockSync = process.env.NODE_ENV === 'development' || vscode.workspace.getConfiguration('gitorial').get('useMockSync', true);
+  const tutorialSyncService = new TutorialSyncService({ useMockClient: useMockSync });
   
   // Set up reference to get current tutorial from TutorialService
   tutorialSyncService.setTutorialServiceRef(() => tutorialService.tutorial);
 
+  // --- UI Layer Controllers (create sync controller early) ---
+  const syncController = new SyncController(
+    tutorialSyncService,
+    tutorialService,
+    userInteractionAdapter
+  );
+
   // --- UI Services ---
   const diffViewService = new DiffViewService(diffDisplayerAdapter, fileSystemAdapter);
   const tabTrackingService = new TabTrackingService();
-  const tutorialViewService = new TutorialViewService(fileSystemAdapter, markdownConverter, diffViewService, gitChangesFactory, context.extensionUri, tutorialSyncService, tabTrackingService);
+  const tutorialViewService = new TutorialViewService(fileSystemAdapter, markdownConverter, diffViewService, gitChangesFactory, context.extensionUri, tutorialSyncService, tabTrackingService, syncController);
 
   // Add services to context subscriptions for proper disposal
   context.subscriptions.push(tabTrackingService);
@@ -163,12 +171,6 @@ async function bootstrapApplication(context: vscode.ExtensionContext): Promise<B
     autoOpenState
   );
 
-  const syncController = new SyncController(
-    tutorialSyncService,
-    tutorialService,
-    userInteractionAdapter
-  );
-
   return {
     tutorialController,
     autoOpenState,
@@ -177,6 +179,7 @@ async function bootstrapApplication(context: vscode.ExtensionContext): Promise<B
     tutorialRepository,
     workspaceId,
     syncController,
+    tutorialSyncService,
   };
 }
 

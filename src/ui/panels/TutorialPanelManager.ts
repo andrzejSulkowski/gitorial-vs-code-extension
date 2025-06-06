@@ -79,4 +79,11 @@ export class TutorialPanelManager {
   public static isPanelVisible(): boolean {
     return !!TutorialPanelManager.currentPanelInstance;
   }
+
+  /**
+   * Get the current panel instance if it exists
+   */
+  public static getCurrentPanelInstance(): TutorialPanel | undefined {
+    return TutorialPanelManager.currentPanelInstance;
+  }
 } 

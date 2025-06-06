@@ -1,0 +1,23 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Minimal Working Examples
+
+Guidelines for providing runnable code that demonstrates core functionality without unnecessary complexity.
+
+<rule>
+name: minimal_working_examples
+description: Ensures that code examples are minimal, runnable, and focused on demonstrating core functionality without extra features or extensive error handling.
+
+# Actual guidelines:
+- Provide minimal working examples that compile or run immediately without modification
+- Include only what's strictly necessary to demonstrate the core idea or functionality
+- Omit extra features, extensive error handling, logging, or polishing beyond basic functionality
+- Focus on creating a runnable proof of concept that can be built upon
+- Avoid over-engineering; the goal is to show the essential implementation pattern
+- Include necessary imports, basic type definitions, and minimal setup code required for compilation
+- Prefer simple, direct implementations over complex abstractions in examples
+- Leave advanced logic, edge-case handling, and optimizations for the user to add later
+</rule>

@@ -97,6 +97,26 @@
       {
         "command": "gitorial.syncCurrentTutorial",
         "title": "Gitorial: Sync Current Tutorial"
+      },
+      {
+        "command": "gitorial.dev.simulateClientJoin",
+        "title": "Gitorial Dev: Simulate Client Join"
+      },
+      {
+        "command": "gitorial.dev.simulateClientLeave",
+        "title": "Gitorial Dev: Simulate Client Leave"
+      },
+      {
+        "command": "gitorial.dev.simulateControlOffer",
+        "title": "Gitorial Dev: Simulate Control Offer"
+      },
+      {
+        "command": "gitorial.dev.simulateStateReceived",
+        "title": "Gitorial Dev: Simulate State Received"
+      },
+      {
+        "command": "gitorial.dev.simulateError",
+        "title": "Gitorial Dev: Simulate Error"
       }
     ],
     "uriHandler": [
@@ -104,7 +124,17 @@
         "id": "gitorial-uri-handler",
         "label": "Gitorial URI Handler"
       }
-    ]
+    ],
+    "configuration": {
+      "title": "Gitorial",
+      "properties": {
+        "gitorial.useMockSync": {
+          "type": "boolean",
+          "default": true,
+          "description": "Use mock sync client for development (no real WebSocket connections)"
+        }
+      }
+    }
   },
   "dependencies": {
     "@gitorial/shared-types": "workspace:*",

@@ -14,6 +14,7 @@ import { IGitChangesFactory } from '../ports/IGitChangesFactory';
 import { TutorialController } from '../controllers/TutorialController';
 import { TutorialSyncService } from '../../domain/services/TutorialSyncService';
 import { TabTrackingService } from './TabTrackingService';
+import { SyncController } from '../controllers/SyncController';
 
 
 enum TutorialViewChangeType {
@@ -36,7 +37,8 @@ export class TutorialViewService {
     private readonly gitAdapterFactory: IGitChangesFactory,
     private readonly extensionUri: vscode.Uri,
     private readonly tutorialSyncService: TutorialSyncService,
-    private readonly tabTrackingService: TabTrackingService
+    private readonly tabTrackingService: TabTrackingService,
+    private readonly syncController?: SyncController
   ) { }
 
 
@@ -138,7 +140,7 @@ export class TutorialViewService {
 
   private _initializeTutorialView(tutorial: Readonly<Tutorial>, controller: TutorialController) {
     if (!this._webviewMessageHandler) {
-      this._webviewMessageHandler = new WebviewMessageHandler(controller);
+      this._webviewMessageHandler = new WebviewMessageHandler(controller, this.syncController);
     }
     if (!this._gitAdapter) {
       this._gitAdapter = this.gitAdapterFactory.createFromPath(tutorial.localPath);
@@ -205,8 +207,21 @@ export class TutorialViewService {
   private async _updateTutorialPanel(extensionUri: vscode.Uri, tutorialViewModel: TutorialViewModel, messageHandler: WebviewMessageHandler): Promise<void> {
     if (tutorialViewModel) {
       TutorialPanelManager.createOrShow(extensionUri, tutorialViewModel, messageHandler);
+      
+      // Set the webview panel reference in the sync controller
+      if (this.syncController && TutorialPanelManager.isPanelVisible()) {
+        const panelInstance = TutorialPanelManager.getCurrentPanelInstance();
+        if (panelInstance) {
+          this.syncController.setWebviewPanel(panelInstance.panel);
+        }
+      }
     } else {
       TutorialPanelManager.disposeCurrentPanel();
+      
+      // Clear the webview panel reference in the sync controller
+      if (this.syncController) {
+        this.syncController.setWebviewPanel(null);
+      }
     }
   }
 

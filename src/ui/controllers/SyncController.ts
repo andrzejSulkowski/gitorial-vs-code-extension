@@ -2,168 +2,133 @@ import * as vscode from 'vscode';
 import { TutorialSyncService } from '../../domain/services/TutorialSyncService';
 import { TutorialService } from '../../domain/services/TutorialService';
 import { IUserInteraction } from '../../domain/ports/IUserInteraction';
+import { SyncStateService, SyncStateEventHandler } from '../../domain/services/SyncStateService';
+import { SyncStateViewModel } from '@gitorial/webview-contracts';
 
 /**
- * UI Controller for managing tutorial synchronization with external relay servers
+ * Simple sync controller for managing tutorial sync and updating UI
  */
-export class SyncController {
+export class SyncController implements SyncStateEventHandler {
   private statusBarItem: vscode.StatusBarItem | null = null;
+  private syncStateService: SyncStateService;
+  private webviewPanel: vscode.WebviewPanel | null = null;
 
   constructor(
     private readonly tutorialSyncService: TutorialSyncService,
     private readonly tutorialService: TutorialService,
     private readonly userInteraction: IUserInteraction
   ) {
+    this.syncStateService = new SyncStateService(tutorialSyncService);
+    this.syncStateService.addEventHandler(this);
     this._createStatusBarItem();
-    this._setupTutorialServiceIntegration();
+  }
+
+  onSyncStateChanged(state: SyncStateViewModel): void {
+    this._updateStatusBar(state);
+    this._sendSyncStateToWebview(state);
   }
 
   /**
-   * Connect to a relay server - prompts user for URL and session ID
+   * Set the webview panel reference to send messages to the UI
    */
-  public async connectToRelay(): Promise<void> {
-    try {
-      if (this.tutorialSyncService.isConnectedToRelay()) {
-        this.userInteraction.showWarningMessage('Already connected to a relay server');
-        return;
-      }
+  setWebviewPanel(panel: vscode.WebviewPanel | null): void {
+    this.webviewPanel = panel;
+    
+    // Send initial state if panel is being set
+    if (panel) {
+      this._sendSyncStateToWebview(this.syncStateService.getCurrentState());
+    }
+  }
 
-      // Prompt user for relay URL
+  /**
+   * Handle webview message for sync state refresh
+   */
+  handleWebviewMessage(message: any): void {
+    switch (message.type) {
+      case 'sync-state-refresh-requested':
+        this._sendSyncStateToWebview(this.syncStateService.getCurrentState());
+        break;
+      case 'sync-connect-requested':
+        this._handleConnectRequest(message.payload);
+        break;
+      case 'sync-disconnect-requested':
+        this.disconnectFromRelay();
+        break;
+      default:
+        // Ignore unknown messages
+        break;
+    }
+  }
+
+  async connectToRelay(): Promise<void> {
+    try {
       const relayUrl = await vscode.window.showInputBox({
-        prompt: 'Enter the relay server WebSocket URL',
-        placeHolder: 'ws://localhost:3000?session=session_abc123 or wss://your-relay-server.com?session=session_abc123',
-        validateInput: (value) => {
-          if (!value || (!value.startsWith('ws://') && !value.startsWith('wss://'))) {
-            return 'Please enter a valid WebSocket URL (starting with ws:// or wss://)';
-          }
-          return null;
-        }
+        prompt: 'Enter relay server URL',
+        placeHolder: 'ws://localhost:3000?session=abc123'
       });
 
-      if (!relayUrl) {
-        return; // User cancelled
-      }
+      if (!relayUrl) return;
 
       const url = new URL(relayUrl);
       const sessionId = url.searchParams.get('session');
-
+      
       if (!sessionId) {
-        this.userInteraction.showWarningMessage('No session ID found in the URL');
+        this.userInteraction.showWarningMessage('No session ID in URL');
         return;
       }
 
-      // Connect to relay with session ID stripped from URL
-      const relayUrlWithoutSession = relayUrl.split('?')[0].trim();
-      await this.tutorialSyncService.connectToRelay(relayUrlWithoutSession, sessionId);
-      this._updateStatusBar();
-      
-      this.userInteraction.showInformationMessage(`Connected to relay server. Session: ${sessionId}`);
-      console.log('SyncController: Connected to relay server successfully');
+      await this.tutorialSyncService.connectToRelay(relayUrl.split('?')[0], sessionId);
+      this.userInteraction.showInformationMessage(`Connected to session: ${sessionId}`);
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      this.userInteraction.showErrorMessage(`Failed to connect to relay server: ${errorMessage}`);
-      console.error('SyncController: Failed to connect to relay server:', error);
+      this.userInteraction.showErrorMessage(`Failed to connect: ${error}`);
     }
   }
 
-  /**
-   * Disconnect from the current relay server
-   */
-  public async disconnectFromRelay(): Promise<void> {
-    try {
-      if (!this.tutorialSyncService.isConnectedToRelay()) {
-        this.userInteraction.showWarningMessage('Not connected to any relay server');
-        return;
-      }
-
-      await this.tutorialSyncService.disconnectFromRelay();
-      this._updateStatusBar();
-      
-      this.userInteraction.showInformationMessage('Disconnected from relay server');
-      console.log('SyncController: Disconnected from relay server successfully');
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      this.userInteraction.showErrorMessage(`Failed to disconnect from relay server: ${errorMessage}`);
-      console.error('SyncController: Failed to disconnect from relay server:', error);
-    }
+  async disconnectFromRelay(): Promise<void> {
+    await this.tutorialSyncService.disconnectFromRelay();
+    this.userInteraction.showInformationMessage('Disconnected from sync');
   }
 
-  /**
-   * Show sync status and connection information
-   */
-  public showSyncStatus(): void {
-    const isConnected = this.tutorialSyncService.isConnectedToRelay();
-    const connectionInfo = this.tutorialSyncService.getConnectionInfo();
-    const clientCount = this.tutorialSyncService.getConnectedClientCount();
-    const isLocked = this.tutorialSyncService.isExtensionLocked();
-
-    let statusMessage = `Gitorial Sync Status:\n\n`;
-    statusMessage += `• Relay Connection: ${isConnected ? '🟢 Connected' : '🔴 Disconnected'}\n`;
-    
-    if (isConnected && connectionInfo) {
-      statusMessage += `• Relay URL: ${connectionInfo.relayUrl}\n`;
-      statusMessage += `• Session ID: ${connectionInfo.sessionId}\n`;
-      statusMessage += `• Client ID: ${connectionInfo.clientId}\n`;
-      statusMessage += `• Connected Clients: ${clientCount}\n`;
-      statusMessage += `• Extension: ${isLocked ? '🔒 Locked (Sync Active)' : '🔓 Unlocked'}\n`;
-    }
-
-    this.userInteraction.showInformationMessage(statusMessage);
+  dispose(): void {
+    this.statusBarItem?.dispose();
+    this.syncStateService.dispose();
   }
 
-  /**
-   * Dispose of resources
-   */
-  public dispose(): void {
-    if (this.statusBarItem) {
-      this.statusBarItem.dispose();
-      this.statusBarItem = null;
-    }
-  }
-
-  /**
-   * Create and configure the status bar item
-   */
   private _createStatusBarItem(): void {
-    this.statusBarItem = vscode.window.createStatusBarItem(
-      vscode.StatusBarAlignment.Right,
-      100
-    );
-    
+    this.statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
     this.statusBarItem.command = 'gitorial.toggleSyncConnection';
-    this.statusBarItem.tooltip = 'Click to toggle Gitorial sync connection';
-    this._updateStatusBar();
     this.statusBarItem.show();
+    this._updateStatusBar(this.syncStateService.getCurrentState());
   }
 
-  /**
-   * Update the status bar item based on current state
-   */
-  private _updateStatusBar(): void {
+  private _updateStatusBar(state: SyncStateViewModel): void {
     if (!this.statusBarItem) return;
 
-    const isConnected = this.tutorialSyncService.isConnectedToRelay();
-    const clientCount = this.tutorialSyncService.getConnectedClientCount();
-    const isLocked = this.tutorialSyncService.isExtensionLocked();
+    this.statusBarItem.text = `$(sync) ${state.statusText} (${state.connectedClients})`;
+    this.statusBarItem.backgroundColor = state.isConnected 
+      ? new vscode.ThemeColor('statusBarItem.activeBackground')
+      : undefined;
+  }
 
-    if (isConnected) {
-      const lockIcon = isLocked ? '🔒' : '🔓';
-      this.statusBarItem.text = `$(sync) Gitorial Sync ${lockIcon} (${clientCount})`;
-      this.statusBarItem.backgroundColor = isLocked 
-        ? new vscode.ThemeColor('statusBarItem.warningBackground')
-        : new vscode.ThemeColor('statusBarItem.activeBackground');
-    } else {
-      this.statusBarItem.text = '$(sync~spin) Gitorial Sync';
-      this.statusBarItem.backgroundColor = undefined;
+  private _sendSyncStateToWebview(state: SyncStateViewModel): void {
+    if (!this.webviewPanel) return;
+
+    try {
+      this.webviewPanel.webview.postMessage({
+        type: 'sync-ui-state-updated',
+        payload: { state }
+      });
+    } catch (error) {
+      console.error('SyncController: Failed to send sync state to webview:', error);
     }
   }
 
-  /**
-   * Setup integration with TutorialService to automatically sync state changes
-   */
-  private _setupTutorialServiceIntegration(): void {
-    // We'll need to modify TutorialService to emit events or provide hooks
-    // For now, we'll implement a polling mechanism or manual sync calls
-    console.log('SyncController: Tutorial service integration setup complete');
+  private async _handleConnectRequest(payload: { relayUrl: string; sessionId: string }): Promise<void> {
+    try {
+      await this.tutorialSyncService.connectToRelay(payload.relayUrl, payload.sessionId);
+      this.userInteraction.showInformationMessage(`Connected to session: ${payload.sessionId}`);
+    } catch (error) {
+      this.userInteraction.showErrorMessage(`Failed to connect: ${error}`);
+    }
   }
 } 

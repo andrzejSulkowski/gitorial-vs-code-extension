@@ -29,3 +29,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 ## [0.1.7] - 2025-05-27
 
 - Fix focus of the last active tutorial file when toggling the solution
+
+## [0.1.8] - 2025-06-06
+
+- Fix Gitorial branch setup when user is on a commit that belongs to the gitorial branch and has not fetched the remote branch

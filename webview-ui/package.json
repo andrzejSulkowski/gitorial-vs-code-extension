@@ -23,6 +23,7 @@
     "@gitorial/shared-types": "workspace:*",
     "@gitorial/webview-contracts": "workspace:*",
     "@types/vscode-webview": "^1.57.5",
+    "esbuild": "^0.25.5",
     "prismjs": "^1.30.0",
     "rehype-raw": "^7.0.0",
     "rehype-sanitize": "^6.0.0",

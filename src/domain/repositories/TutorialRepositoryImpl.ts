@@ -40,6 +40,7 @@ export class TutorialRepositoryImpl implements ITutorialRepository {
       if(!isValid){
         return null;
       }
+      await gitAdapter.ensureGitorialBranch();
       const tutorial = await TutorialBuilder.buildFromLocalPath(localPath, gitService);
       if (tutorial) {
         await this.stateStorage.update(`${this.TUTORIAL_PATH_MAP_KEY_PREFIX}${tutorial.id}`, localPath);

@@ -2,7 +2,7 @@
   "name": "gitorial",
   "displayName": "Gitorial",
   "description": "Interactive VS Code extension that guides you step-by-step through Git-based tutorials with inline explanations and easy navigation.",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "preview": true,
   "private": true,
   "publisher": "AndrzejSulkowski",
@@ -173,6 +173,14 @@
     "sinon": "^20.0.0",
     "ts-node": "^10.9.2",
     "typescript": "^5.8.2",
+
     "undici-types": "^7.10.0"
-  }
+  },
+  "dependencies": {
+    "markdown-it": "^14.1.0",
+    "simple-git": "^3.28.0"
+  },
+  "workspaces": [
+    "webview-ui"
+  ]
 }

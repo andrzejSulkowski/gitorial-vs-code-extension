@@ -1,6 +1,6 @@
 import { expect } from 'chai';
 import { UriParser, UriCommand, type ParseResult } from './UriParser';
-import sinon from 'sinon';
+import * as sinon from 'sinon';
 
 describe('UriParser', () => {
   let consoleWarnStub: sinon.SinonStub;

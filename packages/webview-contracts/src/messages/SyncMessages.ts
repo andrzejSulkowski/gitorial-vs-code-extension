@@ -1,12 +1,13 @@
-import { SyncStateViewModel } from '../viewmodels/SyncStateViewModel';
-
 /**
- * Simple sync messages between extension and webview
+ * Sync-related messages between Extension and Webview
  */
-export type ExtensionToWebviewSyncMessage = 
-  | { type: 'sync-ui-state-updated'; payload: { state: SyncStateViewModel } };
 
+// Extension → Webview Sync Messages
+export type ExtensionToWebviewSyncMessage =
+  | { category: 'sync'; type: 'state-updated'; payload: { state: any } }; // SyncStateViewModel - avoiding import for now
+
+// Webview → Extension Sync Messages
 export type WebviewToExtensionSyncMessage =
-  | { type: 'sync-connect-requested'; payload: { relayUrl: string; sessionId: string } }
-  | { type: 'sync-disconnect-requested' }
-  | { type: 'sync-state-refresh-requested' }; 
+  | { category: 'sync'; type: 'connect-requested'; payload: { relayUrl: string; sessionId: string } }
+  | { category: 'sync'; type: 'disconnect-requested' }
+  | { category: 'sync'; type: 'state-refresh-requested' }; 

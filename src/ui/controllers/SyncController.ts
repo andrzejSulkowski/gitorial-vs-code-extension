@@ -3,7 +3,7 @@ import { TutorialSyncService } from '../../domain/services/TutorialSyncService';
 import { TutorialService } from '../../domain/services/TutorialService';
 import { IUserInteraction } from '../../domain/ports/IUserInteraction';
 import { SyncStateService, SyncStateEventHandler } from '../../domain/services/SyncStateService';
-import { SyncStateViewModel } from '@gitorial/webview-contracts';
+import { SyncStateViewModel, WebviewToExtensionSyncMessage } from '@gitorial/webview-contracts';
 
 /**
  * Simple sync controller for managing tutorial sync and updating UI
@@ -33,7 +33,7 @@ export class SyncController implements SyncStateEventHandler {
    */
   setWebviewPanel(panel: vscode.WebviewPanel | null): void {
     this.webviewPanel = panel;
-    
+
     // Send initial state if panel is being set
     if (panel) {
       this._sendSyncStateToWebview(this.syncStateService.getCurrentState());
@@ -43,20 +43,24 @@ export class SyncController implements SyncStateEventHandler {
   /**
    * Handle webview message for sync state refresh
    */
-  handleWebviewMessage(message: any): void {
+  handleWebviewMessage(message: WebviewToExtensionSyncMessage): void {
     switch (message.type) {
-      case 'sync-state-refresh-requested':
-        this._sendSyncStateToWebview(this.syncStateService.getCurrentState());
-        break;
-      case 'sync-connect-requested':
+      case 'connect-requested': {
         this._handleConnectRequest(message.payload);
         break;
-      case 'sync-disconnect-requested':
+      }
+      case 'disconnect-requested': {
         this.disconnectFromRelay();
         break;
-      default:
-        // Ignore unknown messages
+      }
+      case 'state-refresh-requested': {
+        this._sendSyncStateToWebview(this.syncStateService.getCurrentState());
         break;
+      }
+      default: {
+        console.warn('Received unknown command from webview:', message);
+        break;
+      }
     }
   }
 
@@ -71,14 +75,19 @@ export class SyncController implements SyncStateEventHandler {
 
       const url = new URL(relayUrl);
       const sessionId = url.searchParams.get('session');
-      
+
       if (!sessionId) {
         this.userInteraction.showWarningMessage('No session ID in URL');
         return;
       }
 
-      await this.tutorialSyncService.connectToRelay(relayUrl.split('?')[0], sessionId);
-      this.userInteraction.showInformationMessage(`Connected to session: ${sessionId}`);
+      try {
+        await this.tutorialSyncService.connectToRelay(relayUrl.split('?')[0], sessionId);
+        this.userInteraction.showInformationMessage(`Connected to session: ${sessionId}`);
+        //Inform the webview that the connection is established
+      } catch (e) {
+        this.userInteraction.showErrorMessage(`Failed to connect: ${e}`);
+      }
     } catch (error) {
       this.userInteraction.showErrorMessage(`Failed to connect: ${error}`);
     }
@@ -105,7 +114,7 @@ export class SyncController implements SyncStateEventHandler {
     if (!this.statusBarItem) return;
 
     this.statusBarItem.text = `$(sync) ${state.statusText} (${state.connectedClients})`;
-    this.statusBarItem.backgroundColor = state.isConnected 
+    this.statusBarItem.backgroundColor = state.isConnected
       ? new vscode.ThemeColor('statusBarItem.activeBackground')
       : undefined;
   }

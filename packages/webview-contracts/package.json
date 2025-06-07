@@ -3,9 +3,10 @@
   "version": "1.0.0",
   "description": "Communication contracts between Gitorial extension and webview",
   "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "types": "src/index.ts",
   "files": [
-    "dist/**/*"
+    "dist/**/*",
+    "src/**/*"
   ],
   "scripts": {
     "build": "tsc",

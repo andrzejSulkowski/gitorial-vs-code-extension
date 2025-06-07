@@ -4,7 +4,7 @@ import { Step } from 'src/domain/models/Step';
 import * as path from 'path'; // TODO: Extend IFileSystem with needed functionality to replace 'path'
 import { Tutorial } from '../../domain/models/Tutorial';
 import { IMarkdownConverter } from '../ports/IMarkdownConverter';
-import { TutorialViewModel, TutorialStepViewModel } from '@gitorial/shared-types';
+import { TutorialViewModel, TutorialStepViewModel } from '@gitorial/webview-contracts';
 import { EnrichedStep } from '../../domain/models/EnrichedStep';
 import { TutorialPanelManager } from '../panels/TutorialPanelManager';
 import { WebviewMessageHandler } from '../panels/WebviewMessageHandler';
@@ -38,7 +38,7 @@ export class TutorialViewService {
     private readonly extensionUri: vscode.Uri,
     private readonly tutorialSyncService: TutorialSyncService,
     private readonly tabTrackingService: TabTrackingService,
-    private readonly syncController?: SyncController
+    private readonly syncController: SyncController
   ) { }
 
 
@@ -157,7 +157,7 @@ export class TutorialViewService {
       changeType = TutorialViewChangeType.SolutionToggle;
     }
 
-    if (newTutorialViewModel.currentStepId !== oldTutorialViewModel?.currentStepId) {
+    if (newTutorialViewModel.currentStep.id !== oldTutorialViewModel?.currentStep.id) {
       if (changeType === TutorialViewChangeType.SolutionToggle) {
         changeType = TutorialViewChangeType.StepSolutionChange;
       } else {
@@ -173,11 +173,12 @@ export class TutorialViewService {
    * Returns null if no tutorial is active.
    */
   private _tutorialViewModel(tutorial: Readonly<Tutorial>): TutorialViewModel | null {
-    const actualCurrentStepId = tutorial.activeStep.id;
+    const currentStepId = tutorial.activeStep.id;
+    const currentStepIndex = tutorial.activeStep.index;
 
     const stepsViewModel: TutorialStepViewModel[] = tutorial.steps.map(step => {
       let stepHtmlContent: string | undefined = undefined;
-      if (step.id === actualCurrentStepId && step instanceof EnrichedStep) {
+      if (step.id === currentStepId && step instanceof EnrichedStep) {
         stepHtmlContent = this.markdownConverter.render(step.markdown);
       }
 
@@ -186,7 +187,7 @@ export class TutorialViewService {
         title: step.title,
         commitHash: step.commitHash,
         type: step.type,
-        isActive: step.id === actualCurrentStepId,
+        isActive: step.id === currentStepId,
         htmlContent: stepHtmlContent
       };
     });
@@ -195,7 +196,10 @@ export class TutorialViewService {
       id: tutorial.id,
       title: tutorial.title,
       steps: stepsViewModel,
-      currentStepId: actualCurrentStepId,
+      currentStep: {
+        id: currentStepId,
+        index: currentStepIndex
+      },
       isShowingSolution: tutorial.isShowingSolution
     };
   }

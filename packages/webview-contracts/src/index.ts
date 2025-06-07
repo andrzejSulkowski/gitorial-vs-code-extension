@@ -1,7 +1,8 @@
 // Message contracts
-export * from './messages/WebViewMessages';
-export * from './messages/SyncMessages';
+export * from './messages';
 
 // View models (if any webview-specific ones are needed)
 export * from './viewmodels/SyncStateViewModel';
-// export * from './viewmodels'; 
+export * from './viewmodels/TutorialViewModel';
+export * from './viewmodels/TutorialStepViewModel';
+export * from './viewmodels/HTML';

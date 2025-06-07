@@ -1,4 +1,4 @@
-import { StepType } from "./StepType";
+import type { StepType } from "./StepType";
 
 export interface StepData {
   id: string;

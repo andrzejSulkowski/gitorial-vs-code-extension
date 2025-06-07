@@ -1,0 +1,258 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Svelte Runes Syntax Enforcement
+
+Standards for using Svelte 5's new runes syntax instead of legacy reactive declarations.
+
+<rule>
+name: svelte_runes_syntax
+description: Enforces the use of Svelte 5 runes syntax ($state, $derived, $effect, etc.) over legacy reactive declarations ($:, let, export let)
+
+# Modern Svelte 5 Runes vs Legacy Syntax:
+
+## State Management:
+**✅ Use (Svelte 5 Runes):**
+```svelte
+<script>
+  let count = $state(0);
+  let items = $state([]);
+  let user = $state({ name: '', email: '' });
+</script>
+```
+
+**❌ Avoid (Legacy):**
+```svelte
+<script>
+  let count = 0;
+  let items = [];
+  let user = { name: '', email: '' };
+</script>
+```
+
+## Derived/Computed Values:
+**✅ Use (Svelte 5 Runes):**
+```svelte
+<script>
+  let count = $state(0);
+  let doubled = $derived(count * 2);
+  let message = $derived(`Count is ${count}`);
+  let isEven = $derived(count % 2 === 0);
+</script>
+```
+
+**❌ Avoid (Legacy):**
+```svelte
+<script>
+  let count = 0;
+  $: doubled = count * 2;
+  $: message = `Count is ${count}`;
+  $: isEven = count % 2 === 0;
+</script>
+```
+
+## Side Effects:
+**✅ Use (Svelte 5 Runes):**
+```svelte
+<script>
+  import { tick } from 'svelte';
+  
+  let count = $state(0);
+  
+  $effect(() => {
+    console.log('Count changed:', count);
+  });
+  
+  $effect(() => {
+    document.title = `Count: ${count}`;
+    
+    return () => {
+      // Cleanup function
+      document.title = 'Default Title';
+    };
+  });
+</script>
+```
+
+**❌ Avoid (Legacy):**
+```svelte
+<script>
+  let count = 0;
+  
+  $: console.log('Count changed:', count);
+  $: document.title = `Count: ${count}`;
+  
+  // No direct cleanup mechanism
+</script>
+```
+
+## Props (Component Input):
+**✅ Use (Svelte 5 Runes):**
+```svelte
+<script>
+  let { title, items = [], onSelect } = $props();
+  
+  // For optional props with defaults
+  let { theme = 'light', size = 'medium' } = $props();
+</script>
+```
+
+**❌ Avoid (Legacy):**
+```svelte
+<script>
+  export let title;
+  export let items = [];
+  export let onSelect;
+  export let theme = 'light';
+  export let size = 'medium';
+</script>
+```
+
+## Event Binding:
+**✅ Use (Svelte 5 Runes):**
+```svelte
+<script>
+  let { onClick } = $props();
+  let count = $state(0);
+  
+  function handleClick() {
+    count += 1;
+    onClick?.(count);
+  }
+</script>
+
+<button onclick={handleClick}>
+  Count: {count}
+</button>
+```
+
+**❌ Avoid (Legacy):**
+```svelte
+<script>
+  export let onClick;
+  let count = 0;
+  
+  function handleClick() {
+    count += 1;
+    onClick?.(count);
+  }
+</script>
+
+<button on:click={handleClick}>
+  Count: {count}
+</button>
+```
+
+## Complex State with Nested Reactivity:
+**✅ Use (Svelte 5 Runes):**
+```svelte
+<script>
+  let todos = $state([]);
+  let filter = $state('all');
+  
+  let filteredTodos = $derived(() => {
+    if (filter === 'completed') return todos.filter(t => t.completed);
+    if (filter === 'active') return todos.filter(t => !t.completed);
+    return todos;
+  });
+  
+  let completedCount = $derived(todos.filter(t => t.completed).length);
+  let activeCount = $derived(todos.length - completedCount);
+  
+  $effect(() => {
+    // Save to localStorage whenever todos change
+    localStorage.setItem('todos', JSON.stringify(todos));
+  });
+</script>
+```
+
+**❌ Avoid (Legacy):**
+```svelte
+<script>
+  let todos = [];
+  let filter = 'all';
+  
+  $: filteredTodos = (() => {
+    if (filter === 'completed') return todos.filter(t => t.completed);
+    if (filter === 'active') return todos.filter(t => !t.completed);
+    return todos;
+  })();
+  
+  $: completedCount = todos.filter(t => t.completed).length;
+  $: activeCount = todos.length - completedCount;
+  
+  $: if (todos) {
+    localStorage.setItem('todos', JSON.stringify(todos));
+  }
+</script>
+```
+
+# Key Benefits of Runes:
+
+1. **Explicit State Declaration**: `$state()` makes it clear what is reactive
+2. **Better Performance**: More efficient reactivity system
+3. **Cleaner Syntax**: Less ambiguous than `$:` reactive statements
+4. **Better TypeScript Support**: Improved type inference
+5. **Cleanup Functions**: `$effect()` supports proper cleanup with return functions
+6. **Easier Testing**: More predictable state management
+
+# Migration Guidelines:
+
+1. **Props**: Replace `export let` with `let { propName } = $props()`
+2. **State**: Wrap reactive variables with `$state()`
+3. **Derived Values**: Replace `$: computed = ...` with `let computed = $derived(...)`
+4. **Effects**: Replace `$: { /* side effect */ }` with `$effect(() => { /* side effect */ })`
+5. **Event Handlers**: Use `onclick` instead of `on:click`
+
+# When to Use Each Rune:
+
+- **`$state()`**: For any data that should trigger reactivity when changed
+- **`$derived()`**: For computed values based on other reactive state
+- **`$effect()`**: For side effects (DOM manipulation, API calls, logging)
+- **`$props()`**: For component props/inputs
+
+# Common Patterns:
+
+## Store Integration:
+```svelte
+<script>
+  import { tutorialStore } from '$lib/stores';
+  
+  let currentStep = $derived(tutorialStore.currentStep);
+  let isLoading = $derived(tutorialStore.isLoading);
+  
+  $effect(() => {
+    if (currentStep) {
+      console.log('Step changed:', currentStep.title);
+    }
+  });
+</script>
+```
+
+## Form Handling:
+```svelte
+<script>
+  let formData = $state({
+    name: '',
+    email: '',
+    message: ''
+  });
+  
+  let isValid = $derived(
+    formData.name.length > 0 && 
+    formData.email.includes('@') && 
+    formData.message.length > 10
+  );
+  
+  $effect(() => {
+    if (isValid) {
+      console.log('Form is valid');
+    }
+  });
+</script>
+```
+
+This rule ensures consistent use of modern Svelte 5 patterns throughout the webview-ui codebase.
+</rule>

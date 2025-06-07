@@ -7,6 +7,7 @@ import { IFileSystem } from 'src/domain/ports/IFileSystem';
 import { TutorialService } from '../../domain/services/TutorialService';
 import { TutorialViewService } from '../services/TutorialViewService';
 import { AutoOpenState } from 'src/infrastructure/state/AutoOpenState';
+import { WebviewToExtensionTutorialMessage } from '@gitorial/webview-contracts';
 
 /**
  * Controller responsible for orchestrating tutorial-related UI interactions and actions.
@@ -442,6 +443,27 @@ export class TutorialController {
   //      \/  \/ \___|_.__/ \_/ |_|\___| \_/\_/   |_|  |_|\__,_|_| |_|\__,_|_|\___|_|  |___/
   //                                                                                        
   //                                                                                        
+
+
+  public handleWebviewMessage(message: WebviewToExtensionTutorialMessage): void {
+    switch (message.type) {
+      case 'next-step':
+        this.requestNextStep();
+        return;
+      case 'prev-step':
+        this.requestPreviousStep();
+        return;
+      case 'show-solution':
+        this.requestShowSolution();
+        return;
+      case 'hide-solution':
+        this.requestHideSolution();
+        return;
+      default:
+        console.warn('Received unknown command from webview:', message );
+        return;
+    }
+  }
 
   /**
    * Handles the user request to navigate to the next step in the tutorial.

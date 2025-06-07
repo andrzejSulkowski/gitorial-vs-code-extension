@@ -8,9 +8,9 @@
 			"DOM"
 		],
 		"sourceMap": true,
+		"declarationMap": true,
 		"rootDir": ".",
 		"strict": true,
-		//"noImplicitReturns": true,
 		"noFallthroughCasesInSwitch": true,
 		"noUnusedParameters": true,
 		"moduleResolution": "node",
@@ -22,7 +22,8 @@
 			"mocha",
 			"chai"
 		],
-		"preserveSymlinks": true
+		"preserveSymlinks": true,
+		"composite": true
 	},
 	"include": [
 		"src/**/*"

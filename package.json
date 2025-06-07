@@ -30,7 +30,9 @@
     "build:extension:watch": "node ./scripts/esbuild.js --watch",
     "build:extension:production": "node ./scripts/esbuild.js --production",
     "// Quality": "=== Code Quality ===",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && cd webview-ui && pnpm run typecheck && cd ..",
+    "typecheck:extension": "tsc --noEmit",
+    "typecheck:webview": "cd webview-ui && pnpm run typecheck",
     "lint": "eslint src",
     "lint:fix": "eslint src --fix",
     "// Testing": "=== Testing Commands ===",
@@ -64,7 +66,8 @@
     "guide"
   ],
   "activationEvents": [
-    "onStartupFinished",
+    "onCommand:gitorial.cloneTutorial",
+    "onCommand:gitorial.openTutorial",
     "onUri"
   ],
   "main": "./out/extension.js",
@@ -141,7 +144,7 @@
     "@gitorial/webview-contracts": "workspace:*",
     "@gitorial/sync": "workspace:*",
     "markdown-it": "^14.1.0",
-    "simple-git": "^3.27.0",
+    "simple-git": "^3.28.0",
     "ws": "^8.18.0"
   },
   "devDependencies": {
@@ -175,10 +178,6 @@
     "typescript": "^5.8.2",
 
     "undici-types": "^7.10.0"
-  },
-  "dependencies": {
-    "markdown-it": "^14.1.0",
-    "simple-git": "^3.28.0"
   },
   "workspaces": [
     "webview-ui"

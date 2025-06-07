@@ -119,7 +119,7 @@
     line-height: 1.6;
   }
 
-  .markdown-content :global(code:not(.language-*)) {
+  .markdown-content :global(code:not([class*="language-"])) {
     font-family: var(
       --vscode-editor-font-family,
       "SFMono-Regular",

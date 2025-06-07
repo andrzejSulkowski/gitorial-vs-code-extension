@@ -3,9 +3,10 @@
   "version": "1.0.0",
   "description": "Shared type definitions for Gitorial packages",
   "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "types": "src/index.ts",
   "files": [
-    "dist/**/*"
+    "dist/**/*",
+    "src/**/*"
   ],
   "scripts": {
     "build": "tsc",

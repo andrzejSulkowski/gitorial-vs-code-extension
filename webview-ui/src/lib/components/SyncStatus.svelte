@@ -1,14 +1,20 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import type { SyncStateViewModel, SyncUIState, SyncAction } from '@gitorial/webview-contracts';
+  import { syncStore } from '../stores/syncStore';
 
-  // State
-  let syncState = $state<SyncStateViewModel | null>(null);
+  // Use syncStore instead of local state
+  let storeState = $derived($syncStore);
+  let syncState = $derived(storeState.syncState);
+  let isConnecting = $derived(storeState.isConnecting);
+  let storeError = $derived(storeState.error);
+
+  // Local UI state
   let isExpanded = $state(false);
-  let isPerformingAction = $state(false);
 
   // Reactive computed values
   let statusDisplay = $derived(() => {
+    if (isConnecting) return { text: 'Connecting...', icon: '🔄', color: 'info' };
+    if (storeError) return { text: `Error: ${storeError}`, icon: '❌', color: 'error' };
     if (!syncState) return { text: 'Sync not available', icon: '⚫', color: 'info' };
     return {
       text: syncState.statusText,
@@ -30,64 +36,17 @@
     };
   });
 
-  // Event handlers
-  function handleMessage(event: MessageEvent) {
-    const message = event.data;
-
-    console.log('SyncStatus: Received message:', message);
-    switch (message.type) {
-      case 'sync-state-updated':
-        syncState = message.payload;
-        break;
-      case 'sync-ui-state-updated':
-        syncState = message.payload.state;
-        break;
-      case 'sync-action-completed':
-        isPerformingAction = false;
-        if (!message.payload.success) {
-          console.error('Sync action failed:', message.payload.error);
-        }
-        break;
-    }
-  }
-
-  function performAction(action: SyncAction) {
-    if (!action.enabled || isPerformingAction) return;
-    
-    isPerformingAction = true;
-    
-    // Send action request to extension
-    window.parent.postMessage({
-      type: 'sync-action-requested',
-      payload: { actionId: action.id }
-    }, '*');
-  }
-
   function disconnect() {
-    window.parent.postMessage({
-      type: 'sync-disconnect-requested'
-    }, '*');
+    syncStore.disconnect();
   }
 
   function toggleDetails() {
     isExpanded = !isExpanded;
   }
 
-  function formatConnectionTime(timestamp: number | null): string {
-    if (!timestamp) return 'Unknown';
-    const date = new Date(timestamp);
-    return date.toLocaleTimeString();
-  }
-
   onMount(() => {
-    window.addEventListener('message', handleMessage);
-    
-    // Request initial sync state
-    window.parent.postMessage({
-      type: 'sync-state-refresh-requested'
-    }, '*');
-
-    return () => window.removeEventListener('message', handleMessage);
+    // Request initial sync state when component mounts
+    syncStore.refreshState();
   });
 </script>
 
@@ -146,7 +105,14 @@
       {/if}
 
       <!-- Error Display -->
-      {#if syncState?.lastError}
+      {#if storeError}
+        <div class="error-info">
+          <h4>Error</h4>
+          <div class="error-message">
+            <span class="error-text">{storeError}</span>
+          </div>
+        </div>
+      {:else if syncState?.lastError}
         <div class="error-info">
           <h4>Error</h4>
           <div class="error-message">
@@ -162,9 +128,9 @@
           <div class="action-buttons">
             <button 
               class="action-button"
-              class:disabled={isPerformingAction}
+              class:disabled={isConnecting}
               onclick={() => disconnect()}
-              disabled={isPerformingAction}
+              disabled={isConnecting}
               title="Disconnect from the relay server"
             >
               <span class="action-icon">🔌</span>
@@ -301,10 +267,7 @@
     margin-bottom: 4px;
   }
 
-  .error-action {
-    color: var(--vscode-descriptionForeground);
-    font-style: italic;
-  }
+
 
   .sync-actions {
     margin-top: 16px;
@@ -334,14 +297,7 @@
     background: var(--vscode-button-secondaryHoverBackground);
   }
 
-  .action-button.primary {
-    background: var(--vscode-button-background);
-    color: var(--vscode-button-foreground);
-  }
 
-  .action-button.primary:hover:not(.disabled) {
-    background: var(--vscode-button-hoverBackground);
-  }
 
   .action-button.disabled {
     opacity: 0.5;

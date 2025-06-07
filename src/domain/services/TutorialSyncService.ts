@@ -60,13 +60,11 @@ export class TutorialSyncService implements RelayClientEventHandler {
     }
 
     if (this.config.useMockClient) {
-      // Create MockRelayClient instance
       console.log('🎭 TutorialSyncService: Using MockRelayClient for development');
       this.relayClient = new MockRelayClient({
         eventHandler: this
       });
     } else {
-      // Create RelayClient instance
       this.relayClient = new RelayClient({
         serverUrl: relayUrl,
         sessionEndpoint: '/api/sessions',
@@ -78,10 +76,8 @@ export class TutorialSyncService implements RelayClientEventHandler {
       });
     }
 
-    // Connect to session
     await this.relayClient.connect(sessionId);
 
-    // Store connection info
     this.connectionInfo = {
       relayUrl,
       sessionId,

@@ -1,7 +1,7 @@
 <script lang="ts">
   import Button from "./Button.svelte";
-  import { vscode } from "./vscode";
   import type { StepType } from "@gitorial/shared-types";
+  import { tutorialStore } from '../stores/tutorialStore';
 
   interface Props {
     currentStep: number;
@@ -17,19 +17,19 @@
   const isNextDisabled = $derived(currentStep === totalSteps - 1);
 
   function handlePrev() {
-    vscode.postMessage({ command: "prevStep" });
+    tutorialStore.prevStep();
   }
 
   function handleNext() {
-    vscode.postMessage({ command: "nextStep" });
+    tutorialStore.nextStep();
   }
 
   function handleShowSolution() {
-    vscode.postMessage({ command: "showSolution" });
+    tutorialStore.toggleSolution();
   }
 
   function handleHideSolution() {
-    vscode.postMessage({ command: "hideSolution" });
+    tutorialStore.toggleSolution();
   }
 
   $inspect(stepType);

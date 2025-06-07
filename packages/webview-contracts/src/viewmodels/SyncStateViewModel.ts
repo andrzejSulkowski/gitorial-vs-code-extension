@@ -34,6 +34,7 @@ export interface SyncError {
   action?: string;
 }
 
+
 /**
  * Simple sync state for UI
  */

@@ -25,11 +25,11 @@
   }
 
   function handleShowSolution() {
-    tutorialStore.toggleSolution();
+    tutorialStore.showSolution();
   }
 
   function handleHideSolution() {
-    tutorialStore.toggleSolution();
+    tutorialStore.hideSolution();
   }
 
   $inspect(stepType);

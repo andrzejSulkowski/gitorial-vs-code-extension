@@ -55,20 +55,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<vscode
   } = await bootstrapApplication(context);
 
   // --- VS Code Specific Registrations (Infrastructure concern, performed here) ---
-  const commandHandler = new CommandHandler(tutorialController);
+  const commandHandler = new CommandHandler(tutorialController, autoOpenState);
   const syncCommandHandler = new SyncCommandHandler(syncController, tutorialSyncService);
   const uriHandler = new TutorialUriHandler(tutorialController);
 
   commandHandler.register(context);
   syncCommandHandler.registerCommands(context);
   uriHandler.register(context);
-
-
-  // --- Handle startup logic (auto-open, session restore, workspace check) ---
-  await handleApplicationStartup(
-    tutorialController,
-    autoOpenState,
-  );
 
   console.log("📖 Gitorial activation complete.");
   return context;
@@ -136,7 +129,6 @@ async function bootstrapApplication(context: vscode.ExtensionContext): Promise<B
     workspaceId
   );
 
-
   // --- Sync Infrastructure ---
   const useMockSync = process.env.NODE_ENV === 'development' || vscode.workspace.getConfiguration('gitorial').get('useMockSync', true);
   const tutorialSyncService = new TutorialSyncService({ useMockClient: useMockSync });
@@ -181,11 +173,4 @@ async function bootstrapApplication(context: vscode.ExtensionContext): Promise<B
     syncController,
     tutorialSyncService,
   };
-}
-
-async function handleApplicationStartup(
-  tutorialController: TutorialController,
-  autoOpenState: AutoOpenState,
-): Promise<void> {
-  await tutorialController.detectTutorialInWorkspace(autoOpenState);
 }

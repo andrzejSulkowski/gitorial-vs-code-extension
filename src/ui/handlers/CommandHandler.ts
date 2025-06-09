@@ -1,12 +1,17 @@
 import * as vscode from 'vscode';
 import { TutorialController } from '../controllers/TutorialController';
+import { AutoOpenState } from 'src/infrastructure/state/AutoOpenState';
 
 /**
  * Handles VS Code commands related to Gitorial tutorials.
  * It acts as a bridge between VS Code command palette/buttons and the TutorialController.
  */
 export class CommandHandler {
-  constructor(private tutorialController: TutorialController) {}
+  constructor(private tutorialController: TutorialController, private autoOpenState: AutoOpenState) {}
+
+  public async detectTutorialInWorkspace(): Promise<void> {
+    await this.tutorialController.detectTutorialInWorkspace(this.autoOpenState);
+  }
 
   /**
    * Handles the 'gitorial.openTutorial' command.
@@ -41,6 +46,12 @@ export class CommandHandler {
     context.subscriptions.push(
       vscode.commands.registerCommand('gitorial.cloneTutorial', () => {
         this.handleCloneTutorial();
+      })
+    );
+
+    context.subscriptions.push(
+      vscode.commands.registerCommand('gitorial.detectTutorialInWorkspace', () => {
+        this.detectTutorialInWorkspace();
       })
     );
     

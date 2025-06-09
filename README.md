@@ -49,8 +49,9 @@ A VS Code extension that enables interactive, step-by-step, [Gitorial-based](htt
 
 **Option A: Automatic Detection**
 1. Open a folder containing a Gitorial project in VS Code (`File > Open Folder...`)
-2. The Gitorial extension will activate and detect the tutorial
-3. Click **"Load Tutorial"** when prompted to open the tutorial panel
+2. Run the command **`Gitorial: Open Tutorial in Workspace`**
+3. The Gitorial extension will activate and detect the tutorial
+4. Click **"Load Tutorial"** when prompted to open the tutorial panel
 
 **Option B: Manual Opening**
 1. Use the command **`Gitorial: Open Tutorial`**

@@ -21,6 +21,7 @@ export class WebviewMessageHandler {
    * @param message The message object received from the webview.
    */
   public handleMessage(message: WebviewToExtensionMessage): void {
+      console.log('Received message from webview:', message);
     switch (message.category) {
       case 'tutorial': {
         this.tutorialController.handleWebviewMessage(message);

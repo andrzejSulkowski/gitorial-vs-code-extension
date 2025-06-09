@@ -2,8 +2,8 @@
 - Wraps Node.js fs operations
 - Handles file reading/writing operations
 */
-import * as fs from 'fs/promises';
-import * as path from 'path';
+import * as fs from 'node:fs/promises';
+import * as path from 'node:path';
 import { IFileSystem } from 'src/domain/ports/IFileSystem';
 
 // It's good practice to define an interface in the Domain layer

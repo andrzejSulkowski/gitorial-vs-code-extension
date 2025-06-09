@@ -66,8 +66,6 @@
     "guide"
   ],
   "activationEvents": [
-    "onCommand:gitorial.cloneTutorial",
-    "onCommand:gitorial.openTutorial",
     "onUri"
   ],
   "main": "./out/extension.js",
@@ -76,6 +74,10 @@
       {
         "command": "gitorial.cloneTutorial",
         "title": "Gitorial: Clone New Tutorial"
+      },
+      {
+        "command": "gitorial.detectTutorialInWorkspace",
+        "title": "Gitorial: Open Tutorial in Workspace"
       },
       {
         "command": "gitorial.openTutorial",

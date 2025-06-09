@@ -2,9 +2,11 @@
  * Sync-related messages between Extension and Webview
  */
 
+import type { SyncStateViewModel } from "@gitorial/webview-contracts";
+
 // Extension → Webview Sync Messages
 export type ExtensionToWebviewSyncMessage =
-  | { category: 'sync'; type: 'state-updated'; payload: { state: any } }; // SyncStateViewModel - avoiding import for now
+  | { category: 'sync'; type: 'state-updated'; payload: { state: SyncStateViewModel } };
 
 // Webview → Extension Sync Messages
 export type WebviewToExtensionSyncMessage =

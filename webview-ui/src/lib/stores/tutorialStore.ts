@@ -105,10 +105,16 @@ export const tutorialStore = {
     });
   },
   
-  toggleSolution() {
+  showSolution() {
     sendMessage({
       category: 'tutorial',
-      type: 'toggle-solution'
+      type: 'show-solution'
+    });
+  },
+  hideSolution() {
+    sendMessage({
+      category: 'tutorial',
+      type: 'hide-solution'
     });
   }
 }; 

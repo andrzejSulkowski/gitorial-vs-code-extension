@@ -1,3 +1,4 @@
+//TODO: Move 'webview-contracts' code to 'shared-types/src/ui'
 // Message contracts
 export * from './messages';
 

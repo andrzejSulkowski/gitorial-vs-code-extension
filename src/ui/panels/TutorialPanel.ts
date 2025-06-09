@@ -6,10 +6,9 @@
 import * as vscode from 'vscode';
 import { WebviewMessageHandler } from './WebviewMessageHandler';
 import { Uri } from 'vscode';
-import path from 'path';
+import path from 'node:path';
 import fs from 'fs';
-import { TutorialViewModel } from '@gitorial/shared-types';
-import { ExtensionToWebviewMessage, ExtensionToWebviewSyncMessage, SyncStateViewModel } from '@gitorial/webview-contracts';
+import { TutorialViewModel, ExtensionToWebviewSyncMessage, SyncStateViewModel, ExtensionToWebviewTutorialMessage } from '@gitorial/webview-contracts';
 
 function getNonce() {
   let text = '';
@@ -49,13 +48,18 @@ export class TutorialPanel {
 
   public updateTutorial(tutorial: TutorialViewModel): void {
     this.panel.title = tutorial.title || 'Gitorial Tutorial';
-    //TODO: utilise TypeScript `const message: ExtensionToWebviewMessage = {};`
-    this.panel.webview.postMessage({ command: 'updateTutorial', data: tutorial });
+    const message: ExtensionToWebviewTutorialMessage = {
+      category: 'tutorial',
+      type: 'data-updated',
+      payload: tutorial
+    };
+    this.panel.webview.postMessage(message);
   }
 
   public updateSyncState(syncState: SyncStateViewModel): void {
     const message: ExtensionToWebviewSyncMessage = {
-      type: 'sync-ui-state-updated',
+      category: 'sync',
+      type: 'state-updated',
       payload: {
         state: syncState
       }

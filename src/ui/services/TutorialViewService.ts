@@ -334,8 +334,7 @@ export class TutorialViewService {
         await vscode.window.tabGroups.close(tabsToClose, false);
       } catch (error) {
         console.error("TutorialViewService: Error closing tabs in group two:", error);
-        console.error("tabs to close");
-        console.error(tabsToClose);
+        console.error("Tabs to close: ", tabsToClose);
       }
     }
 

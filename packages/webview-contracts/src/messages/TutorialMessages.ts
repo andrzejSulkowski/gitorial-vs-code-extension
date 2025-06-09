@@ -15,6 +15,5 @@ export type WebviewToExtensionTutorialMessage =
   | { category: 'tutorial'; type: 'navigate-to-step'; payload: { stepIndex: number } }
   | { category: 'tutorial'; type: 'next-step' }
   | { category: 'tutorial'; type: 'prev-step' }
-  | { category: 'tutorial'; type: 'toggle-solution' }
   | { category: 'tutorial'; type: 'show-solution' }
   | { category: 'tutorial'; type: 'hide-solution' };

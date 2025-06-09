@@ -1,5 +1,5 @@
-import type { WebviewToExtensionMessage, ExtensionToWebviewMessage, WebviewToExtensionSyncMessage, WebviewToExtensionSystemMessage, WebviewToExtensionTutorialMessage, ExtensionToWebviewTutorialMessage, ExtensionToWebviewSyncMessage, ExtensionToWebviewSystemMessage } from "@gitorial/webview-contracts";
-import { MessageRouter } from "@gitorial/webview-contracts";
+import type { WebviewToExtensionMessage, ExtensionToWebviewMessage, WebviewToExtensionSyncMessage, WebviewToExtensionSystemMessage, WebviewToExtensionTutorialMessage, ExtensionToWebviewTutorialMessage, ExtensionToWebviewSyncMessage, ExtensionToWebviewSystemMessage } from "@gitorial/shared-types";
+import { MessageRouter } from "@gitorial/shared-types";
 
 export class WebviewMessageHandler {
     public static startListening() {

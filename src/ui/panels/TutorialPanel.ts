@@ -8,7 +8,7 @@ import { WebviewMessageHandler } from './WebviewMessageHandler';
 import { Uri } from 'vscode';
 import path from 'node:path';
 import fs from 'fs';
-import { TutorialViewModel, ExtensionToWebviewSyncMessage, SyncStateViewModel, ExtensionToWebviewTutorialMessage } from '@gitorial/webview-contracts';
+import { TutorialViewModel, ExtensionToWebviewSyncMessage, SyncStateViewModel, ExtensionToWebviewTutorialMessage } from '@gitorial/shared-types';
 
 function getNonce() {
   let text = '';

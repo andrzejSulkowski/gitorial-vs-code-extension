@@ -7,7 +7,7 @@ import { IFileSystem } from 'src/domain/ports/IFileSystem';
 import { TutorialService } from '../../domain/services/TutorialService';
 import { TutorialViewService } from '../services/TutorialViewService';
 import { AutoOpenState } from 'src/infrastructure/state/AutoOpenState';
-import { WebviewToExtensionTutorialMessage } from '@gitorial/webview-contracts';
+import { WebviewToExtensionTutorialMessage } from '@gitorial/shared-types';
 
 /**
  * Controller responsible for orchestrating tutorial-related UI interactions and actions.

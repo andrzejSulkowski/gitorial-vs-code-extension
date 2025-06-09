@@ -1,5 +1,5 @@
 import { writable } from 'svelte/store';
-import type { ExtensionToWebviewSystemMessage } from '@gitorial/webview-contracts';
+import type { ExtensionToWebviewSystemMessage } from '@gitorial/shared-types';
 import { sendMessage } from '../utils/messaging';
 
 interface SystemState {

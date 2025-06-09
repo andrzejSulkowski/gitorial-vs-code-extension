@@ -2,7 +2,7 @@ import { writable } from 'svelte/store';
 import type { 
   SyncStateViewModel,
   ExtensionToWebviewSyncMessage 
-} from '@gitorial/webview-contracts';
+} from '@gitorial/shared-types';
 import { sendMessage } from './messageRouter';
 
 interface SyncState {

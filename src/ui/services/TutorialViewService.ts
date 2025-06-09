@@ -4,7 +4,7 @@ import { Step } from 'src/domain/models/Step';
 import * as path from 'path'; // TODO: Extend IFileSystem with needed functionality to replace 'path'
 import { Tutorial } from '../../domain/models/Tutorial';
 import { IMarkdownConverter } from '../ports/IMarkdownConverter';
-import { TutorialViewModel, TutorialStepViewModel } from '@gitorial/webview-contracts';
+import { TutorialViewModel, TutorialStepViewModel } from '@gitorial/shared-types';
 import { EnrichedStep } from '../../domain/models/EnrichedStep';
 import { TutorialPanelManager } from '../panels/TutorialPanelManager';
 import { WebviewMessageHandler } from '../panels/WebviewMessageHandler';

@@ -1,6 +1,15 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { syncStore } from '../stores/syncStore';
+  import type { SyncStateViewModel } from '@gitorial/shared-types';
+
+  // Define SyncPhase constants locally to avoid import issues
+  const SyncPhase = {
+    DISCONNECTED: 'disconnected',
+    CONNECTING: 'connecting',
+    ACTIVE: 'active',
+    PASSIVE: 'passive'
+  } as const;
 
   // Use syncStore instead of local state
   let storeState = $derived($syncStore);
@@ -11,26 +20,59 @@
   // Local UI state
   let isExpanded = $state(false);
 
-  // Reactive computed values
+  // Derived properties - computed from core state
+  let isConnected = $derived(() => {
+    if (!syncState) return false;
+    return syncState.phase === SyncPhase.ACTIVE || syncState.phase === SyncPhase.PASSIVE;
+  });
+
+  let hasControl = $derived(() => {
+    if (!syncState) return false;
+    return syncState.phase === SyncPhase.ACTIVE;
+  });
+
+  let canConnect = $derived(() => {
+    if (!syncState) return false;
+    return syncState.phase === SyncPhase.DISCONNECTED;
+  });
+
+  let canDisconnect = $derived(() => {
+    if (!syncState) return false;
+    return syncState.phase !== SyncPhase.DISCONNECTED;
+  });
+
   let statusDisplay = $derived(() => {
     if (isConnecting) return { text: 'Connecting...', icon: '🔄', color: 'info' };
     if (storeError) return { text: `Error: ${storeError}`, icon: '❌', color: 'error' };
     if (!syncState) return { text: 'Sync not available', icon: '⚫', color: 'info' };
-    return {
-      text: syncState.statusText,
-      icon: syncState.statusIcon,
-      color: syncState.statusColor
-    };
+    
+    // Check for sync state errors
+    if (syncState.lastError) {
+      return { text: `Error: ${syncState.lastError.message}`, icon: '❌', color: 'error' };
+    }
+    
+    switch (syncState.phase) {
+      case SyncPhase.DISCONNECTED:
+        return { text: 'Disconnected', icon: '⚫', color: 'info' };
+      case SyncPhase.CONNECTING:
+        return { text: 'Connecting...', icon: '🟡', color: 'warning' };
+      case SyncPhase.ACTIVE:
+        return { text: 'Connected as Host', icon: '🟢', color: 'success' };
+      case SyncPhase.PASSIVE:
+        return { text: 'Connected as Client', icon: '🔵', color: 'info' };
+      default:
+        return { text: 'Unknown state', icon: '⚫', color: 'info' };
+    }
   });
 
   let connectionDetails = $derived(() => {
-    if (!syncState || !syncState.isConnected) return null;
+    if (!syncState || !isConnected()) return null;
     return {
       sessionId: syncState.sessionId,
       clientId: syncState.clientId,
       connectedClients: syncState.connectedClients,
       relayUrl: syncState.relayUrl,
-      hasControl: syncState.hasControl,
+      hasControl: hasControl(),
       connectedAt: syncState.connectedAt ? new Date(syncState.connectedAt).toLocaleTimeString() : null,
       lastSyncAt: syncState.lastSyncAt ? new Date(syncState.lastSyncAt).toLocaleTimeString() : null
     };
@@ -53,17 +95,17 @@
 <div class="sync-status">
   <!-- Main Status Display -->
   <div class="sync-status-header" onclick={toggleDetails} onkeydown={(e) => e.key === 'Enter' && toggleDetails()} role="button" tabindex="0">
-    <div class="status-indicator" class:connected={syncState?.isConnected} class:error={syncState?.statusColor === 'error'}>
+    <div class="status-indicator" class:connected={isConnected()} class:error={statusDisplay().color === 'error'}>
       <span class="status-icon">{statusDisplay().icon}</span>
       <span class="status-text">{statusDisplay().text}</span>
     </div>
     
-    {#if syncState?.isConnected}
+    {#if isConnected()}
       <div class="connection-summary">
-        <span class="client-count">{syncState.connectedClients} client{syncState.connectedClients !== 1 ? 's' : ''}</span>
-        {#if syncState.hasControl}
+        <span class="client-count">{syncState?.connectedClients || 0} client{(syncState?.connectedClients || 0) !== 1 ? 's' : ''}</span>
+        {#if hasControl()}
           <span class="control-badge">Active</span>
-        {:else if syncState.isConnected}
+        {:else}
           <span class="control-badge passive">Passive</span>
         {/if}
       </div>
@@ -121,8 +163,8 @@
         </div>
       {/if}
 
-      <!-- Disconnect Action -->
-      {#if syncState?.canDisconnect}
+      <!-- Actions -->
+      {#if canDisconnect()}
         <div class="sync-actions">
           <h4>Actions</h4>
           <div class="action-buttons">
@@ -267,8 +309,6 @@
     margin-bottom: 4px;
   }
 
-
-
   .sync-actions {
     margin-top: 16px;
   }
@@ -296,8 +336,6 @@
   .action-button:hover:not(.disabled) {
     background: var(--vscode-button-secondaryHoverBackground);
   }
-
-
 
   .action-button.disabled {
     opacity: 0.5;

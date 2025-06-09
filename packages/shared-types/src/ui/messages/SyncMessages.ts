@@ -2,7 +2,7 @@
  * Sync-related messages between Extension and Webview
  */
 
-import type { SyncStateViewModel } from "@gitorial/webview-contracts";
+import type { SyncStateViewModel } from "@gitorial/shared-types";
 
 // Extension → Webview Sync Messages
 export type ExtensionToWebviewSyncMessage =

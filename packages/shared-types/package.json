@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "Shared type definitions for Gitorial packages",
   "main": "dist/index.js",
-  "types": "src/index.ts",
+  "types": "dist/index.d.ts",
   "files": [
     "dist/**/*",
     "src/**/*"

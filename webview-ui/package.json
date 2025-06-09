@@ -22,7 +22,6 @@
   },
   "dependencies": {
     "@gitorial/shared-types": "workspace:*",
-    "@gitorial/webview-contracts": "workspace:*",
     "@types/vscode-webview": "^1.57.5",
     "esbuild": "^0.25.5",
     "prismjs": "^1.30.0",

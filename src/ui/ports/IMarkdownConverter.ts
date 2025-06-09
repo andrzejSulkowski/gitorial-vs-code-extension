@@ -1,4 +1,4 @@
-import { HTML } from "@gitorial/webview-contracts";
+import { HTML } from "@gitorial/shared-types";
 import { Markdown } from "../../domain/models/Markdown";
 
 /** 

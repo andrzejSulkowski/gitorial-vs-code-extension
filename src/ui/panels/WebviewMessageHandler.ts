@@ -5,7 +5,7 @@
 
 import { TutorialController } from '../controllers/TutorialController';
 import { SyncController } from '../controllers/SyncController';
-import { WebviewToExtensionMessage, WebviewToExtensionSyncMessage } from '@gitorial/webview-contracts';
+import { WebviewToExtensionMessage, WebviewToExtensionSyncMessage } from '@gitorial/shared-types';
 
 /**
  * Processes messages from the webview and maps UI actions to the TutorialController.

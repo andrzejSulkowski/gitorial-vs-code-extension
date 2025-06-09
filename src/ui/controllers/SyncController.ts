@@ -3,7 +3,7 @@ import { TutorialSyncService } from '../../domain/services/TutorialSyncService';
 import { TutorialService } from '../../domain/services/TutorialService';
 import { IUserInteraction } from '../../domain/ports/IUserInteraction';
 import { SyncStateService, SyncStateEventHandler } from '../../domain/services/SyncStateService';
-import { SyncStateViewModel, WebviewToExtensionSyncMessage } from '@gitorial/webview-contracts';
+import { SyncStateViewModel, WebviewToExtensionSyncMessage } from '@gitorial/shared-types';
 
 /**
  * Simple sync controller for managing tutorial sync and updating UI
@@ -113,8 +113,28 @@ export class SyncController implements SyncStateEventHandler {
   private _updateStatusBar(state: SyncStateViewModel): void {
     if (!this.statusBarItem) return;
 
-    this.statusBarItem.text = `$(sync) ${state.statusText} (${state.connectedClients})`;
-    this.statusBarItem.backgroundColor = state.isConnected
+    // Compute status text from core state
+    let statusText = 'Not Connected';
+    switch (state.phase) {
+      case 'connecting':
+        statusText = 'Connecting...';
+        break;
+      case 'active':
+        statusText = 'In Control';
+        break;
+      case 'passive':
+        statusText = 'Following';
+        break;
+      case 'disconnected':
+      default:
+        statusText = 'Not Connected';
+        break;
+    }
+
+    this.statusBarItem.text = `$(sync) ${statusText} (${state.connectedClients})`;
+    
+    const isConnected = state.phase === 'active' || state.phase === 'passive';
+    this.statusBarItem.backgroundColor = isConnected
       ? new vscode.ThemeColor('statusBarItem.activeBackground')
       : undefined;
   }

@@ -34,29 +34,19 @@ export interface SyncError {
   action?: string;
 }
 
-
 /**
- * Simple sync state for UI
+ * Simplified sync state for UI - contains only core state data
+ * All derived properties (isConnected, hasControl, etc.) should be computed in the UI layer
  */
 export interface SyncStateViewModel {
+  // Core state - the minimal data needed
   phase: SyncPhase;
-  connectionStatus: 'disconnected' | 'connecting' | 'connected' | 'error';
-  isConnected: boolean;
   sessionId: string | null;
   clientId: string | null;
   connectedClients: number;
   relayUrl: string | null;
-  hasControl: boolean;
   isLocked: boolean;
   lastError: { message: string } | null;
-  canConnect: boolean;
-  canDisconnect: boolean;
-  canChooseDirection: boolean;
-  canSendState: boolean;
-  canReceiveState: boolean;
-  statusText: string;
-  statusIcon: string;
-  statusColor: 'success' | 'warning' | 'error' | 'info';
   connectedAt: number | null;
   lastSyncAt: number | null;
 }

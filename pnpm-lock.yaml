@@ -14,9 +14,6 @@ importers:
       '@gitorial/sync':
         specifier: workspace:*
         version: link:packages/gitorial-sync
-      '@gitorial/webview-contracts':
-        specifier: workspace:*
-        version: link:packages/webview-contracts
       markdown-it:
         specifier: ^14.1.0
         version: 14.1.0
@@ -212,24 +209,11 @@ importers:
         specifier: ^5.8.2
         version: 5.8.3
 
-  packages/webview-contracts:
-    dependencies:
-      '@gitorial/shared-types':
-        specifier: workspace:*
-        version: link:../shared-types
-    devDependencies:
-      typescript:
-        specifier: ^5.8.2
-        version: 5.8.3
-
   webview-ui:
     dependencies:
       '@gitorial/shared-types':
         specifier: workspace:*
         version: link:../packages/shared-types
-      '@gitorial/webview-contracts':
-        specifier: workspace:*
-        version: link:../packages/webview-contracts
       '@types/vscode-webview':
         specifier: ^1.57.5
         version: 1.57.5

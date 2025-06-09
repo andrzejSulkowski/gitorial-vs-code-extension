@@ -1,6 +1,6 @@
 import type { 
   ExtensionToWebviewMessage
-} from '@gitorial/webview-contracts';
+} from '@gitorial/shared-types';
 import { tutorialStore } from './tutorialStore';
 import { syncStore } from './syncStore';
 import { systemStore } from './systemStore';
@@ -19,4 +19,4 @@ export function createMessageRouter() {
       }
     }
   };
-} 
+}

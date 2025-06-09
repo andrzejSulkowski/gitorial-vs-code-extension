@@ -3,7 +3,7 @@ import type {
   TutorialViewModel, 
   TutorialStepViewModel,
   ExtensionToWebviewTutorialMessage 
-} from '@gitorial/webview-contracts';
+} from '@gitorial/shared-types';
 import { sendMessage } from '../utils/messaging';
 
 // Tutorial state

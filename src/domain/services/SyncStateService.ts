@@ -1,6 +1,6 @@
 import { RelayClientEvent, RelayClientEventHandler } from '@gitorial/sync';
 import { TutorialSyncService } from './TutorialSyncService';
-import { SyncStateViewModel, SyncPhase } from '@gitorial/webview-contracts';
+import { SyncStateViewModel, SyncPhase } from '@gitorial/shared-types';
 
 /**
  * Event handler for sync state changes
@@ -34,26 +34,14 @@ export class SyncStateService implements RelayClientEventHandler {
     const isConnected = this.tutorialSyncService.isConnectedToRelay();
     const isLocked = this.tutorialSyncService.isExtensionLocked();
     
-    // Simple state mapping - minimal logic
     return {
-      phase: isConnected ? SyncPhase.ACTIVE : SyncPhase.DISCONNECTED,
-      connectionStatus: isConnected ? 'connected' : 'disconnected',
-      isConnected,
+      phase: isConnected ? (isLocked ? SyncPhase.PASSIVE : SyncPhase.ACTIVE) : SyncPhase.DISCONNECTED,
       sessionId: connectionInfo?.sessionId || null,
       clientId: connectionInfo?.clientId || null,
       connectedClients: this.tutorialSyncService.getConnectedClientCount(),
       relayUrl: connectionInfo?.relayUrl || null,
-      hasControl: isConnected && !isLocked,
       isLocked,
       lastError: null,
-      canConnect: !isConnected,
-      canDisconnect: isConnected,
-      canChooseDirection: false,
-      canSendState: isConnected && !isLocked,
-      canReceiveState: isConnected && isLocked,
-      statusText: isConnected ? (isLocked ? 'Following' : 'In Control') : 'Not Connected',
-      statusIcon: isConnected ? (isLocked ? '👁️' : '🎮') : '⚫',
-      statusColor: isConnected ? 'success' : 'info',
       connectedAt: connectionInfo?.connectedAt || null,
       lastSyncAt: null
     };

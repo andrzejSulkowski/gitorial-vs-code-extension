@@ -22,7 +22,7 @@
     "dev": "pnpm run build:shared && pnpm run build:watch",
     "build": "pnpm run build:shared && pnpm run build:sync && pnpm run typecheck && pnpm run build:webview && pnpm run build:extension",
     "build:watch": "concurrently \"pnpm run build:extension:watch\" \"pnpm run build:webview:watch\"",
-    "build:shared": "cd packages/shared-types && pnpm run build && cd ../webview-contracts && pnpm run build && cd ../..",
+    "build:shared": "cd packages/shared-types && pnpm run build && cd ../..",
     "build:sync": "cd packages/gitorial-sync && pnpm run build && cd ../..",
     "build:webview": "cd webview-ui && pnpm run build",
     "build:webview:watch": "cd webview-ui && pnpm run dev",
@@ -143,7 +143,6 @@
   },
   "dependencies": {
     "@gitorial/shared-types": "workspace:*",
-    "@gitorial/webview-contracts": "workspace:*",
     "@gitorial/sync": "workspace:*",
     "markdown-it": "^14.1.0",
     "simple-git": "^3.28.0",

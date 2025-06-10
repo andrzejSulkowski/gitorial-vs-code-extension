@@ -1,4 +1,4 @@
-import { RelayClientEvent, RelayClientEventHandler } from '@gitorial/sync';
+import { RelayClientEvent, RelayClientEventHandler, SyncPhase as GitorialSyncPhase } from '@gitorial/sync';
 import { TutorialSyncService } from './TutorialSyncService';
 import { SyncStateViewModel, SyncPhase } from '@gitorial/shared-types';
 
@@ -7,6 +7,29 @@ import { SyncStateViewModel, SyncPhase } from '@gitorial/shared-types';
  */
 export interface SyncStateEventHandler {
   onSyncStateChanged(state: SyncStateViewModel): void;
+}
+
+/**
+ * Maps gitorial-sync SyncPhase to shared-types SyncPhase
+ */
+function mapSyncPhase(gitorialPhase: GitorialSyncPhase): SyncPhase {
+  switch (gitorialPhase) {
+    case GitorialSyncPhase.DISCONNECTED:
+      return SyncPhase.DISCONNECTED;
+    case GitorialSyncPhase.CONNECTING:
+      return SyncPhase.CONNECTING;
+    case GitorialSyncPhase.CONNECTED_IDLE:
+      return SyncPhase.CONNECTED_IDLE;
+    case GitorialSyncPhase.INITIALIZING_PULL:
+    case GitorialSyncPhase.INITIALIZING_PUSH:
+      return SyncPhase.CONNECTING; // Treat initializing phases as connecting
+    case GitorialSyncPhase.ACTIVE:
+      return SyncPhase.ACTIVE;
+    case GitorialSyncPhase.PASSIVE:
+      return SyncPhase.PASSIVE;
+    default:
+      return SyncPhase.DISCONNECTED;
+  }
 }
 
 /**
@@ -31,11 +54,11 @@ export class SyncStateService implements RelayClientEventHandler {
 
   getCurrentState(): SyncStateViewModel {
     const connectionInfo = this.tutorialSyncService.getConnectionInfo();
-    const isConnected = this.tutorialSyncService.isConnectedToRelay();
+    const currentPhase = this.tutorialSyncService.getCurrentPhase();
     const isLocked = this.tutorialSyncService.isExtensionLocked();
     
     return {
-      phase: isConnected ? (isLocked ? SyncPhase.PASSIVE : SyncPhase.ACTIVE) : SyncPhase.DISCONNECTED,
+      phase: mapSyncPhase(currentPhase),
       sessionId: connectionInfo?.sessionId || null,
       clientId: connectionInfo?.clientId || null,
       connectedClients: this.tutorialSyncService.getConnectedClientCount(),

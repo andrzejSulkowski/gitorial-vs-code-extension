@@ -2,11 +2,13 @@
   import { onMount } from 'svelte';
   import { syncStore } from '../stores/syncStore';
   import type { SyncStateViewModel } from '@gitorial/shared-types';
+  import SyncDirectionOverlay from './SyncDirectionOverlay.svelte';
 
   // Define SyncPhase constants locally to avoid import issues
   const SyncPhase = {
     DISCONNECTED: 'disconnected',
     CONNECTING: 'connecting',
+    CONNECTED_IDLE: 'connected_idle',
     ACTIVE: 'active',
     PASSIVE: 'passive'
   } as const;
@@ -23,7 +25,9 @@
   // Derived properties - computed from core state
   let isConnected = $derived(() => {
     if (!syncState) return false;
-    return syncState.phase === SyncPhase.ACTIVE || syncState.phase === SyncPhase.PASSIVE;
+    return syncState.phase === SyncPhase.ACTIVE || 
+           syncState.phase === SyncPhase.PASSIVE || 
+           syncState.phase === SyncPhase.CONNECTED_IDLE;
   });
 
   let hasControl = $derived(() => {
@@ -41,6 +45,11 @@
     return syncState.phase !== SyncPhase.DISCONNECTED;
   });
 
+  let needsDirectionChoice = $derived(() => {
+    if (!syncState) return false;
+    return syncState.phase === SyncPhase.CONNECTED_IDLE;
+  });
+
   let statusDisplay = $derived(() => {
     if (isConnecting) return { text: 'Connecting...', icon: '🔄', color: 'info' };
     if (storeError) return { text: `Error: ${storeError}`, icon: '❌', color: 'error' };
@@ -56,6 +65,8 @@
         return { text: 'Disconnected', icon: '⚫', color: 'info' };
       case SyncPhase.CONNECTING:
         return { text: 'Connecting...', icon: '🟡', color: 'warning' };
+      case SyncPhase.CONNECTED_IDLE:
+        return { text: 'Choose Direction', icon: '🔗', color: 'warning' };
       case SyncPhase.ACTIVE:
         return { text: 'Connected as Host', icon: '🟢', color: 'success' };
       case SyncPhase.PASSIVE:
@@ -86,11 +97,20 @@
     isExpanded = !isExpanded;
   }
 
+  function handleDirectionChoice(direction: 'push' | 'pull') {
+    console.log(`User chose sync direction: ${direction}`);
+    // The message was already sent by the overlay component
+  }
+
   onMount(() => {
     // Request initial sync state when component mounts
     syncStore.refreshState();
   });
 </script>
+
+{#if needsDirectionChoice()}
+  <SyncDirectionOverlay onChoice={handleDirectionChoice} />
+{/if}
 
 <div class="sync-status">
   <!-- Main Status Display -->

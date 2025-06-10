@@ -57,6 +57,14 @@ export class SyncController implements SyncStateEventHandler {
         this._sendSyncStateToWebview(this.syncStateService.getCurrentState());
         break;
       }
+      case 'direction-choice-push': {
+        this._handleDirectionChoicePush();
+        break;
+      }
+      case 'direction-choice-pull': {
+        this._handleDirectionChoicePull();
+        break;
+      }
       default: {
         console.warn('Received unknown command from webview:', message);
         break;
@@ -119,6 +127,9 @@ export class SyncController implements SyncStateEventHandler {
       case 'connecting':
         statusText = 'Connecting...';
         break;
+      case 'connected_idle':
+        statusText = 'Choose Direction';
+        break;
       case 'active':
         statusText = 'In Control';
         break;
@@ -133,7 +144,7 @@ export class SyncController implements SyncStateEventHandler {
 
     this.statusBarItem.text = `$(sync) ${statusText} (${state.connectedClients})`;
     
-    const isConnected = state.phase === 'active' || state.phase === 'passive';
+    const isConnected = state.phase === 'active' || state.phase === 'passive' || state.phase === 'connected_idle';
     this.statusBarItem.backgroundColor = isConnected
       ? new vscode.ThemeColor('statusBarItem.activeBackground')
       : undefined;
@@ -158,6 +169,26 @@ export class SyncController implements SyncStateEventHandler {
       this.userInteraction.showInformationMessage(`Connected to session: ${payload.sessionId}`);
     } catch (error) {
       this.userInteraction.showErrorMessage(`Failed to connect: ${error}`);
+    }
+  }
+
+  private async _handleDirectionChoicePush(): Promise<void> {
+    try {
+      // Choose to push (become active) - this should trigger transition to ACTIVE phase
+      await this.tutorialSyncService.setSyncDirection('ACTIVE');
+      this.userInteraction.showInformationMessage('You are now the host - others will follow your tutorial progress');
+    } catch (error) {
+      this.userInteraction.showErrorMessage(`Failed to become host: ${error}`);
+    }
+  }
+
+  private async _handleDirectionChoicePull(): Promise<void> {
+    try {
+      // Choose to pull (become passive) - this should trigger transition to PASSIVE phase  
+      await this.tutorialSyncService.setSyncDirection('PASSIVE');
+      this.userInteraction.showInformationMessage('You are now following - your tutorial will sync with the host');
+    } catch (error) {
+      this.userInteraction.showErrorMessage(`Failed to become follower: ${error}`);
     }
   }
 } 

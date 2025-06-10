@@ -19,6 +19,7 @@ export enum SyncErrorType {
 export enum SyncPhase {
   DISCONNECTED = 'disconnected',
   CONNECTING = 'connecting',
+  CONNECTED_IDLE = 'connected_idle',  // Connected but no sync direction chosen
   ACTIVE = 'active',
   PASSIVE = 'passive'
 }

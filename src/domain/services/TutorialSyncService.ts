@@ -1,4 +1,4 @@
-import { RelayClient, RelayClientEventHandler, RelayClientEvent, TutorialSyncState } from '@gitorial/sync';
+import { RelayClient, RelayClientEventHandler, RelayClientEvent, TutorialSyncState, SyncPhase } from '@gitorial/sync';
 import { MockRelayClient } from '../../infrastructure/mocks/MockRelayClient';
 import { Tutorial } from '../models/Tutorial';
 import { EnrichedStep } from '../models/EnrichedStep';
@@ -35,6 +35,7 @@ export class TutorialSyncService implements RelayClientEventHandler {
   private relayClient: RelayClient | MockRelayClient | null = null;
   private connectionInfo: SyncConnectionInfo | null = null;
   private config: TutorialSyncServiceConfig;
+  private isFollowingRemote = false;
 
   constructor(config: TutorialSyncServiceConfig = {}) {
     this.config = config;
@@ -143,10 +144,20 @@ export class TutorialSyncService implements RelayClientEventHandler {
   }
 
   /**
-   * Check if the extension is currently locked (web app is active)
+   * Check if the extension is in a locked state (following remote tutorial)
    */
   public isExtensionLocked(): boolean {
-    return this.isLocked;
+    return this.isFollowingRemote;
+  }
+
+  /**
+   * Get the current sync phase from the relay client
+   */
+  public getCurrentPhase(): SyncPhase {
+    if (!this.relayClient) {
+      return SyncPhase.DISCONNECTED;
+    }
+    return this.relayClient.getCurrentPhase();
   }
 
   /**

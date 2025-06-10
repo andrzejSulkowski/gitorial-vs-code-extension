@@ -12,4 +12,6 @@ export type ExtensionToWebviewSyncMessage =
 export type WebviewToExtensionSyncMessage =
   | { category: 'sync'; type: 'connect-requested'; payload: { relayUrl: string; sessionId: string } }
   | { category: 'sync'; type: 'disconnect-requested' }
-  | { category: 'sync'; type: 'state-refresh-requested' }; 
+  | { category: 'sync'; type: 'state-refresh-requested' }
+  | { category: 'sync'; type: 'direction-choice-push'; payload: {} }  // Choose to push (become active)
+  | { category: 'sync'; type: 'direction-choice-pull'; payload: {} }; // Choose to pull (become passive) 

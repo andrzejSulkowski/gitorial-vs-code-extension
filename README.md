@@ -7,6 +7,14 @@
 
 A VS Code extension that enables interactive, step-by-step, [Gitorial-based](https://github.com/gitorial-sdk) tutorials directly in your editor. Learn coding concepts, frameworks, and best practices through guided, hands-on experiences.
 
+## Funding & Support
+
+<p align="center">
+  <img src="./images/Polkadot_Logo_Pink-Black.png" alt="Polkadot Logo" height="60">
+</p>
+
+This project is proudly **funded by Polkadot OpenGov**. We're grateful for the community's support in making interactive learning more accessible for developers in the Polkadot ecosystem and beyond.
+
 ## Table of Contents
 
 - [Features](#features)

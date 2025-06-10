@@ -31,10 +31,10 @@ git clone https://github.com/andrzejSulkowski/gitorial-vs-code-plugin.git
 cd gitorial-vs-code-plugin/project
 
 # 2. Install dependencies (both root and webview-ui)
-npm install
+pnpm install
 
 # 3. Compile the extension
-npm run compile
+pnpm run compile
 
 # 4. Open in VS Code
 code .

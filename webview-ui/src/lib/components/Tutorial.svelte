@@ -2,6 +2,7 @@
   import Nav from './Nav.svelte';
   import StepContent from './StepContent.svelte';
   import { tutorialStore, currentStepIndex, totalSteps, isShowingSolution } from '../stores/tutorialStore';
+  import PolkadotTokenPink from './../PolkadotTokenPink.svelte';
 
   let tutorial = $derived($tutorialStore.tutorial);
   let currentStep = $derived($tutorialStore.currentStep);
@@ -14,6 +15,9 @@
 
 {#if currentStep && !isLoading}
   <div class="tutorial-container">
+    <div class="polkadot-background">
+      <PolkadotTokenPink />
+    </div>
     <div class="content-area">
       <StepContent
         content={currentStep.htmlContent || ''}
@@ -40,6 +44,24 @@
     flex-direction: column;
     height: 100vh;
     font-family: var(--vscode-font-family);
+    position: relative;
+  }
+
+  .polkadot-background {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 200px;
+    height: 200px;
+    opacity: 0.05;
+    pointer-events: none;
+    z-index: -1;
+  }
+
+  .polkadot-background :global(svg) {
+    width: 100%;
+    height: 100%;
   }
 
   .content-area {

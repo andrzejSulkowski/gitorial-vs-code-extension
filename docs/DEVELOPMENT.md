@@ -28,7 +28,7 @@ This comprehensive guide provides information for developers looking to contribu
 ```bash
 # 1. Clone the repository
 git clone https://github.com/andrzejSulkowski/gitorial-vs-code-plugin.git
-cd gitorial-vs-code-plugin/project
+cd gitorial-vs-code-plugin
 
 # 2. Install dependencies (both root and webview-ui)
 npm install

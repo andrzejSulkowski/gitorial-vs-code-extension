@@ -296,6 +296,7 @@ export class TutorialViewService {
     const targetUriStrings = targetUris.map(u => u.toString());
 
     const tabsToClose: vscode.Tab[] = [];
+    console.log("Current tabs in group 2: ", currentTabsInGroupTwo);
     for (const tab of currentTabsInGroupTwo) {
       const input = tab.input as any;
       if (input && input.original && input.modified) {
@@ -331,8 +332,11 @@ export class TutorialViewService {
 
     if (tabsToClose.length > 0) {
       try {
-        await vscode.window.tabGroups.close(tabsToClose, false);
+        const tabToClose = tabsToClose[0];
+        console.log(tabToClose);
+        await vscode.window.tabGroups.close(tabToClose, false);
       } catch (error) {
+        // Note: catch needed because of a VSCode issue: https://github.com/microsoft/vscode/issues/228270
         console.error("TutorialViewService: Error closing tabs in group two:", error);
         console.error("Tabs to close: ", tabsToClose);
       }

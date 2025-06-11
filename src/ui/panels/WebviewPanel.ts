@@ -19,7 +19,7 @@ function getNonce() {
   return text;
 }
 
-export class TutorialPanel {
+export class WebViewPanel {
   private disposables: vscode.Disposable[] = [];
   public readonly panel: vscode.WebviewPanel;
   private readonly messageHandler: WebviewMessageHandler;

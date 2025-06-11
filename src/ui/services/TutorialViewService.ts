@@ -216,7 +216,7 @@ export class TutorialViewService {
       if (this.syncController && TutorialPanelManager.isPanelVisible()) {
         const panelInstance = TutorialPanelManager.getCurrentPanelInstance();
         if (panelInstance) {
-          this.syncController.setWebviewPanel(panelInstance.panel);
+          this.syncController.setWebviewPanel(panelInstance);
         }
       }
     } else {

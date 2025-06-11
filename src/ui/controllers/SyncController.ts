@@ -4,6 +4,7 @@ import { TutorialService } from '../../domain/services/TutorialService';
 import { IUserInteraction } from '../../domain/ports/IUserInteraction';
 import { SyncStateService, SyncStateEventHandler } from '../../domain/services/sync/SyncStateService';
 import { SyncStateViewModel, WebviewToExtensionSyncMessage } from '@gitorial/shared-types';
+import { WebViewPanel } from '../panels/WebviewPanel';
 
 /**
  * Simple sync controller for managing tutorial sync and updating UI
@@ -11,7 +12,7 @@ import { SyncStateViewModel, WebviewToExtensionSyncMessage } from '@gitorial/sha
 export class SyncController implements SyncStateEventHandler {
   private statusBarItem: vscode.StatusBarItem | null = null;
   private syncStateService: SyncStateService;
-  private webviewPanel: vscode.WebviewPanel | null = null;
+  private webviewPanel: WebViewPanel | null = null;
 
   constructor(
     private readonly tutorialSyncService: TutorialSyncService,
@@ -32,11 +33,11 @@ export class SyncController implements SyncStateEventHandler {
   /**
    * Set the webview panel reference to send messages to the UI
    */
-  setWebviewPanel(panel: vscode.WebviewPanel | null): void {
-    this.webviewPanel = panel;
+  setWebviewPanel(panel: WebViewPanel| null): void {
 
     // Send initial state if panel is being set
     if (panel) {
+      this.webviewPanel = panel;
       this._sendSyncStateToWebview(this.syncStateService.getCurrentState());
     }
   }
@@ -161,17 +162,8 @@ export class SyncController implements SyncStateEventHandler {
   }
 
   private _sendSyncStateToWebview(state: SyncStateViewModel): void {
-    //TODO: Look into where and how to send sync messages to the webview
-    if (!this.webviewPanel) return;
-
-    try {
-      this.webviewPanel.webview.postMessage({
-        type: 'sync-ui-state-updated',
-        payload: { state }
-      });
-    } catch (error) {
-      console.error('SyncController: Failed to send sync state to webview:', error);
-    }
+    if(!this.webviewPanel) return;
+    this.webviewPanel.updateSyncState(state);
   }
 
   private async _handleConnectRequest(payload: { relayUrl: string; sessionId: string }): Promise<void> {

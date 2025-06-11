@@ -2,12 +2,12 @@
 // handling its messages to/from the webview content, and displaying tutorial data.
 // It interacts with the TutorialController.
 import * as vscode from 'vscode';
-import { TutorialPanel } from './WebviewPanel'; // Import the new TutorialPanel
+import { WebViewPanel } from './WebviewPanel'; // Import the new TutorialPanel
 import { WebviewMessageHandler } from './WebviewMessageHandler'; // Added import
 import { TutorialViewModel } from '@gitorial/shared-types';
 
 export class TutorialPanelManager {
-  private static currentPanelInstance: TutorialPanel | undefined;
+  private static currentPanelInstance: WebViewPanel | undefined;
   private static currentPanelManagerDisposables: vscode.Disposable[] = [];
 
   /**
@@ -48,7 +48,7 @@ export class TutorialPanelManager {
   /**
    * Get the current panel instance if it exists
    */
-  public static getCurrentPanelInstance(): TutorialPanel | undefined {
+  public static getCurrentPanelInstance(): WebViewPanel | undefined {
     return TutorialPanelManager.currentPanelInstance;
   }
 
@@ -77,7 +77,7 @@ export class TutorialPanelManager {
       }
     );
 
-    const newTutorialPanel = new TutorialPanel(vscodePanel, extensionUri, messageHandler);
+    const newTutorialPanel = new WebViewPanel(vscodePanel, extensionUri, messageHandler);
     TutorialPanelManager.currentPanelInstance = newTutorialPanel;
 
     vscodePanel.onDidDispose(

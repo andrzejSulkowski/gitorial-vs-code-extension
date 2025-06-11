@@ -92,16 +92,8 @@
         "title": "Gitorial: Disconnect from Relay Server"
       },
       {
-        "command": "gitorial.toggleSyncConnection",
-        "title": "Gitorial: Toggle Sync Connection"
-      },
-      {
-        "command": "gitorial.showSyncStatus",
-        "title": "Gitorial: Show Sync Status"
-      },
-      {
-        "command": "gitorial.syncCurrentTutorial",
-        "title": "Gitorial: Sync Current Tutorial"
+        "command": "gitorial.createSession",
+        "title": "Gitorial: Create Session"
       },
       {
         "command": "gitorial.dev.simulateClientJoin",
@@ -129,17 +121,7 @@
         "id": "gitorial-uri-handler",
         "label": "Gitorial URI Handler"
       }
-    ],
-    "configuration": {
-      "title": "Gitorial",
-      "properties": {
-        "gitorial.useMockSync": {
-          "type": "boolean",
-          "default": true,
-          "description": "Use mock sync client for development (no real WebSocket connections)"
-        }
-      }
-    }
+    ]
   },
   "dependencies": {
     "@gitorial/shared-types": "workspace:*",

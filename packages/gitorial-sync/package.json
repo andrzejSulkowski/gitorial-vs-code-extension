@@ -1,6 +1,6 @@
 {
   "name": "@gitorial/sync",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Universal sync library for real-time tutorial state synchronization between websites and VS Code extensions with built-in relay server orchestration",
   "main": "dist/index.js",
   "module": "dist/index.esm.js",

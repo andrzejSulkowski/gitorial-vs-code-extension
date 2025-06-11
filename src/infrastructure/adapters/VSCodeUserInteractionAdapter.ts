@@ -16,8 +16,17 @@ export class VSCodeUserInteractionAdapter implements IUserInteraction {
   public async showSaveDialog(options: vscode.SaveDialogOptions): Promise<vscode.Uri | undefined> {
     return await vscode.window.showSaveDialog(options);
   }
-  // TODO: rename to showStatusBarMessage
-  public async showInformationMessage(message: string): Promise<void> {
+  public async showInformationMessage(message: string, options: { copy?: { data: string } }): Promise<void> {
+    if(options?.copy){
+      const action = await vscode.window.showInformationMessage(message, 'Copy');
+      if(action === 'Copy'){
+        await vscode.env.clipboard.writeText(options.copy.data);
+      }
+    }else{
+      await vscode.window.showInformationMessage(message);
+    }
+  }
+  public async showStatusBarMessage(message: string): Promise<void> {
     vscode.window.setStatusBarMessage(message, 5000);
   }
 

@@ -1,8 +1,8 @@
 import * as vscode from 'vscode';
-import { TutorialSyncService } from '../../domain/services/TutorialSyncService';
+import { TutorialSyncService } from '../../domain/services/sync/TutorialSyncService';
 import { TutorialService } from '../../domain/services/TutorialService';
 import { IUserInteraction } from '../../domain/ports/IUserInteraction';
-import { SyncStateService, SyncStateEventHandler } from '../../domain/services/SyncStateService';
+import { SyncStateService, SyncStateEventHandler } from '../../domain/services/sync/SyncStateService';
 import { SyncStateViewModel, WebviewToExtensionSyncMessage } from '@gitorial/shared-types';
 
 /**
@@ -24,6 +24,7 @@ export class SyncController implements SyncStateEventHandler {
   }
 
   onSyncStateChanged(state: SyncStateViewModel): void {
+    console.log("🔄 onSyncStateChanged:", state);
     this._updateStatusBar(state);
     this._sendSyncStateToWebview(state);
   }
@@ -92,7 +93,7 @@ export class SyncController implements SyncStateEventHandler {
       try {
         await this.tutorialSyncService.connectToRelay(relayUrl.split('?')[0], sessionId);
         this.userInteraction.showInformationMessage(`Connected to session: ${sessionId}`);
-        //Inform the webview that the connection is established
+        this._sendSyncStateToWebview(this.syncStateService.getCurrentState());
       } catch (e) {
         this.userInteraction.showErrorMessage(`Failed to connect: ${e}`);
       }
@@ -106,6 +107,14 @@ export class SyncController implements SyncStateEventHandler {
     this.userInteraction.showInformationMessage('Disconnected from sync');
   }
 
+  async createSession(): Promise<void> {
+    const relayServerUrl = await this.userInteraction.getInput('Enter relay server URL', 'ws://localhost:3001', 'ws://localhost:3001');
+    if (!relayServerUrl) return;
+    const session = await this.tutorialSyncService.createSession(relayServerUrl);
+    const relayConnectionUrl = `${relayServerUrl}?session=${session.id}`;
+    this.userInteraction.showInformationMessage(`Session created using ${relayConnectionUrl}`, { copy: { data: relayConnectionUrl } });
+  }
+
   dispose(): void {
     this.statusBarItem?.dispose();
     this.syncStateService.dispose();
@@ -113,7 +122,8 @@ export class SyncController implements SyncStateEventHandler {
 
   private _createStatusBarItem(): void {
     this.statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
-    this.statusBarItem.command = 'gitorial.toggleSyncConnection';
+    this.statusBarItem.command = 'gitorial.disconnectFromRelay';
+    this.statusBarItem.tooltip = 'Gitorial: Disconnect from Sync';
     this.statusBarItem.show();
     this._updateStatusBar(this.syncStateService.getCurrentState());
   }
@@ -143,7 +153,7 @@ export class SyncController implements SyncStateEventHandler {
     }
 
     this.statusBarItem.text = `$(sync) ${statusText} (${state.connectedClients})`;
-    
+
     const isConnected = state.phase === 'active' || state.phase === 'passive' || state.phase === 'connected_idle';
     this.statusBarItem.backgroundColor = isConnected
       ? new vscode.ThemeColor('statusBarItem.activeBackground')
@@ -151,6 +161,7 @@ export class SyncController implements SyncStateEventHandler {
   }
 
   private _sendSyncStateToWebview(state: SyncStateViewModel): void {
+    //TODO: Look into where and how to send sync messages to the webview
     if (!this.webviewPanel) return;
 
     try {

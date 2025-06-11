@@ -74,7 +74,7 @@ export class RelayClient {
   }
 
   // Common operations
-  async connect(sessionId: string): Promise<void> {
+  async connect(sessionId: string): Promise<SessionData> {
     return this.core.connectToSession(sessionId);
   }
 
@@ -88,6 +88,13 @@ export class RelayClient {
 
   getConnectionStatus(): ConnectionStatus {
     return this.core.getConnectionStatus();
+  }
+
+  /**
+   * Get the client ID
+   */
+  clientId(): string {
+    return this.core.clientId;
   }
 }
 

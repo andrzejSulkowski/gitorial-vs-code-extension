@@ -22,7 +22,7 @@ export type OpenDialogOptions = {
 export interface IUserInteraction {
   showOpenDialog(options: OpenDialogOptions): Promise<undefined | string>;
   showInputBox(options: {prompt: string, placeHolder?: string, defaultValue?: string}): Promise<undefined | string>;
-  showInformationMessage(message: string): Promise<void>;
+  showInformationMessage(message: string, options?: { copy?: { data: string } }): Promise<void>;
   showWarningMessage(message: string): Promise<void>;
   showErrorMessage(message: string): Promise<void>;
 

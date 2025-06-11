@@ -1,6 +1,5 @@
 import { EventEmitter } from 'events'; //TODO: This wont work in browser based envs BUT this is all server code anyways...
 import { WebSocket } from 'ws';
-import { IncomingMessage } from 'http';
 import { v4 as uuidv4 } from 'uuid';
 
 import { SessionStore } from './stores/SessionStore';
@@ -12,7 +11,8 @@ import {
   SessionOrchestratorEvents, 
   CreateSessionOptions, 
   SessionData, 
-  RelayConnection 
+  RelayConnection, 
+  Session
 } from './types/session';
 
 import { SyncMessage, SyncMessageType, SyncDirectionRequest, SyncDirectionAssignment } from '../client/types/messages';
@@ -128,7 +128,7 @@ export class RelaySessionOrchestrator extends EventEmitter implements Connection
   /**
    * Handle WebSocket upgrade for a session
    */
-  handleUpgrade(sessionId: string, socket: WebSocket, request: IncomingMessage): boolean {
+  handleUpgrade(sessionId: string, socket: WebSocket): boolean {
     const session = this.sessionStore.getInternal(sessionId);
     if (!session) {
       console.log(`❌ Session not found: ${sessionId}`);
@@ -238,7 +238,7 @@ export class RelaySessionOrchestrator extends EventEmitter implements Connection
           break;
         
         case SyncMessageType.REQUEST_CONTROL:
-          this.handleControlRequest(connection, message);
+          this.handleControlRequest(connection);
           break;
         
         case SyncMessageType.OFFER_CONTROL:
@@ -288,7 +288,7 @@ export class RelaySessionOrchestrator extends EventEmitter implements Connection
   /**
    * Handle control request messages
    */
-  private handleControlRequest(connection: RelayConnection, message: SyncMessage): void {
+  private handleControlRequest(connection: RelayConnection): void {
     const session = this.sessionStore.getInternal(connection.sessionId);
     if (!session) return;
 
@@ -319,7 +319,7 @@ export class RelaySessionOrchestrator extends EventEmitter implements Connection
       });
     } else {
       // Handle conflict resolution
-      const shouldGrant = this.resolveControlConflict(connection, activeConnection, session);
+      const shouldGrant = this.resolveControlConflict(session);
       
       if (shouldGrant) {
         // Transfer control
@@ -473,8 +473,10 @@ export class RelaySessionOrchestrator extends EventEmitter implements Connection
 
   /**
    * Resolve control conflicts based on session configuration
+   * @param session - The session data
+   * @returns true if the request is granted (requestingConnection is granted control), false otherwise
    */
-  private resolveControlConflict(requestingConnection: RelayConnection, activeConnection: RelayConnection, session: any): boolean {
+  private resolveControlConflict(session: Session<any>): boolean {
     switch (session.conflictResolution) {
       case ConflictResolution.FIRST_COME_FIRST_SERVED:
         return false; // Keep current active client

@@ -59,7 +59,7 @@ export interface RelayClientCoreConfig {
  */
 export class RelayClientCore implements ConnectionManagerEventHandler, MessageDispatcherEventHandler {
   private readonly config: RelayClientCoreConfig;
-  private readonly clientId: string;
+  readonly clientId: string;
 
   // Core components (no bloated state machines)
   private readonly connectionManager: ConnectionManager;
@@ -203,7 +203,7 @@ export class RelayClientCore implements ConnectionManagerEventHandler, MessageDi
     return session;
   }
 
-  async connectToSession(sessionId: string): Promise<void> {
+  async connectToSession(sessionId: string): Promise<SessionData> {
     if (this.currentPhase !== SyncPhase.DISCONNECTED) {
       throw new SyncClientError(SyncErrorType.INVALID_OPERATION, 'Cannot connect while already connected');
     }
@@ -212,6 +212,9 @@ export class RelayClientCore implements ConnectionManagerEventHandler, MessageDi
 
     try {
       await this.connectionManager.connect(sessionId);
+      const sessionInfo = await this.getSessionInfo();
+      if(!sessionInfo) throw new SyncClientError(SyncErrorType.CONNECTION_FAILED, 'Failed to get session info');
+      return sessionInfo;
       // onConnected will be called automatically
     } catch (error) {
       this.setPhase(SyncPhase.DISCONNECTED, 'Connection failed');

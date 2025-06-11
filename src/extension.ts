@@ -29,7 +29,7 @@ import { ITutorialRepository } from "./domain/repositories/ITutorialRepository";
 import { DiffViewService } from "./ui/services/DiffViewService";
 import { GitChangesFactory } from "./infrastructure/factories/GitChangesFactory";
 import { TabTrackingService } from "./ui/services/TabTrackingService";
-import { TutorialSyncService } from "./domain/services/TutorialSyncService";
+import { TutorialSyncService } from "./domain/services/sync/TutorialSyncService";
 import { SyncController } from "./ui/controllers/SyncController";
 import { SyncCommandHandler } from "./ui/handlers/SyncCommandHandler";
 
@@ -130,8 +130,7 @@ async function bootstrapApplication(context: vscode.ExtensionContext): Promise<B
   );
 
   // --- Sync Infrastructure ---
-  const useMockSync = process.env.NODE_ENV === 'development' || vscode.workspace.getConfiguration('gitorial').get('useMockSync', true);
-  const tutorialSyncService = new TutorialSyncService({ useMockClient: useMockSync });
+  const tutorialSyncService = new TutorialSyncService();
   
   // Set up reference to get current tutorial from TutorialService
   tutorialSyncService.setTutorialServiceRef(() => tutorialService.tutorial);

@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import { IProgressReporter } from '../../domain/ports/IProgressReporter';
 import { IUserInteraction } from '../../domain/ports/IUserInteraction';
 import { Tutorial } from '../../domain/models/Tutorial';
-import { TutorialPanelManager } from '../panels/TutorialPanelManager';
+import { TutorialPanelManager } from '../panels/WebviewPanelManager';
 import { IFileSystem } from 'src/domain/ports/IFileSystem';
 import { TutorialService } from '../../domain/services/TutorialService';
 import { TutorialViewService } from '../services/TutorialViewService';

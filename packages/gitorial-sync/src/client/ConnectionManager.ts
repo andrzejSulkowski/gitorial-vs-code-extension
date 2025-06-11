@@ -95,6 +95,7 @@ export class ConnectionManager {
       this.socket.onError((error: any) => {
         this.clearConnectionTimeout();
         this.isConnecting = false;
+        console.error('Internal Websocket error', error);
         const syncError = new SyncClientError(SyncErrorType.CONNECTION_FAILED, 'WebSocket connection failed');
         this.handleError(syncError);
       });

@@ -1,8 +1,7 @@
-import { RelayClient, RelayClientEventHandler, RelayClientEvent, TutorialSyncState, SyncPhase } from '@gitorial/sync';
-import { MockRelayClient } from '../../infrastructure/mocks/MockRelayClient';
-import { Tutorial } from '../models/Tutorial';
-import { EnrichedStep } from '../models/EnrichedStep';
-import { Step } from '../models/Step';
+import { RelayClient, RelayClientEventHandler, RelayClientEvent, TutorialSyncState, SyncPhase, SessionData } from '@gitorial/sync';
+import { Tutorial } from '../../models/Tutorial';
+import { EnrichedStep } from '../../models/EnrichedStep';
+import { Step } from '../../models/Step';
 import { StepData } from '@gitorial/shared-types';
 
 /**
@@ -10,18 +9,12 @@ import { StepData } from '@gitorial/shared-types';
  */
 export interface SyncConnectionInfo {
   relayUrl: string;
-  sessionId: string;
+  sessionId: string | null; // when there is no sessionId, the client is not connected to a session
   clientId: string;
   connectedClients: string[];
   connectedAt: number;
 }
 
-/**
- * Configuration for TutorialSyncService
- */
-export interface TutorialSyncServiceConfig {
-  useMockClient?: boolean;
-}
 
 /**
  * Domain service for managing tutorial state synchronization with external relay servers.
@@ -32,15 +25,11 @@ export class TutorialSyncService implements RelayClientEventHandler {
   private isLocked = false;
   private currentTutorial: Tutorial | null = null;
   private tutorialServiceRef: (() => Readonly<Tutorial> | null) | null = null;
-  private relayClient: RelayClient | MockRelayClient | null = null;
+  private relayClient: RelayClient | null = null;
   private connectionInfo: SyncConnectionInfo | null = null;
-  private config: TutorialSyncServiceConfig;
   private isFollowingRemote = false;
 
-  constructor(config: TutorialSyncServiceConfig = {}) {
-    this.config = config;
-    // RelayClient will be created when connecting
-  }
+  constructor() { }
 
   /**
    * Set a reference to get the current tutorial from TutorialService
@@ -48,6 +37,32 @@ export class TutorialSyncService implements RelayClientEventHandler {
    */
   public setTutorialServiceRef(getTutorial: () => Readonly<Tutorial> | null): void {
     this.tutorialServiceRef = getTutorial;
+  }
+
+  public async createSession(relayServerUrl: string): Promise<SessionData> {
+    const relayClient = new RelayClient({
+      serverUrl: relayServerUrl,
+      sessionEndpoint: '/api/sessions',
+      connectionTimeout: 5000,
+      autoReconnect: true,
+      maxReconnectAttempts: 3,
+      reconnectDelay: 2000,
+      eventHandler: this
+    });
+
+    this.relayClient = relayClient;
+
+    const session = await relayClient.session.create();
+
+    this.connectionInfo = {
+      relayUrl: relayServerUrl,
+      sessionId: session.id,
+      clientId: relayClient.clientId(),
+      connectedClients: [],
+      connectedAt: Date.now()
+    };
+
+    return session;
   }
 
   /**
@@ -60,12 +75,7 @@ export class TutorialSyncService implements RelayClientEventHandler {
       throw new Error('Already connected to a relay server');
     }
 
-    if (this.config.useMockClient) {
-      console.log('🎭 TutorialSyncService: Using MockRelayClient for development');
-      this.relayClient = new MockRelayClient({
-        eventHandler: this
-      });
-    } else {
+    if (!this.relayClient) {
       this.relayClient = new RelayClient({
         serverUrl: relayUrl,
         sessionEndpoint: '/api/sessions',
@@ -78,26 +88,17 @@ export class TutorialSyncService implements RelayClientEventHandler {
     }
 
     await this.relayClient.connect(sessionId);
+    this.connectedClients.add(this.relayClient.clientId());
 
     this.connectionInfo = {
       relayUrl,
       sessionId,
-      clientId: this.relayClient.session.id() || `client_${Date.now()}`,
+      clientId: this.relayClient.clientId(),
       connectedClients: Array.from(this.connectedClients),
       connectedAt: Date.now()
     };
 
     console.log(`TutorialSyncService: Connected to relay ${relayUrl} with session ${sessionId}`);
-  }
-
-  /**
-   * Get access to mock controls (only available when using MockRelayClient)
-   */
-  public getMockControls() {
-    if (this.relayClient instanceof MockRelayClient) {
-      return this.relayClient.mockControls;
-    }
-    return null;
   }
 
   /**
@@ -115,7 +116,6 @@ export class TutorialSyncService implements RelayClientEventHandler {
     this.isLocked = false;
     console.log('TutorialSyncService: Disconnected from relay server');
   }
-
   /**
    * Check if currently connected to a relay server
    */
@@ -176,7 +176,7 @@ export class TutorialSyncService implements RelayClientEventHandler {
     this.currentTutorial = tutorial as Tutorial;
     const syncState = this._createTutorialSyncState(tutorial);
     this.relayClient.tutorial.sendState(syncState);
-    
+
     console.log(`TutorialSyncService: Synced tutorial state for "${tutorial.title}" to relay server`);
   }
 
@@ -225,15 +225,12 @@ export class TutorialSyncService implements RelayClientEventHandler {
    * Handle events from the RelayClient
    */
   onEvent(event: RelayClientEvent): void {
+    console.log("🔄 TutorialSyncService: RelayClientEvent", event);
     switch (event.type) {
       case 'connected': {
+        if (!this.relayClient) throw new Error('RelayClient not initialized');
+        this.connectedClients.add(this.relayClient.clientId());
         console.log('TutorialSyncService: Connected to relay server');
-        
-        // Send current tutorial state to newly connected session if available
-        const currentTutorial = this.tutorialServiceRef ? this.tutorialServiceRef() : this.currentTutorial;
-        if (currentTutorial) {
-          this.syncTutorialState(currentTutorial).catch(console.error);
-        }
         break;
       }
       case 'disconnected': {
@@ -261,7 +258,7 @@ export class TutorialSyncService implements RelayClientEventHandler {
         this.connectedClients.add(connectedEvent.clientId);
         this._updateConnectionInfo();
         console.log(`TutorialSyncService: Client ${connectedEvent.clientId} connected (${this.connectedClients.size} total)`);
-        
+
         // If clients are connected, lock the extension
         if (this.connectedClients.size > 0) {
           this.lockExtension();
@@ -273,7 +270,7 @@ export class TutorialSyncService implements RelayClientEventHandler {
         this.connectedClients.delete(disconnectedEvent.clientId);
         this._updateConnectionInfo();
         console.log(`TutorialSyncService: Client ${disconnectedEvent.clientId} disconnected (${this.connectedClients.size} total)`);
-        
+
         // If no clients are connected, unlock the extension
         if (this.connectedClients.size === 0) {
           this.unlockExtension();

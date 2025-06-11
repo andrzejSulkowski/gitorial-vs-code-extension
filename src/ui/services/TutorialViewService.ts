@@ -6,13 +6,13 @@ import { Tutorial } from '../../domain/models/Tutorial';
 import { IMarkdownConverter } from '../ports/IMarkdownConverter';
 import { TutorialViewModel, TutorialStepViewModel } from '@gitorial/shared-types';
 import { EnrichedStep } from '../../domain/models/EnrichedStep';
-import { TutorialPanelManager } from '../panels/TutorialPanelManager';
+import { TutorialPanelManager } from '../panels/WebviewPanelManager';
 import { WebviewMessageHandler } from '../panels/WebviewMessageHandler';
 import { DiffViewService } from './DiffViewService';
 import { IGitChanges } from '../ports/IGitChanges';
 import { IGitChangesFactory } from '../ports/IGitChangesFactory';
 import { TutorialController } from '../controllers/TutorialController';
-import { TutorialSyncService } from '../../domain/services/TutorialSyncService';
+import { TutorialSyncService } from '../../domain/services/sync/TutorialSyncService';
 import { TabTrackingService } from './TabTrackingService';
 import { SyncController } from '../controllers/SyncController';
 

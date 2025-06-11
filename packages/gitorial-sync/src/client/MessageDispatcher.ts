@@ -39,6 +39,7 @@ export interface MessageDispatcherEventHandler {
   onControlOffered(event: ControlOfferEvent): void;
   onControlAccepted(fromClientId: string): void;
   onControlTransferConfirmed(): void;
+  //onControlTransferDeclined(): void;
   onControlReleased(fromClientId: string): void;
   
   // Sync coordination events
@@ -195,7 +196,7 @@ export class MessageDispatcher {
         break;
 
       case SyncMessageType.REQUEST_SYNC:
-        this.handleSyncRequest(message);
+        this.handleSyncRequest();
         break;
 
       case SyncMessageType.REQUEST_CONTROL:
@@ -219,7 +220,7 @@ export class MessageDispatcher {
         break;
 
       case SyncMessageType.CONFIRM_TRANSFER:
-        this.handleTransferConfirm(message);
+        this.handleTransferConfirm();
         break;
 
       case SyncMessageType.ROLE_CHANGED:
@@ -258,7 +259,7 @@ export class MessageDispatcher {
     }
   }
 
-  private handleSyncRequest(message: SyncMessage): void {
+  private handleSyncRequest(): void {
     // If we're passive and have state, send it (passive pushes state when requested)
     if (this.lastSynchronizedState) {
       this.broadcastTutorialState(this.lastSynchronizedState);
@@ -313,25 +314,27 @@ export class MessageDispatcher {
   }
 
   private handleControlDecline(message: SyncMessage): void {
-    // Handle declined control transfer
+    if ('clientId' in message) {
+      console.log(`Control declined from ${message.clientId}`);
+    }else {
+      console.log('Control declined from unknown client');
+    }
+    //this.config.eventHandler.onControlTransferDeclined();
   }
 
   private handleControlRelease(message: SyncMessage): void {
     if ('clientId' in message) {
-      // Notify that the peer has released control
       this.config.eventHandler.onControlReleased(message.clientId);
     }
   }
 
-  private handleTransferConfirm(message: SyncMessage): void {
-    // Handle confirmed control transfer
+  private handleTransferConfirm(): void {
     this.config.eventHandler.onControlTransferConfirmed();
   }
 
   private handleRoleChanged(message: SyncMessage): void {
     if ('data' in message) {
-      const event = message.data as RoleChangeEvent;
-      // Handle role change event
+      //const event = message.data as RoleChangeEvent;
     }
   }
 

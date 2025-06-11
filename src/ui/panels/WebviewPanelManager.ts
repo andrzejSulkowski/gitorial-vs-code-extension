@@ -2,7 +2,7 @@
 // handling its messages to/from the webview content, and displaying tutorial data.
 // It interacts with the TutorialController.
 import * as vscode from 'vscode';
-import { TutorialPanel } from './TutorialPanel'; // Import the new TutorialPanel
+import { TutorialPanel } from './WebviewPanel'; // Import the new TutorialPanel
 import { WebviewMessageHandler } from './WebviewMessageHandler'; // Added import
 import { TutorialViewModel } from '@gitorial/shared-types';
 
@@ -89,8 +89,8 @@ export class TutorialPanelManager {
       null,
       TutorialPanelManager.currentPanelManagerDisposables
     );
+    TutorialPanelManager.currentPanelInstance.panel.reveal(vscode.ViewColumn.One);
 
     this._show(tutorial);
-    TutorialPanelManager.currentPanelInstance.panel.reveal(vscode.ViewColumn.One);
   }
 } 

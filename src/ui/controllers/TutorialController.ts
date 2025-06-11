@@ -123,31 +123,50 @@ export class TutorialController {
    * and prompt the user to open it
    * @param autoOpenState The auto-open state to check.
    */
-  public async detectTutorialInWorkspace(autoOpenState: AutoOpenState, options?: { commitHash?: string }): Promise<void> {
-    const workspaceFolders = vscode.workspace.workspaceFolders;
-    if (!workspaceFolders || workspaceFolders.length === 0) return;
-    const workspacePath = workspaceFolders[0].uri.fsPath;
+  public async openWorkspaceTutorial(
+    autoOpenState: AutoOpenState,
+    options?: { commitHash?: string; force?: boolean }
+  ): Promise<void> {
+    const wf = vscode.workspace.workspaceFolders?.[0];
+    if (!wf) {
+      this.userInteraction.showErrorMessage('No Workspace is open');
+      return;
+    };
 
-    const found = await this.tutorialService.isTutorialInPath(workspacePath);
-    if (!found) return;
+    const workspacePath = wf.uri.fsPath;
+    if (!(await this.tutorialService.isTutorialInPath(workspacePath))) {
+      this.userInteraction.showErrorMessage('There is no Gitorial in the current Workspace');
+      return;
+    };
 
-    const pendingAutoOpen = autoOpenState.get();
-    if (pendingAutoOpen) {
-      const savedTime = new Date(pendingAutoOpen.timestamp).getTime();
-      const now = new Date().getTime();
-      const commitHash = pendingAutoOpen.commitHash;
+    // Determine if we should auto-open
+    const pending = autoOpenState.get();
+    let autoOpen = false;
+    let initialHash = options?.commitHash;
 
-      const autoOpen = now - savedTime < 5_000;
-      if (found && (autoOpen || await this._promptOpen({ message: 'Gitorial tutorial found in the current workspace. Do you want to open it?', confirmActionTitle: 'Open Now', cancelActionTitle: 'No Thanks' }))) {
-        await this._openTutorialFromPath(workspacePath, { initialStepCommitHash: options?.commitHash || commitHash });
-      }
+    if (pending) {
+      const ageMs = Date.now() - new Date(pending.timestamp).getTime();
+      autoOpen = ageMs < 5_000;
+      initialHash = initialHash || pending.commitHash;
       autoOpenState.clear();
-    } else {
-      if (await this._promptOpen({ message: 'Gitorial tutorial found in the current workspace. Do you want to open it?', confirmActionTitle: 'Open Now', cancelActionTitle: 'No Thanks' })) {
-        await this._openTutorialFromPath(workspacePath, { initialStepCommitHash: options?.commitHash });
-      }
+    }
+
+    // If --force flag, always open
+    if (options?.force) {
+      await this._openTutorialFromPath(workspacePath, { initialStepCommitHash: initialHash });
+      return;
+    }
+
+    // Auto-open or prompt once
+    if (autoOpen || await this._promptOpen({
+      message: 'Gitorial tutorial found in the current workspace. Do you want to open it?',
+      confirmActionTitle: 'Open Now',
+      cancelActionTitle: 'No Thanks'
+    })) {
+      await this._openTutorialFromPath(workspacePath, { initialStepCommitHash: initialHash });
     }
   }
+
   public async openLocalTutorial(options?: { commitHash?: string }): Promise<void> {
     const path = await this._pickFolder({ title: 'Open Local Gitorial Tutorial', openLabel: 'Select Tutorial Folder' });
     if (!path) return;
@@ -460,7 +479,7 @@ export class TutorialController {
         this.requestHideSolution();
         return;
       default:
-        console.warn('Received unknown command from webview:', message );
+        console.warn('Received unknown command from webview:', message);
         return;
     }
   }

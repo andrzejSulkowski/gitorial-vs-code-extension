@@ -9,8 +9,8 @@ import { AutoOpenState } from 'src/infrastructure/state/AutoOpenState';
 export class CommandHandler {
   constructor(private tutorialController: TutorialController, private autoOpenState: AutoOpenState) {}
 
-  public async detectTutorialInWorkspace(): Promise<void> {
-    await this.tutorialController.detectTutorialInWorkspace(this.autoOpenState);
+  public async openWorkspaceTutorial(): Promise<void> {
+    await this.tutorialController.openWorkspaceTutorial(this.autoOpenState, { force: true }); //If there is a tutorial in the workspace we dont want to prompt the user first
   }
 
   /**
@@ -50,8 +50,8 @@ export class CommandHandler {
     );
 
     context.subscriptions.push(
-      vscode.commands.registerCommand('gitorial.detectTutorialInWorkspace', () => {
-        this.detectTutorialInWorkspace();
+      vscode.commands.registerCommand('gitorial.openWorkspaceTutorial', () => {
+        this.openWorkspaceTutorial();
       })
     );
     

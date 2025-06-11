@@ -74,8 +74,8 @@
         "title": "Gitorial: Clone New Tutorial"
       },
       {
-        "command": "gitorial.detectTutorialInWorkspace",
-        "title": "Gitorial: Open Tutorial in Workspace"
+        "command": "gitorial.openWorkspaceTutorial",
+        "title": "Gitorial: Open Tutorial (Workspace)"
       },
       {
         "command": "gitorial.openTutorial",

@@ -1,15 +1,10 @@
 export * from './TutorialMessages';
-export * from './SyncMessages';
 export * from './SystemMessages';
 
 import type { 
   ExtensionToWebviewTutorialMessage, 
   WebviewToExtensionTutorialMessage 
 } from './TutorialMessages';
-import type { 
-  ExtensionToWebviewSyncMessage, 
-  WebviewToExtensionSyncMessage 
-} from './SyncMessages';
 import type { 
   ExtensionToWebviewSystemMessage, 
   WebviewToExtensionSystemMessage 
@@ -20,7 +15,6 @@ import type {
  */
 export type ExtensionToWebviewMessage =
     | ExtensionToWebviewTutorialMessage
-    | ExtensionToWebviewSyncMessage
     | ExtensionToWebviewSystemMessage;
 
 /**
@@ -28,7 +22,6 @@ export type ExtensionToWebviewMessage =
  */
 export type WebviewToExtensionMessage =
     | WebviewToExtensionTutorialMessage
-    | WebviewToExtensionSyncMessage
     | WebviewToExtensionSystemMessage;
 
 /**
@@ -36,10 +29,6 @@ export type WebviewToExtensionMessage =
  */
 export function isTutorialMessage(message: WebviewToExtensionMessage): message is WebviewToExtensionTutorialMessage {
     return message.category === 'tutorial';
-}
-
-export function isSyncMessage(message: WebviewToExtensionMessage): message is WebviewToExtensionSyncMessage {
-    return message.category === 'sync';
 }
 
 export function isSystemMessage(message: WebviewToExtensionMessage): message is WebviewToExtensionSystemMessage {
@@ -51,10 +40,6 @@ export function isSystemMessage(message: WebviewToExtensionMessage): message is 
  */
 export function isOutgoingTutorialMessage(message: ExtensionToWebviewMessage): message is ExtensionToWebviewTutorialMessage {
     return message.category === 'tutorial';
-}
-
-export function isOutgoingSyncMessage(message: ExtensionToWebviewMessage): message is ExtensionToWebviewSyncMessage {
-    return message.category === 'sync';
 }
 
 export function isOutgoingSystemMessage(message: ExtensionToWebviewMessage): message is ExtensionToWebviewSystemMessage {
@@ -70,7 +55,6 @@ export const MessageRouter = {
      */
     extension: {
         isTutorial: isTutorialMessage,
-        isSync: isSyncMessage,
         isSystem: isSystemMessage,
     },
 
@@ -79,7 +63,6 @@ export const MessageRouter = {
      */
     webview: {
         isTutorial: isOutgoingTutorialMessage,
-        isSync: isOutgoingSyncMessage,
         isSystem: isOutgoingSystemMessage,
     }
 } as const;
@@ -87,4 +70,4 @@ export const MessageRouter = {
 /**
  * Message categories for reference
  */
-export type MessageCategory = 'tutorial' | 'sync' | 'system';
+export type MessageCategory = 'tutorial' | 'system';

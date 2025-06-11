@@ -8,7 +8,7 @@ import { WebviewMessageHandler } from './WebviewMessageHandler';
 import { Uri } from 'vscode';
 import path from 'node:path';
 import fs from 'fs';
-import { TutorialViewModel, ExtensionToWebviewSyncMessage, SyncStateViewModel, ExtensionToWebviewTutorialMessage } from '@gitorial/shared-types';
+import { TutorialViewModel, ExtensionToWebviewTutorialMessage } from '@gitorial/shared-types';
 
 function getNonce() {
   let text = '';
@@ -52,17 +52,6 @@ export class WebViewPanel {
       category: 'tutorial',
       type: 'data-updated',
       payload: tutorial
-    };
-    this.panel.webview.postMessage(message);
-  }
-
-  public updateSyncState(syncState: SyncStateViewModel): void {
-    const message: ExtensionToWebviewSyncMessage = {
-      category: 'sync',
-      type: 'state-updated',
-      payload: {
-        state: syncState
-      }
     };
     this.panel.webview.postMessage(message);
   }

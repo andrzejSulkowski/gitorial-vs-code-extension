@@ -29,10 +29,6 @@ import { ITutorialRepository } from "./domain/repositories/ITutorialRepository";
 import { DiffViewService } from "./ui/services/DiffViewService";
 import { GitChangesFactory } from "./infrastructure/factories/GitChangesFactory";
 import { TabTrackingService } from "./ui/services/TabTrackingService";
-import { TutorialSyncService } from "./domain/services/sync/TutorialSyncService";
-import { SyncController } from "./ui/controllers/SyncController";
-import { SyncCommandHandler } from "./ui/handlers/SyncCommandHandler";
-
 
 /**
  * Main extension activation point.
@@ -50,17 +46,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<vscode
     activeTutorialStateRepository,
     tutorialRepository,
     workspaceId,
-    syncController,
-    tutorialSyncService,
   } = await bootstrapApplication(context);
 
   // --- VS Code Specific Registrations (Infrastructure concern, performed here) ---
   const commandHandler = new CommandHandler(tutorialController, autoOpenState);
-  const syncCommandHandler = new SyncCommandHandler(syncController, tutorialSyncService);
   const uriHandler = new TutorialUriHandler(tutorialController);
 
   commandHandler.register(context);
-  syncCommandHandler.registerCommands(context);
   uriHandler.register(context);
 
   console.log("📖 Gitorial activation complete.");
@@ -83,8 +75,6 @@ interface BootstrappedDependencies {
   activeTutorialStateRepository: IActiveTutorialStateRepository;
   tutorialRepository: ITutorialRepository;
   workspaceId: string | undefined;
-  syncController: SyncController;
-  tutorialSyncService: TutorialSyncService;
 }
 
 async function bootstrapApplication(context: vscode.ExtensionContext): Promise<BootstrappedDependencies> {
@@ -129,23 +119,10 @@ async function bootstrapApplication(context: vscode.ExtensionContext): Promise<B
     workspaceId
   );
 
-  // --- Sync Infrastructure ---
-  const tutorialSyncService = new TutorialSyncService();
-  
-  // Set up reference to get current tutorial from TutorialService
-  tutorialSyncService.setTutorialServiceRef(() => tutorialService.tutorial);
-
-  // --- UI Layer Controllers (create sync controller early) ---
-  const syncController = new SyncController(
-    tutorialSyncService,
-    tutorialService,
-    userInteractionAdapter
-  );
-
   // --- UI Services ---
   const diffViewService = new DiffViewService(diffDisplayerAdapter, fileSystemAdapter);
   const tabTrackingService = new TabTrackingService();
-  const tutorialViewService = new TutorialViewService(fileSystemAdapter, markdownConverter, diffViewService, gitChangesFactory, context.extensionUri, tutorialSyncService, tabTrackingService, syncController);
+  const tutorialViewService = new TutorialViewService(fileSystemAdapter, markdownConverter, diffViewService, gitChangesFactory, context.extensionUri, tabTrackingService);
 
   // Add services to context subscriptions for proper disposal
   context.subscriptions.push(tabTrackingService);
@@ -169,7 +146,5 @@ async function bootstrapApplication(context: vscode.ExtensionContext): Promise<B
     activeTutorialStateRepository,
     tutorialRepository,
     workspaceId,
-    syncController,
-    tutorialSyncService,
   };
 }

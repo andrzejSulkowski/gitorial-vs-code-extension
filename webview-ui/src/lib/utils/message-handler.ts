@@ -1,4 +1,4 @@
-import type { WebviewToExtensionMessage, ExtensionToWebviewMessage, WebviewToExtensionSyncMessage, WebviewToExtensionSystemMessage, WebviewToExtensionTutorialMessage, ExtensionToWebviewTutorialMessage, ExtensionToWebviewSyncMessage, ExtensionToWebviewSystemMessage } from "@gitorial/shared-types";
+import type { WebviewToExtensionMessage, ExtensionToWebviewMessage, ExtensionToWebviewTutorialMessage, ExtensionToWebviewSystemMessage } from "@gitorial/shared-types";
 import { MessageRouter } from "@gitorial/shared-types";
 
 export class WebviewMessageHandler {
@@ -14,9 +14,6 @@ export class WebviewMessageHandler {
         
         if (MessageRouter.webview.isTutorial(message)) {
             this._handleTutorialMessage(message as ExtensionToWebviewTutorialMessage);
-        }
-        else if (MessageRouter.webview.isSync(message)) {
-            this._handleSyncMessage(message as ExtensionToWebviewSyncMessage);
         }
         else if (MessageRouter.webview.isSystem(message)) {
             this._handleSystemMessage(message as ExtensionToWebviewSystemMessage);
@@ -37,10 +34,6 @@ export class WebviewMessageHandler {
             case 'solution-toggled': {}
             case 'step-changed': {}
         }
-    }
-
-    private static _handleSyncMessage(message: ExtensionToWebviewSyncMessage) {
-        console.log('Sync message received:', message);
     }
 
     private static _handleSystemMessage(message: ExtensionToWebviewSystemMessage) {

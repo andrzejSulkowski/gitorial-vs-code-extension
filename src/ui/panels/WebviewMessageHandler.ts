@@ -4,8 +4,7 @@
 */
 
 import { TutorialController } from '../controllers/TutorialController';
-import { SyncController } from '../controllers/SyncController';
-import { WebviewToExtensionMessage, WebviewToExtensionSyncMessage } from '@gitorial/shared-types';
+import { WebviewToExtensionMessage } from '@gitorial/shared-types';
 
 /**
  * Processes messages from the webview and maps UI actions to the TutorialController.
@@ -13,7 +12,6 @@ import { WebviewToExtensionMessage, WebviewToExtensionSyncMessage } from '@gitor
 export class WebviewMessageHandler {
   constructor(
     private tutorialController: TutorialController,
-    private syncController: SyncController
   ) {}
 
   /**
@@ -25,10 +23,6 @@ export class WebviewMessageHandler {
     switch (message.category) {
       case 'tutorial': {
         this.tutorialController.handleWebviewMessage(message);
-        break;
-      }
-      case 'sync': {
-        this.syncController.handleWebviewMessage(message);
         break;
       }
       case 'system': {

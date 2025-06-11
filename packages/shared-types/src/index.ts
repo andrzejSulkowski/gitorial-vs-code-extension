@@ -10,7 +10,6 @@ export * from './domain/StepData';
 export * from './ui/messages';
 
 // View models (if any webview-specific ones are needed)
-export * from './ui/viewmodels/SyncStateViewModel';
 export * from './ui/viewmodels/TutorialViewModel';
 export * from './ui/viewmodels/TutorialStepViewModel';
 export * from './ui/viewmodels/HTML';

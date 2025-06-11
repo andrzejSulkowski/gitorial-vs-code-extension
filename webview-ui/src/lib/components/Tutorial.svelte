@@ -1,7 +1,6 @@
 <script lang="ts">
   import Nav from './Nav.svelte';
   import StepContent from './StepContent.svelte';
-  import SyncStatus from './SyncStatus.svelte';
   import { tutorialStore, currentStepIndex, totalSteps, isShowingSolution } from '../stores/tutorialStore';
 
   let tutorial = $derived($tutorialStore.tutorial);
@@ -15,9 +14,6 @@
 
 {#if currentStep && !isLoading}
   <div class="tutorial-container">
-    <div class="sync-area">
-      <SyncStatus />
-    </div>
     <div class="content-area">
       <StepContent
         content={currentStep.htmlContent || ''}
@@ -44,11 +40,6 @@
     flex-direction: column;
     height: 100vh;
     font-family: var(--vscode-font-family);
-  }
-
-  .sync-area {
-    flex-shrink: 0;
-    padding: 16px 16px 0;
   }
 
   .content-area {

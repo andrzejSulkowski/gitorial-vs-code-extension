@@ -20,10 +20,9 @@
   "scripts": {
     "// Development": "=== Development Commands ===",
     "dev": "pnpm run build:shared && pnpm run build:watch",
-    "build": "pnpm run build:shared && pnpm run build:sync && pnpm run typecheck && pnpm run build:webview && pnpm run build:extension",
+    "build": "pnpm run build:shared && pnpm run typecheck && pnpm run build:webview && pnpm run build:extension",
     "build:watch": "concurrently \"pnpm run build:extension:watch\" \"pnpm run build:webview:watch\"",
     "build:shared": "cd packages/shared-types && pnpm run build && cd ../..",
-    "build:sync": "cd packages/gitorial-sync && pnpm run build && cd ../..",
     "build:webview": "cd webview-ui && pnpm run build",
     "build:webview:watch": "cd webview-ui && pnpm run dev",
     "build:extension": "node ./scripts/esbuild.js",
@@ -37,7 +36,6 @@
     "lint:fix": "eslint src --fix",
     "// Testing": "=== Testing Commands ===",
     "test": "pnpm run build && pnpm run lint && vscode-test",
-    "test:sync": "cd packages/gitorial-sync && pnpm run test",
     "test:unit": "mocha --require ts-node/register \"src/**/*.test.ts\" --exclude \"src/test/**/*.test.ts\"",
     "// Publishing": "=== VS Code Extension ===",
     "vscode:prepublish": "pnpm run build:extension:production",
@@ -82,38 +80,6 @@
       {
         "command": "gitorial.openTutorial",
         "title": "Gitorial: Open Tutorial"
-      },
-      {
-        "command": "gitorial.connectToRelay",
-        "title": "Gitorial: Connect to Relay Server"
-      },
-      {
-        "command": "gitorial.disconnectFromRelay",
-        "title": "Gitorial: Disconnect from Relay Server"
-      },
-      {
-        "command": "gitorial.createSession",
-        "title": "Gitorial: Create Session"
-      },
-      {
-        "command": "gitorial.dev.simulateClientJoin",
-        "title": "Gitorial Dev: Simulate Client Join"
-      },
-      {
-        "command": "gitorial.dev.simulateClientLeave",
-        "title": "Gitorial Dev: Simulate Client Leave"
-      },
-      {
-        "command": "gitorial.dev.simulateControlOffer",
-        "title": "Gitorial Dev: Simulate Control Offer"
-      },
-      {
-        "command": "gitorial.dev.simulateStateReceived",
-        "title": "Gitorial Dev: Simulate State Received"
-      },
-      {
-        "command": "gitorial.dev.simulateError",
-        "title": "Gitorial Dev: Simulate Error"
       }
     ],
     "uriHandler": [
@@ -125,7 +91,6 @@
   },
   "dependencies": {
     "@gitorial/shared-types": "workspace:*",
-    "@gitorial/sync": "workspace:*",
     "markdown-it": "^14.1.0",
     "simple-git": "^3.28.0",
     "ws": "^8.18.0"

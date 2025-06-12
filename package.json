@@ -64,7 +64,9 @@
     "guide"
   ],
   "activationEvents": [
-    "onUri"
+    "onUri",
+    "onStartupFinished",
+    "workspaceContains:.git"
   ],
   "main": "./out/extension.js",
   "contributes": {

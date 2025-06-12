@@ -127,15 +127,12 @@ export class TutorialController implements IWebviewTutorialMessageHandler {
     autoOpenState: AutoOpenState,
     options?: { commitHash?: string; force?: boolean }
   ): Promise<void> {
-    //This process is very quick
     const wf = vscode.workspace.workspaceFolders?.[0];
     if (!wf) {
       this.userInteraction.showErrorMessage('No Workspace is open');
       return;
     };
 
-
-    //This process takes a while, so we ideally want to show a loading state before that
     const workspacePath = wf.uri.fsPath;
     if (!(await this.tutorialService.isTutorialInPath(workspacePath))) {
       this.userInteraction.showErrorMessage('There is no Gitorial in the current Workspace');

@@ -62,7 +62,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<vscode
 
   const webviewMessageHandler = new WebviewMessageHandler(tutorialController, systemController);
   WebviewPanelManager.setMessageHandler((msg) => webviewMessageHandler.handleMessage(msg));
-  WebviewPanelManager.renderSystem(context.extensionUri);
+
+  await checkAndHandleAutoOpenState(tutorialController, autoOpenState);
 
   console.log("📖 Gitorial activation complete.");
   return context;
@@ -160,4 +161,47 @@ async function bootstrapApplication(context: vscode.ExtensionContext): Promise<B
     tutorialViewService,
     workspaceId
   };
+}
+
+/**
+ * Checks if there's a pending auto-open state and automatically opens the tutorial.
+ * This is called during extension activation to handle tutorial opening after workspace switches.
+ */
+async function checkAndHandleAutoOpenState(
+  tutorialController: TutorialController,
+  autoOpenState: AutoOpenState
+): Promise<void> {
+  try {
+    // Check if there's a workspace folder
+    const workspaceFolders = vscode.workspace.workspaceFolders;
+    if (!workspaceFolders || workspaceFolders.length === 0) {
+      return; // No workspace, nothing to auto-open
+    }
+
+    // Check for pending auto-open state
+    const pending = autoOpenState.get();
+    if (!pending) {
+      return; // No pending auto-open
+    }
+
+    // Check if the auto-open state is still fresh (within 10 seconds)
+    const ageMs = Date.now() - new Date(pending.timestamp).getTime();
+    if (ageMs > 10_000) {
+      console.log('Gitorial: Auto-open state expired, clearing it');
+      autoOpenState.clear();
+      return;
+    }
+
+    console.log('Gitorial: Found pending auto-open state, attempting to open tutorial automatically');
+    
+    // Use the existing openWorkspaceTutorial method which handles all the logic
+    await tutorialController.openWorkspaceTutorial(autoOpenState, { 
+      commitHash: pending.commitHash,
+      force: true // Force opening since this is from auto-open state
+    });
+  } catch (error) {
+    console.error('Gitorial: Error during auto-open check:', error);
+    // Clear the auto-open state if there was an error to prevent infinite loops
+    autoOpenState.clear();
+  }
 }

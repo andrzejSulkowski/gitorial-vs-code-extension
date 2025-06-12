@@ -123,6 +123,7 @@ export class TutorialViewService {
   }
 
   private _initializeTutorialView(tutorial: Readonly<Tutorial>) {
+    WebviewPanelManager.renderSystem(this.extensionUri);
     if (!this._gitAdapter) {
       this._gitAdapter = this.gitAdapterFactory.createFromPath(tutorial.localPath);
     }

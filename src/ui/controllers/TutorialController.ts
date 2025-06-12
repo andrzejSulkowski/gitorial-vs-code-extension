@@ -2,19 +2,20 @@ import * as vscode from 'vscode';
 import { IProgressReporter } from '../../domain/ports/IProgressReporter';
 import { IUserInteraction } from '../../domain/ports/IUserInteraction';
 import { Tutorial } from '../../domain/models/Tutorial';
-import { TutorialPanelManager } from '../panels/WebviewPanelManager';
+import { WebviewPanelManager } from '../panels/WebviewPanelManager';
 import { IFileSystem } from 'src/domain/ports/IFileSystem';
 import { TutorialService } from '../../domain/services/TutorialService';
 import { TutorialViewService } from '../services/TutorialViewService';
 import { AutoOpenState } from 'src/infrastructure/state/AutoOpenState';
 import { WebviewToExtensionTutorialMessage } from '@gitorial/shared-types';
+import { IWebviewTutorialMessageHandler } from '../panels/WebviewMessageHandler';
 
 /**
  * Controller responsible for orchestrating tutorial-related UI interactions and actions.
  * It bridges user actions (from commands, UI panels) with the domain logic (TutorialService)
  * and UI-specific services (TutorialViewService).
  */
-export class TutorialController {
+export class TutorialController implements IWebviewTutorialMessageHandler {
   /**
    * Constructs a TutorialController instance.
    * @param extensionUri The URI of the extension, used for webview panel resources.
@@ -26,7 +27,6 @@ export class TutorialController {
    * @param autoOpenState Service for managing the state for auto-opening cloned tutorials.
    */
   constructor(
-    private readonly extensionUri: vscode.Uri,
     private readonly progressReporter: IProgressReporter,
     private readonly userInteraction: IUserInteraction,
     private readonly fs: IFileSystem,
@@ -127,12 +127,15 @@ export class TutorialController {
     autoOpenState: AutoOpenState,
     options?: { commitHash?: string; force?: boolean }
   ): Promise<void> {
+    //This process is very quick
     const wf = vscode.workspace.workspaceFolders?.[0];
     if (!wf) {
       this.userInteraction.showErrorMessage('No Workspace is open');
       return;
     };
 
+
+    //This process takes a while, so we ideally want to show a loading state before that
     const workspacePath = wf.uri.fsPath;
     if (!(await this.tutorialService.isTutorialInPath(workspacePath))) {
       this.userInteraction.showErrorMessage('There is no Gitorial in the current Workspace');
@@ -253,7 +256,7 @@ export class TutorialController {
         const reloadedTutorial = await this.tutorialService.loadTutorialFromPath(activeTutorialInstance.localPath, { initialStepCommitHash: commitHash });
         if (reloadedTutorial) {
           await this._processLoadedTutorial(reloadedTutorial, commitHash);
-          await this.tutorialViewService.display(reloadedTutorial, this);
+          await this.tutorialViewService.display(reloadedTutorial);
         } else {
           await this._promptCloneOrOpenLocalForExternal(repoUrl, commitHash);
         }
@@ -411,7 +414,7 @@ export class TutorialController {
       await this.tutorialService.updatePersistedOpenTabs(currentOpenTabs);
       console.log('TutorialController: Persisted current open tabs after tutorial load/activation:', currentOpenTabs);
     }
-    await this.tutorialViewService.display(tutorial, this);
+    await this.tutorialViewService.display(tutorial);
   }
 
 
@@ -424,7 +427,7 @@ export class TutorialController {
     if (this.tutorialService.tutorial) {
       this.tutorialService.closeTutorial();
     }
-    TutorialPanelManager.disposeCurrentPanel();
+    WebviewPanelManager.disposeCurrentPanel();
     vscode.commands.executeCommand('setContext', 'gitorial.tutorialActive', false);
     console.log('TutorialController: Active tutorial state cleared.');
   }
@@ -537,7 +540,7 @@ export class TutorialController {
     }
 
     // Always update the display based on the latest tutorial state from the service
-    await this.tutorialViewService.display(currentTutorial, this);
+    await this.tutorialViewService.display(currentTutorial);
   }
 
   /**
@@ -565,6 +568,6 @@ export class TutorialController {
       return;
     }
     await this.tutorialService.toggleSolution(show);
-    await this.tutorialViewService.display(activeTutorial, this);
+    await this.tutorialViewService.display(activeTutorial);
   }
 }

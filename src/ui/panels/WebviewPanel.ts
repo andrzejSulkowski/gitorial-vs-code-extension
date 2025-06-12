@@ -4,11 +4,10 @@
 */
 
 import * as vscode from 'vscode';
-import { WebviewMessageHandler } from './WebviewMessageHandler';
 import { Uri } from 'vscode';
 import path from 'node:path';
 import fs from 'fs';
-import { TutorialViewModel, ExtensionToWebviewTutorialMessage } from '@gitorial/shared-types';
+import { TutorialViewModel, ExtensionToWebviewTutorialMessage, ExtensionToWebviewSystemMessage } from '@gitorial/shared-types';
 
 function getNonce() {
   let text = '';
@@ -22,28 +21,28 @@ function getNonce() {
 export class WebViewPanel {
   private disposables: vscode.Disposable[] = [];
   public readonly panel: vscode.WebviewPanel;
-  private readonly messageHandler: WebviewMessageHandler;
+  public onDidReceiveMessage: ((e: any) => any) | null = null;
 
   constructor(
     vscodePanel: vscode.WebviewPanel,
     private readonly extensionUri: vscode.Uri,
-    messageHandler: WebviewMessageHandler
   ) {
     this.panel = vscodePanel;
-    this.messageHandler = messageHandler;
-
-    this.updateWebviewContent();
 
     this.panel.webview.onDidReceiveMessage(
       message => {
-        this.messageHandler.handleMessage(message);
+        if (this.onDidReceiveMessage) {
+          this.onDidReceiveMessage(message);
+        } else {
+          console.error('WebViewPanel: No message handler set! Message dropped:', message);
+        }
       },
       null,
       this.disposables
     );
 
-    // Note: The TutorialPanelManager will be responsible for listening to
-    // this.panel.onDidDispose to manage its static reference.
+    this._showLoadingState();
+    this.updateWebviewContent().then(() => this._hideLoadingState());
   }
 
   public updateTutorial(tutorial: TutorialViewModel): void {
@@ -55,6 +54,7 @@ export class WebViewPanel {
     };
     this.panel.webview.postMessage(message);
   }
+
 
   public displayError(error: string): void {
     this.panel.webview.postMessage({ command: 'error', data: error });
@@ -141,5 +141,23 @@ export class WebViewPanel {
         x.dispose();
       }
     }
+  }
+
+  private _showLoadingState(): void {
+    const message: ExtensionToWebviewSystemMessage = {
+      category: 'system',
+      type: 'loading-state',
+      payload: { isLoading: true }
+    };
+    this.panel.webview.postMessage(message);
+  }
+
+  private _hideLoadingState(): void {
+    const message: ExtensionToWebviewSystemMessage = {
+      category: 'system',
+      type: 'loading-state',
+      payload: { isLoading: false }
+    };
+    this.panel.webview.postMessage(message);
   }
 }

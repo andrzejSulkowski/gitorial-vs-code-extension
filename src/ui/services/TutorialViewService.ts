@@ -6,12 +6,10 @@ import { Tutorial } from '../../domain/models/Tutorial';
 import { IMarkdownConverter } from '../ports/IMarkdownConverter';
 import { TutorialViewModel, TutorialStepViewModel } from '@gitorial/shared-types';
 import { EnrichedStep } from '../../domain/models/EnrichedStep';
-import { TutorialPanelManager } from '../panels/WebviewPanelManager';
-import { WebviewMessageHandler } from '../panels/WebviewMessageHandler';
+import { WebviewPanelManager } from '../panels/WebviewPanelManager';
 import { DiffViewService } from './DiffViewService';
 import { IGitChanges } from '../ports/IGitChanges';
 import { IGitChangesFactory } from '../ports/IGitChangesFactory';
-import { TutorialController } from '../controllers/TutorialController';
 import { TabTrackingService } from './TabTrackingService';
 
 
@@ -25,7 +23,6 @@ enum TutorialViewChangeType {
 
 export class TutorialViewService {
   private _gitAdapter: IGitChanges | null = null;
-  private _webviewMessageHandler: WebviewMessageHandler | null = null;
   private _oldTutorialViewModel: TutorialViewModel | null = null;
 
   constructor(
@@ -41,8 +38,8 @@ export class TutorialViewService {
   // Here can be effectivly two different things going on here:
   // 1. The user has changed steps
   // 2. The user has toggled the solution
-  public async display(tutorial: Readonly<Tutorial>, controller: TutorialController) {
-    this._initializeTutorialView(tutorial, controller);
+  public async display(tutorial: Readonly<Tutorial>) {
+    this._initializeTutorialView(tutorial);
 
     const tutorialViewModel = this._tutorialViewModel(tutorial);
 
@@ -77,7 +74,7 @@ export class TutorialViewService {
       }
     }
 
-    await this._updateTutorialPanel(this.extensionUri, tutorialViewModel, this._webviewMessageHandler!);
+    await this._updateTutorialPanel(this.extensionUri, tutorialViewModel);
 
     const groupTwoTabs = this._getTabsInGroup(vscode.ViewColumn.Two);
     const isShowingSolutionInGroupTwo = tutorial.isShowingSolution && groupTwoTabs.some(tab => {
@@ -98,7 +95,7 @@ export class TutorialViewService {
       // Get the preferred focus file from tab tracking service
       let preferredFocusFile: string | undefined;
       const lastActiveFile = this.tabTrackingService.getLastActiveTutorialFile();
-      
+
       if (lastActiveFile && tutorial.localPath) {
         const relativePath = path.relative(tutorial.localPath, lastActiveFile.fsPath);
         preferredFocusFile = relativePath;
@@ -113,7 +110,7 @@ export class TutorialViewService {
       const changedFiles = await this.diffViewService.getDiffModelsForParent(tutorial, this._gitAdapter!);
       await this._updateSidePanelFiles(tutorial.activeStep, changedFiles.map(f => f.relativePath), tutorial.localPath); //FIXME: this and '_closeDiffTabsInGroupTwo' both close tabs
       await this._closeDiffTabsInGroupTwo();
-      
+
       // Restore focus to the last active tutorial file if available
       if (lastActiveTutorialFile) {
         try {
@@ -122,18 +119,14 @@ export class TutorialViewService {
           console.error('TutorialViewService: Error restoring focus using TabTrackingService:', error);
         }
       }
-    }  
+    }
   }
 
-  private _initializeTutorialView(tutorial: Readonly<Tutorial>, controller: TutorialController) {
-    if (!this._webviewMessageHandler) {
-      this._webviewMessageHandler = new WebviewMessageHandler(controller);
-    }
+  private _initializeTutorialView(tutorial: Readonly<Tutorial>) {
     if (!this._gitAdapter) {
       this._gitAdapter = this.gitAdapterFactory.createFromPath(tutorial.localPath);
     }
-    
-    // Set the tutorial path for tab tracking
+
     this.tabTrackingService.setTutorialPath(tutorial.localPath);
   }
 
@@ -195,11 +188,11 @@ export class TutorialViewService {
    * Updates the tutorial panel UI by creating or showing it with the latest view model.
    * If no tutorial is active, it disposes of any existing panel.
    */
-  private async _updateTutorialPanel(extensionUri: vscode.Uri, tutorialViewModel: TutorialViewModel, messageHandler: WebviewMessageHandler): Promise<void> {
+  private async _updateTutorialPanel(extensionUri: vscode.Uri, tutorialViewModel: TutorialViewModel): Promise<void> {
     if (tutorialViewModel) {
-      TutorialPanelManager.createOrShow(extensionUri, tutorialViewModel, messageHandler);
+      WebviewPanelManager.renderTutorial(extensionUri, tutorialViewModel);
     } else {
-      TutorialPanelManager.disposeCurrentPanel();
+      WebviewPanelManager.disposeCurrentPanel();
     }
   }
 

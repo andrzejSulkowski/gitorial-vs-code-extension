@@ -29,6 +29,9 @@ import { ITutorialRepository } from "./domain/repositories/ITutorialRepository";
 import { DiffViewService } from "./ui/services/DiffViewService";
 import { GitChangesFactory } from "./infrastructure/factories/GitChangesFactory";
 import { TabTrackingService } from "./ui/services/TabTrackingService";
+import { SystemController } from "./ui/controllers/SystemController";
+import { WebviewMessageHandler } from "./ui/panels/WebviewMessageHandler";
+import { WebviewPanelManager } from "./ui/panels/WebviewPanelManager";
 
 /**
  * Main extension activation point.
@@ -45,6 +48,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<vscode
     userInteractionAdapter,
     activeTutorialStateRepository,
     tutorialRepository,
+    systemController,
+    tutorialViewService,
     workspaceId,
   } = await bootstrapApplication(context);
 
@@ -54,6 +59,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<vscode
 
   commandHandler.register(context);
   uriHandler.register(context);
+
+  const webviewMessageHandler = new WebviewMessageHandler(tutorialController, systemController);
+  WebviewPanelManager.setMessageHandler((msg) => webviewMessageHandler.handleMessage(msg));
+  WebviewPanelManager.renderSystem(context.extensionUri);
 
   console.log("📖 Gitorial activation complete.");
   return context;
@@ -74,6 +83,8 @@ interface BootstrappedDependencies {
   userInteractionAdapter: IUserInteraction;
   activeTutorialStateRepository: IActiveTutorialStateRepository;
   tutorialRepository: ITutorialRepository;
+  systemController: SystemController;
+  tutorialViewService: TutorialViewService;
   workspaceId: string | undefined;
 }
 
@@ -130,7 +141,6 @@ async function bootstrapApplication(context: vscode.ExtensionContext): Promise<B
 
   // --- UI Layer Controllers ---
   const tutorialController = new TutorialController(
-    context.extensionUri,
     progressReportAdapter,
     userInteractionAdapter,
     fileSystemAdapter,
@@ -138,6 +148,7 @@ async function bootstrapApplication(context: vscode.ExtensionContext): Promise<B
     tutorialViewService,
     autoOpenState
   );
+  const systemController = new SystemController();
 
   return {
     tutorialController,
@@ -145,6 +156,8 @@ async function bootstrapApplication(context: vscode.ExtensionContext): Promise<B
     userInteractionAdapter,
     activeTutorialStateRepository,
     tutorialRepository,
-    workspaceId,
+    systemController,
+    tutorialViewService,
+    workspaceId
   };
 }

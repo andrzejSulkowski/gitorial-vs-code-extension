@@ -11,6 +11,7 @@ import { DiffViewService } from './DiffViewService';
 import { IGitChanges } from '../ports/IGitChanges';
 import { IGitChangesFactory } from '../ports/IGitChangesFactory';
 import { TabTrackingService } from './TabTrackingService';
+import { TutorialFileService } from './TutorialFileService';
 
 
 enum TutorialViewChangeType {
@@ -24,6 +25,7 @@ enum TutorialViewChangeType {
 export class TutorialViewService {
   private _gitAdapter: IGitChanges | null = null;
   private _oldTutorialViewModel: TutorialViewModel | null = null;
+  private _tutorialFileService: TutorialFileService;
 
   constructor(
     private readonly fs: IFileSystem,
@@ -32,7 +34,9 @@ export class TutorialViewService {
     private readonly gitAdapterFactory: IGitChangesFactory,
     private readonly extensionUri: vscode.Uri,
     private readonly tabTrackingService: TabTrackingService,
-  ) { }
+  ) { 
+    this._tutorialFileService = new TutorialFileService(fs);
+  }
 
 
   // Here can be effectivly two different things going on here:
@@ -50,7 +54,7 @@ export class TutorialViewService {
     if (!this._oldTutorialViewModel) {
       //Initial render
       const changedFiles = await this.diffViewService.getDiffModelsForParent(tutorial, this._gitAdapter!);
-      await this._updateSidePanelFiles(tutorial.activeStep, changedFiles.map(f => f.relativePath), tutorial.localPath);
+      await this._tutorialFileService.updateSidePanelFiles(tutorial.activeStep, changedFiles.map(f => f.relativePath), tutorial.localPath);
     } else {
       const changeType = this._getTutorialViewChangeType(tutorialViewModel, this._oldTutorialViewModel);
       switch (changeType) {
@@ -60,13 +64,13 @@ export class TutorialViewService {
         }
         case TutorialViewChangeType.StepChange: {
           const changedFiles = await this.diffViewService.getDiffModelsForParent(tutorial, this._gitAdapter!);
-          await this._updateSidePanelFiles(tutorial.activeStep, changedFiles.map(f => f.relativePath), tutorial.localPath);
+          await this._tutorialFileService.updateSidePanelFiles(tutorial.activeStep, changedFiles.map(f => f.relativePath), tutorial.localPath);
           break;
         }
         case TutorialViewChangeType.StepSolutionChange: {
           await this._solutionToggle(tutorial);
           const changedFiles = await this.diffViewService.getDiffModelsForParent(tutorial, this._gitAdapter!);
-          await this._updateSidePanelFiles(tutorial.activeStep, changedFiles.map(f => f.relativePath), tutorial.localPath);
+          await this._tutorialFileService.updateSidePanelFiles(tutorial.activeStep, changedFiles.map(f => f.relativePath), tutorial.localPath);
           break;
         }
         default:
@@ -76,7 +80,7 @@ export class TutorialViewService {
 
     await this._updateTutorialPanel(this.extensionUri, tutorialViewModel);
 
-    const groupTwoTabs = this._getTabsInGroup(vscode.ViewColumn.Two);
+    const groupTwoTabs = this._tutorialFileService.getTabsInGroup(vscode.ViewColumn.Two);
     const isShowingSolutionInGroupTwo = tutorial.isShowingSolution && groupTwoTabs.some(tab => {
       const input = tab.input as any;
       return input && input.original && input.modified;
@@ -103,13 +107,13 @@ export class TutorialViewService {
       //TODO: we have two methods to restore/focus tabs, one is in TabTrackingService, the other is in DiffViewService.showStepSolution.
       //We should use one method (pref. TabTrackingService) to restore focus to the last active tutorial file only.
       await this.diffViewService.showStepSolution(tutorial, this._gitAdapter!, preferredFocusFile);
-      await this._closeNonDiffTabsInGroupTwo();
+      await this._tutorialFileService.closeNonDiffTabsInGroup(vscode.ViewColumn.Two);
     } else {
       //hide -> show
       const lastActiveTutorialFile = this.tabTrackingService.getLastActiveTutorialFile();
       const changedFiles = await this.diffViewService.getDiffModelsForParent(tutorial, this._gitAdapter!);
-      await this._updateSidePanelFiles(tutorial.activeStep, changedFiles.map(f => f.relativePath), tutorial.localPath); //FIXME: this and '_closeDiffTabsInGroupTwo' both close tabs
-      await this._closeDiffTabsInGroupTwo();
+      await this._tutorialFileService.updateSidePanelFiles(tutorial.activeStep, changedFiles.map(f => f.relativePath), tutorial.localPath); //FIXME: this and '_closeDiffTabsInGroupTwo' both close tabs
+      await this._tutorialFileService.closeDiffTabs(vscode.ViewColumn.Two);
 
       // Restore focus to the last active tutorial file if available
       if (lastActiveTutorialFile) {
@@ -197,17 +201,6 @@ export class TutorialViewService {
     }
   }
 
-
-  /**
-   * Gets all tabs in a specific editor group.
-   * @param viewColumn The view column of the editor group.
-   * @returns An array of tabs in the specified group.
-   */
-  private _getTabsInGroup(viewColumn: vscode.ViewColumn): vscode.Tab[] {
-    const group = vscode.window.tabGroups.all.find(tg => tg.viewColumn === viewColumn);
-    return group ? [...group.tabs] : [];
-  }
-
   /**
    * Resets the editor layout by closing all editor tabs.
    * Typically used when starting a new tutorial or a major mode switch.
@@ -218,170 +211,12 @@ export class TutorialViewService {
   }
 
   /**
-   * Updates the files shown in the side panel (editor group two) for the current tutorial step.
-   * Closes irrelevant files and opens necessary ones.
-   * @param step The current tutorial step.
-   * @param changedFilePaths Relative paths of files changed in this step.
-   * @param tutorialLocalPath The local file system path of the active tutorial.
-   */
-  private async _updateSidePanelFiles(step: Step, changedFilePaths: string[], tutorialLocalPath: string): Promise<void> {
-    if (!tutorialLocalPath) {
-      console.warn("TutorialViewService: Cannot update side panel files, tutorialLocalPath missing.");
-      return;
-    }
-
-    const excludedExtensions = ['.md', '.toml', '.lock'];
-    const excludedFileNames = ['.gitignore'];
-
-    if (step.type === 'section') {
-      const groupTwoTabs = this._getTabsInGroup(vscode.ViewColumn.Two);
-      if (groupTwoTabs.length > 0) {
-        await vscode.window.tabGroups.close(groupTwoTabs, false);
-        console.log("TutorialViewService: Closed all tabs in group two for section step.");
-      }
-      return;
-    }
-
-    const targetUris: vscode.Uri[] = [];
-    for (const relativePath of changedFilePaths) {
-      const fileName = path.basename(relativePath);
-      const fileExtension = path.extname(relativePath).toLowerCase();
-
-      if (excludedFileNames.includes(fileName) || excludedExtensions.includes(fileExtension)) {
-        console.log(`TutorialViewService: Skipping excluded file: ${relativePath}`);
-        continue;
-      }
-
-      const absolutePath = this.fs.join(tutorialLocalPath, relativePath);
-      if (await this.fs.pathExists(absolutePath)) {
-        targetUris.push(vscode.Uri.file(absolutePath));
-      } else {
-        console.warn(`TutorialViewService: File path from changed files does not exist: ${absolutePath}`);
-      }
-    }
-
-    const currentTabsInGroupTwo = this._getTabsInGroup(vscode.ViewColumn.Two);
-    const targetUriStrings = targetUris.map(u => u.toString());
-
-    const tabsToClose: vscode.Tab[] = [];
-    for (const tab of currentTabsInGroupTwo) {
-      const input = tab.input as any;
-      if (input && input.original && input.modified) {
-        tabsToClose.push(tab);
-        continue;
-      }
-      const tabUri = (input?.uri as vscode.Uri);
-      if (tabUri) {
-        if (!(await this.fs.pathExists(tabUri.fsPath))) {
-          tabsToClose.push(tab);
-          continue;
-        }
-        if (!targetUriStrings.includes(tabUri.toString())) {
-          tabsToClose.push(tab);
-          continue;
-        }
-      }
-    }
-
-    const urisToActuallyOpen = targetUris.filter(uri => !currentTabsInGroupTwo.find(tab => (tab.input as any)?.uri?.toString() === uri.toString()));
-    if (urisToActuallyOpen.length > 0) {
-      for (let i = 0; i < urisToActuallyOpen.length; i++) {
-        const uriToOpen = urisToActuallyOpen[i];
-        try {
-          // Focus the last document that is opened in the loop
-          const shouldPreserveFocus = i < urisToActuallyOpen.length - 1;
-          await vscode.window.showTextDocument(uriToOpen, { viewColumn: vscode.ViewColumn.Two, preview: false, preserveFocus: shouldPreserveFocus });
-        } catch (error) {
-          console.error(`TutorialViewService: Error opening file ${uriToOpen.fsPath} in group two:`, error);
-        }
-      }
-    }
-
-    if (tabsToClose.length > 0) {
-      try {
-        await vscode.window.tabGroups.close(tabsToClose, false);
-      } catch (error) {
-        console.error("TutorialViewService: Error closing tabs in group two:", error);
-        console.error("Tabs to close: ", tabsToClose);
-      }
-    }
-
-    const finalTabsInGroupTwo = this._getTabsInGroup(vscode.ViewColumn.Two);
-    if (finalTabsInGroupTwo.length > 0) {
-      await vscode.commands.executeCommand('workbench.action.focusSecondEditorGroup');
-    }
-
-    console.log("TutorialViewService: Side panel files updated for step:", step.title);
-  }
-
-  /**
-   * Closes all tabs in the second editor group that are not diff views.
-   */
-  private async _closeNonDiffTabsInGroupTwo(): Promise<void> {
-    const groupTwoTabs = this._getTabsInGroup(vscode.ViewColumn.Two);
-    const regularFileTabsToClose: vscode.Tab[] = [];
-    for (const tab of groupTwoTabs) {
-      const input = tab.input as any;
-      if (!(input && input.original && input.modified)) { // Not a diff view
-        regularFileTabsToClose.push(tab);
-      }
-    }
-    if (regularFileTabsToClose.length > 0) {
-      try {
-        await vscode.window.tabGroups.close(regularFileTabsToClose, false);
-        console.log("TutorialViewService: Closed regular files in group two.");
-      } catch (error) {
-        console.error("TutorialViewService: Error closing regular files in group two:", error);
-      }
-    }
-  }
-
-  /**
-   * Closes all diff tabs in the second editor group.
-   */
-  private async _closeDiffTabsInGroupTwo(): Promise<void> {
-    const groupTwoTabs = this._getTabsInGroup(vscode.ViewColumn.Two);
-    const diffTabsToClose: vscode.Tab[] = [];
-    for (const tab of groupTwoTabs) {
-      const input = tab.input as any;
-      if (input && input.original && input.modified) { // It's a diff view
-        diffTabsToClose.push(tab);
-      }
-    }
-    if (diffTabsToClose.length > 0) {
-      try {
-        await vscode.window.tabGroups.close(diffTabsToClose, false);
-        console.log("TutorialViewService: Closed diff tabs in group two.");
-      } catch (error) {
-        console.error("TutorialViewService: Error closing diff tabs in group two:", error);
-      }
-    }
-  }
-
-  /**
    * Gets the file system paths of all open tabs that are part of the specified tutorial.
    * @param tutorialLocalPath The absolute local path of the active tutorial.
    * @returns An array of fsPath strings for the relevant open tutorial files.
    */
   public getTutorialOpenTabFsPaths(tutorialLocalPath: string): string[] {
-    const openTutorialTabs: string[] = [];
-    for (const tabGroup of vscode.window.tabGroups.all) {
-      for (const tab of tabGroup.tabs) {
-        if (tab.input instanceof vscode.TabInputText) {
-          const tabFsPath = tab.input.uri.fsPath;
-          // Normalize paths to ensure consistent comparison, especially on Windows
-          const normalizedTabFsPath = path.normalize(tabFsPath);
-          const normalizedTutorialLocalPath = path.normalize(tutorialLocalPath);
-          if (normalizedTabFsPath.startsWith(normalizedTutorialLocalPath)) {
-            // We store relative paths to make the state more portable if the tutorial
-            // is moved, though for this feature, absolute might be fine.
-            // Let's stick to absolute fsPath for now as per StoredTutorialState.openFileUris
-            openTutorialTabs.push(tabFsPath);
-          }
-        }
-      }
-    }
-    return openTutorialTabs;
+    return this._tutorialFileService.getTutorialOpenTabFsPaths(tutorialLocalPath);
   }
 
   /**
@@ -389,22 +224,7 @@ export class TutorialViewService {
    * @param uris An array of vscode.Uri objects to open.
    */
   public async openAndFocusTabs(uris: vscode.Uri[]): Promise<void> {
-    if (!uris || uris.length === 0) {
-      return;
-    }
-
-    for (let i = 0; i < uris.length; i++) {
-      try {
-        const preserveFocus = i < uris.length - 1;
-        await vscode.window.showTextDocument(uris[i], { preview: false, preserveFocus, viewColumn: vscode.ViewColumn.Two });
-      } catch (error) {
-        console.error(`TutorialViewService: Error opening document ${uris[i].fsPath}:`, error);
-      }
-    }
-    // After loop, if uris were opened, the last one should have focus. Ensure group is focused.
-    if (uris.length > 0) {
-      await vscode.commands.executeCommand('workbench.action.focusSecondEditorGroup');
-    }
+    await this._tutorialFileService.openAndFocusTabs(uris);
   }
 
   /**

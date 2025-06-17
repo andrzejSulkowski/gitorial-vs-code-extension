@@ -22,7 +22,7 @@ import { TutorialService } from "./domain/services/TutorialService";
 import { createMarkdownConverterAdapter } from "./infrastructure/adapters/MarkdownConverter";
 import { StepContentRepository } from "./infrastructure/repositories/StepContentRepository";
 import { MementoActiveTutorialStateRepository } from "./infrastructure/repositories/MementoActiveTutorialStateRepository";
-import { TutorialViewService } from "./ui/services/TutorialViewService";
+import { TutorialUIManager } from "./ui/managers/TutorialUIManager";
 import { AutoOpenState } from "./infrastructure/state/AutoOpenState";
 import { IActiveTutorialStateRepository } from "./domain/repositories/IActiveTutorialStateRepository";
 import { ITutorialRepository } from "./domain/repositories/ITutorialRepository";
@@ -32,6 +32,12 @@ import { TabTrackingService } from "./ui/services/TabTrackingService";
 import { SystemController } from "./ui/controllers/SystemController";
 import { WebviewMessageHandler } from "./ui/panels/WebviewMessageHandler";
 import { WebviewPanelManager } from "./ui/panels/WebviewPanelManager";
+import { TutorialDisplayOrchestrator } from "./ui/orchestrators/TutorialDisplayOrchestrator";
+import { TutorialViewModelConverter } from "./ui/converters/TutorialViewModelConverter";
+import { TutorialChangeDetector } from "./ui/utils/TutorialChangeDetector";
+import { TutorialSolutionWorkflow } from "./ui/workflows/TutorialSolutionWorkflow";
+import { TutorialInitializer } from "./ui/factories/TutorialInitializer";
+import { TutorialFileService } from "./ui/services/TutorialFileService";
 
 /**
  * Main extension activation point.
@@ -45,12 +51,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<vscode
   const {
     tutorialController,
     autoOpenState,
-    userInteractionAdapter,
-    activeTutorialStateRepository,
-    tutorialRepository,
     systemController,
-    tutorialViewService,
-    workspaceId,
   } = await bootstrapApplication(context);
 
   // --- VS Code Specific Registrations (Infrastructure concern, performed here) ---
@@ -85,7 +86,7 @@ interface BootstrappedDependencies {
   activeTutorialStateRepository: IActiveTutorialStateRepository;
   tutorialRepository: ITutorialRepository;
   systemController: SystemController;
-  tutorialViewService: TutorialViewService;
+  tutorialUIManager: TutorialUIManager;
   workspaceId: string | undefined;
 }
 
@@ -134,11 +135,37 @@ async function bootstrapApplication(context: vscode.ExtensionContext): Promise<B
   // --- UI Services ---
   const diffViewService = new DiffViewService(diffDisplayerAdapter, fileSystemAdapter);
   const tabTrackingService = new TabTrackingService();
-  const tutorialViewService = new TutorialViewService(fileSystemAdapter, markdownConverter, diffViewService, gitChangesFactory, context.extensionUri, tabTrackingService);
+  
+  // Create TutorialFileService (needed by orchestrator and solution manager)
+  const tutorialFileService = new TutorialFileService(fileSystemAdapter);
+  
+  // Create services for the TutorialDisplayOrchestrator
+  const viewModelConverter = new TutorialViewModelConverter(markdownConverter);
+  const changeDetector = new TutorialChangeDetector();
+  const solutionWorkflow = new TutorialSolutionWorkflow(diffViewService, tabTrackingService, tutorialFileService);
+  const tutorialInitializer = new TutorialInitializer(gitChangesFactory, context.extensionUri, tabTrackingService);
+  
+  // Create the TutorialDisplayOrchestrator
+  const tutorialDisplayOrchestrator = new TutorialDisplayOrchestrator(
+    viewModelConverter,
+    changeDetector,
+    solutionWorkflow,
+    tutorialInitializer,
+    diffViewService,
+    tutorialFileService
+  );
+  
+  // Create TutorialUIManager with the orchestrator
+  const tutorialUIManager = new TutorialUIManager(
+    fileSystemAdapter, 
+    context.extensionUri, 
+    tabTrackingService,
+    tutorialDisplayOrchestrator
+  );
 
   // Add services to context subscriptions for proper disposal
   context.subscriptions.push(tabTrackingService);
-  context.subscriptions.push(tutorialViewService);
+  context.subscriptions.push(tutorialUIManager);
 
   // --- UI Layer Controllers ---
   const tutorialController = new TutorialController(
@@ -146,7 +173,7 @@ async function bootstrapApplication(context: vscode.ExtensionContext): Promise<B
     userInteractionAdapter,
     fileSystemAdapter,
     tutorialService,
-    tutorialViewService,
+    tutorialUIManager,
     autoOpenState
   );
   const systemController = new SystemController();
@@ -158,7 +185,7 @@ async function bootstrapApplication(context: vscode.ExtensionContext): Promise<B
     activeTutorialStateRepository,
     tutorialRepository,
     systemController,
-    tutorialViewService,
+    tutorialUIManager,
     workspaceId
   };
 }

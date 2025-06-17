@@ -344,7 +344,7 @@ export class TutorialService {
     return markdown;
   }
 
-  //TODO: I'd actually like to move the whole tab management and state persistence into the TutorialViewService
+  //TODO: I'd actually like to move the whole tab management and state persistence into the TutorialUIManager
 
   /**
    * Gets the URIs of files that were open when the tutorial state was last persisted.

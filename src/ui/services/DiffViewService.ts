@@ -6,7 +6,6 @@ import { IFileSystem } from 'src/domain/ports/IFileSystem';
 
 
 export class DiffViewService {
-
   constructor(
     private readonly diffView: IDiffDisplayer,
     private readonly fs: IFileSystem

@@ -18,10 +18,10 @@ This comprehensive guide provides information for developers looking to contribu
 
 ## Prerequisites
 
-- **Node.js** (v18 or higher) and **npm**
+- **Node.js** (v20 or higher) and **pnpm** (v10 or higher)
 - **VS Code** (v1.87.0 or higher)
 - **Git** (for cloning and testing with tutorial repositories)
-- Basic understanding of TypeScript, VS Code extensions, and Clean Architecture
+- Basic understanding of TypeScript, VS Code extensions, and Hexagonal Architecture
 
 ## Quick Start
 
@@ -34,7 +34,7 @@ cd gitorial-vs-code-plugin/project
 pnpm install
 
 # 3. Compile the extension
-pnpm run compile
+pnpm run dev
 
 # 4. Open in VS Code
 code .
@@ -49,19 +49,19 @@ code .
 
 | Script | Description |
 |--------|-------------|
-| `npm run compile` | Full build: typecheck + webview + extension + post-build |
-| `npm run typecheck` | TypeScript type checking without compilation |
-| `npm run compile:webview` | Build the Svelte webview UI |
-| `npm run compile:extension` | Build the extension backend using esbuild |
-| `npm run lint` | Run ESLint on the source code |
-| `npm run test` | Run all tests using VS Code test runner |
-| `npm run test:unit` | Run unit tests with Mocha |
-| `npm run vscode:package` | Package the extension as .vsix file |
+| `pnpm run compile` | Full build: typecheck + webview + extension + post-build |
+| `pnpm run typecheck` | TypeScript type checking without compilation |
+| `pnpm run compile:webview` | Build the Svelte webview UI |
+| `pnpm run compile:extension` | Build the extension backend using esbuild |
+| `pnpm run lint` | Run ESLint on the source code |
+| `pnpm run test` | Run all tests using VS Code test runner |
+| `pnpm run test:unit` | Run unit tests with Mocha |
+| `pnpm run vscode:package` | Package the extension as .vsix file |
 
 ### Development Loop
 
 1. **Make changes** to TypeScript/Svelte code
-2. **Compile**: Run `npm run compile` or use watch mode
+2. **Compile**: Run `pnpm run compile` or use watch mode
 3. **Test**: Press `F5` in VS Code to launch Extension Development Host
 4. **Debug**: Use VS Code debugger or console logs
 5. **Iterate**: Reload the Extension Development Host (`Ctrl+R`/`Cmd+R`)
@@ -72,10 +72,10 @@ For faster development, you can run components in watch mode:
 
 ```bash
 # Terminal 1: Watch webview changes
-cd webview-ui && npm run dev
+cd webview-ui && pnpm run dev
 
 # Terminal 2: Watch extension changes  
-npm run compile:extension -- --watch
+pnpm run compile:extension -- --watch
 
 # Then press F5 in VS Code to start debugging
 ```
@@ -89,13 +89,13 @@ The webview UI is a separate Svelte application with its own build process:
 cd webview-ui
 
 # Install webview dependencies
-npm install
+pnpm install
 
 # Development server with hot reload
-npm run dev
+pnpm run dev
 
 # Production build
-npm run build
+pnpm run build
 ```
 
 **Key webview files:**
@@ -184,7 +184,7 @@ The extension follows **Clean Architecture** principles with clear separation of
 - **Controllers** (`src/ui/controllers/`): Orchestrate user actions and coordinate between domain services and UI services
   - `TutorialController.ts`: Main controller handling tutorial operations
 - **Services** (`src/ui/services/`): Manage UI-specific operations
-  - `TutorialViewService.ts`: Manages tutorial display, file views, and editor groups
+  - `TutorialUIManager.ts`: Manages tutorial display, file views, and editor groups
   - `DiffViewService.ts`: Handles diff view generation and display
 - **Panels** (`src/ui/panels/`): Manage VS Code webview panels
   - `TutorialPanelManager.ts`: Singleton manager for tutorial panels
@@ -272,13 +272,13 @@ The extension follows **Clean Architecture** principles with clear separation of
 
 ```bash
 # Run all tests
-npm run test
+pnpm run test
 
 # Run unit tests only
-npm run test:unit
+pnpm run test:unit
 
 # Run with coverage (if configured)
-npm run test:unit -- --coverage
+pnpm run test:unit -- --coverage
 ```
 
 ### Test Structure
@@ -332,14 +332,14 @@ console.log('Webview debug:', data);
 ### Development Build
 
 ```bash
-npm run compile
+pnpm run compile
 ```
 
 ### Production Package
 
 ```bash
 # Create .vsix package
-npm run vscode:package
+pnpm run vscode:package
 
 # The package will be created as gitorial-0.1.8.vsix
 ```
@@ -356,7 +356,7 @@ npm run vscode:package
 ### Code Style
 
 - Follow existing TypeScript and Svelte conventions
-- Use ESLint configuration: `npm run lint`
+- Use ESLint configuration: `pnpm run lint`
 - Prefer functional programming for utilities
 - Use classes for domain models with behavior
 - Follow Clean Architecture dependency rules
@@ -374,8 +374,8 @@ npm run vscode:package
 2. **Create feature branch**: `git checkout -b feature/your-feature`
 3. **Make changes** following code style guidelines
 4. **Add tests** for new functionality
-5. **Run tests**: `npm run test`
-6. **Lint code**: `npm run lint`
+5. **Run tests**: `pnpm run test`
+6. **Lint code**: `pnpm run lint`
 7. **Commit changes**: Use conventional commit messages
 8. **Push branch**: `git push origin feature/your-feature`
 9. **Create Pull Request** with clear description
@@ -386,16 +386,16 @@ npm run vscode:package
 
 **Extension not loading in Development Host**
 - Check console for compilation errors
-- Ensure `npm run compile` completed successfully
+- Ensure `pnpm run compile` completed successfully
 - Verify `package.json` contributions are correct
 
 **Webview not displaying**
-- Check webview build: `npm run compile:webview`
+- Check webview build: `pnpm run compile:webview`
 - Verify webview HTML and assets are generated
 - Check browser console in webview dev tools
 
 **TypeScript errors**
-- Run `npm run typecheck` to see all type errors
+- Run `pnpm run typecheck` to see all type errors
 - Ensure all dependencies are installed
 - Check `tsconfig.json` configuration
 

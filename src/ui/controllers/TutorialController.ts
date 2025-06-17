@@ -5,7 +5,7 @@ import { Tutorial } from '../../domain/models/Tutorial';
 import { WebviewPanelManager } from '../panels/WebviewPanelManager';
 import { IFileSystem } from 'src/domain/ports/IFileSystem';
 import { TutorialService } from '../../domain/services/TutorialService';
-import { TutorialViewService } from '../services/TutorialViewService';
+import { TutorialUIManager } from '../managers/TutorialUIManager';
 import { AutoOpenState } from 'src/infrastructure/state/AutoOpenState';
 import { WebviewToExtensionTutorialMessage } from '@gitorial/shared-types';
 import { IWebviewTutorialMessageHandler } from '../panels/WebviewMessageHandler';
@@ -13,7 +13,7 @@ import { IWebviewTutorialMessageHandler } from '../panels/WebviewMessageHandler'
 /**
  * Controller responsible for orchestrating tutorial-related UI interactions and actions.
  * It bridges user actions (from commands, UI panels) with the domain logic (TutorialService)
- * and UI-specific services (TutorialViewService).
+ * and UI-specific services (TutorialUIManager).
  */
 export class TutorialController implements IWebviewTutorialMessageHandler {
   /**
@@ -23,7 +23,7 @@ export class TutorialController implements IWebviewTutorialMessageHandler {
    * @param userInteraction For showing messages, dialogs, and confirmations to the user.
    * @param fs Abstraction for file system operations.
    * @param tutorialService Domain service for managing tutorial logic and state.
-   * @param tutorialViewService UI service for managing tutorial-specific view updates (editors, tabs).
+   * @param tutorialUIManager UI service for managing tutorial-specific view updates (editors, tabs).
    * @param autoOpenState Service for managing the state for auto-opening cloned tutorials.
    */
   constructor(
@@ -31,7 +31,7 @@ export class TutorialController implements IWebviewTutorialMessageHandler {
     private readonly userInteraction: IUserInteraction,
     private readonly fs: IFileSystem,
     private readonly tutorialService: TutorialService,
-    private readonly tutorialViewService: TutorialViewService,
+    private readonly tutorialUIManager: TutorialUIManager,
     private readonly autoOpenState: AutoOpenState
   ) { }
 
@@ -253,7 +253,7 @@ export class TutorialController implements IWebviewTutorialMessageHandler {
         const reloadedTutorial = await this.tutorialService.loadTutorialFromPath(activeTutorialInstance.localPath, { initialStepCommitHash: commitHash });
         if (reloadedTutorial) {
           await this._processLoadedTutorial(reloadedTutorial, commitHash);
-          await this.tutorialViewService.display(reloadedTutorial);
+          await this.tutorialUIManager.display(reloadedTutorial);
         } else {
           await this._promptCloneOrOpenLocalForExternal(repoUrl, commitHash);
         }
@@ -343,6 +343,7 @@ export class TutorialController implements IWebviewTutorialMessageHandler {
    */
   private async _openTutorialFromPath(folderPath: string, options?: { initialStepCommitHash?: string }): Promise<void> {
     try {
+      await this.tutorialUIManager.showLoadingScreen();
       const tutorial = await this.tutorialService.loadTutorialFromPath(folderPath, {
         initialStepCommitHash: options?.initialStepCommitHash,
       });
@@ -386,7 +387,7 @@ export class TutorialController implements IWebviewTutorialMessageHandler {
       return;
     }
 
-    await this.tutorialViewService.resetEditorLayout();
+    await this.tutorialUIManager.resetEditorLayout();
     try {
       if (initialStepCommitHash) {
         await this.tutorialService.forceStepCommitHash(initialStepCommitHash);
@@ -403,15 +404,15 @@ export class TutorialController implements IWebviewTutorialMessageHandler {
     if (pathsToRestore && pathsToRestore.length > 0 && tutorial.localPath) {
       console.log('TutorialController: Restoring open tabs:', pathsToRestore);
       const urisToRestore = pathsToRestore.map(fsPath => vscode.Uri.file(fsPath));
-      await this.tutorialViewService.openAndFocusTabs(urisToRestore);
+      await this.tutorialUIManager.openAndFocusTabs(urisToRestore);
     }
 
     if (tutorial.localPath) {
-      const currentOpenTabs = this.tutorialViewService.getTutorialOpenTabFsPaths(tutorial.localPath);
+      const currentOpenTabs = this.tutorialUIManager.getTutorialOpenTabFsPaths(tutorial.localPath);
       await this.tutorialService.updatePersistedOpenTabs(currentOpenTabs);
       console.log('TutorialController: Persisted current open tabs after tutorial load/activation:', currentOpenTabs);
     }
-    await this.tutorialViewService.display(tutorial);
+    await this.tutorialUIManager.display(tutorial);
   }
 
 
@@ -524,7 +525,7 @@ export class TutorialController implements IWebviewTutorialMessageHandler {
 
       // Ensure localPath, activeStep, and gitOps are valid before proceeding with tab persistence
       if (currentTutorial.localPath && activeStep && gitOps) {
-        const openTabs = this.tutorialViewService.getTutorialOpenTabFsPaths(currentTutorial.localPath);
+        const openTabs = this.tutorialUIManager.getTutorialOpenTabFsPaths(currentTutorial.localPath);
         await this.tutorialService.updatePersistedOpenTabs(openTabs);
         console.log(`TutorialController: Persisted open tabs after ${direction} step:`, openTabs);
       }
@@ -537,7 +538,7 @@ export class TutorialController implements IWebviewTutorialMessageHandler {
     }
 
     // Always update the display based on the latest tutorial state from the service
-    await this.tutorialViewService.display(currentTutorial);
+    await this.tutorialUIManager.display(currentTutorial);
   }
 
   /**
@@ -565,6 +566,6 @@ export class TutorialController implements IWebviewTutorialMessageHandler {
       return;
     }
     await this.tutorialService.toggleSolution(show);
-    await this.tutorialViewService.display(activeTutorial);
+    await this.tutorialUIManager.display(activeTutorial);
   }
 }

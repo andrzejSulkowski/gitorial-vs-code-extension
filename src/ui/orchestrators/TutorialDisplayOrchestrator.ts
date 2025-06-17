@@ -1,13 +1,13 @@
 import * as vscode from 'vscode';
 import { Tutorial } from '../../domain/models/Tutorial';
 import { TutorialViewModel } from '@gitorial/shared-types';
-import { ITutorialViewModelConverter } from '../ports/ITutorialViewModelConverter';
-import { ITutorialChangeDetector, TutorialViewChangeType } from '../ports/ITutorialChangeDetector';
-import { ITutorialSolutionWorkflow } from '../ports/ITutorialSolutionWorkflow';
-import { ITutorialInitializer } from '../ports/ITutorialInitializer';
+import { TutorialChangeDetector, TutorialViewChangeType } from '../utils/TutorialChangeDetector';
 import { DiffViewService } from '../services/DiffViewService';
 import { TutorialFileService } from '../services/TutorialFileService';
 import { IGitChanges } from '../ports/IGitChanges';
+import { TutorialViewModelConverter } from '../converters/TutorialViewModelConverter';
+import { TutorialSolutionWorkflow } from '../workflows/TutorialSolutionWorkflow';
+import { TutorialInitializer } from '../factories/TutorialInitializer';
 
 /**
  * Orchestrates the tutorial display pipeline by coordinating various services
@@ -18,10 +18,10 @@ export class TutorialDisplayOrchestrator {
   private _lastViewModel: TutorialViewModel | null = null;
 
   constructor(
-    private readonly viewModelConverter: ITutorialViewModelConverter,
-    private readonly changeDetector: ITutorialChangeDetector,
-    private readonly solutionWorkflow: ITutorialSolutionWorkflow,
-    private readonly initializer: ITutorialInitializer,
+    private readonly viewModelConverter: TutorialViewModelConverter,
+    private readonly changeDetector: TutorialChangeDetector,
+    private readonly solutionWorkflow: TutorialSolutionWorkflow,
+    private readonly initializer: TutorialInitializer,
     private readonly diffViewService: DiffViewService,
     private readonly fileService: TutorialFileService
   ) {}

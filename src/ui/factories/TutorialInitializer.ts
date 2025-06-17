@@ -1,7 +1,6 @@
 import * as vscode from 'vscode';
 import { Tutorial } from '../../domain/models/Tutorial';
 import { IGitChanges } from '../ports/IGitChanges';
-import { ITutorialInitializer } from '../ports/ITutorialInitializer';
 import { IGitChangesFactory } from '../ports/IGitChangesFactory';
 import { WebviewPanelManager } from '../panels/WebviewPanelManager';
 import { TabTrackingService } from '../services/TabTrackingService';
@@ -9,7 +8,7 @@ import { TabTrackingService } from '../services/TabTrackingService';
 /**
  * Initializes tutorial display components and sets up necessary state
  */
-export class TutorialInitializer implements ITutorialInitializer {
+export class TutorialInitializer {
   
   constructor(
     private readonly gitAdapterFactory: IGitChangesFactory,

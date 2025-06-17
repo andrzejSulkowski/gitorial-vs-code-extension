@@ -1,10 +1,19 @@
 import { TutorialViewModel } from '@gitorial/shared-types';
-import { ITutorialChangeDetector, TutorialViewChangeType } from '../ports/ITutorialChangeDetector';
 
+/**
+ * Enum representing the type of change detected between tutorial states
+ */
+export enum TutorialViewChangeType {
+  StepChange = 'StepChange',
+  SolutionToggle = 'SolutionToggle',
+  // Case where the user has a solution open, and then moves to a new step
+  StepSolutionChange = 'StepSolutionChange',
+  None = 'None'
+}
 /**
  * Detects changes between tutorial view models to determine what type of update is needed
  */
-export class TutorialChangeDetector implements ITutorialChangeDetector {
+export class TutorialChangeDetector {
   
   /**
    * Detects the type of change between two tutorial view models

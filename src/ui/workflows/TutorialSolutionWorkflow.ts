@@ -2,7 +2,6 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import { Tutorial } from '../../domain/models/Tutorial';
 import { IGitChanges } from '../ports/IGitChanges';
-import { ITutorialSolutionWorkflow } from '../ports/ITutorialSolutionWorkflow';
 import { DiffViewService } from '../services/DiffViewService';
 import { TabTrackingService } from '../services/TabTrackingService';
 import { TutorialFileService } from '../services/TutorialFileService';
@@ -10,7 +9,7 @@ import { TutorialFileService } from '../services/TutorialFileService';
 /**
  * Manages tutorial solution display logic (showing/hiding solutions)
  */
-export class TutorialSolutionWorkflow implements ITutorialSolutionWorkflow {
+export class TutorialSolutionWorkflow {
   
   constructor(
     private readonly diffViewService: DiffViewService,

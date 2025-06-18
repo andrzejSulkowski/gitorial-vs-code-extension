@@ -45,16 +45,13 @@ export class WebViewPanel {
     this.updateWebviewContent().then(() => this._hideLoadingState());
   }
 
-  public updateTutorial(tutorial: TutorialViewModel): void {
-    this.panel.title = tutorial.title || 'Gitorial Tutorial';
-    const message: ExtensionToWebviewTutorialMessage = {
-      category: 'tutorial',
-      type: 'data-updated',
-      payload: tutorial
-    };
+  public sendTutorialMessage(message: ExtensionToWebviewTutorialMessage): void {
     this.panel.webview.postMessage(message);
   }
 
+  public sendSystemMessage(message: ExtensionToWebviewSystemMessage): void {
+    this.panel.webview.postMessage(message);
+  }
 
   public displayError(error: string): void {
     this.panel.webview.postMessage({ command: 'error', data: error });

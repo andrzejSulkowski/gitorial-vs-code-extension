@@ -134,10 +134,6 @@ export class TutorialController implements IWebviewTutorialMessageHandler {
     };
 
     const workspacePath = wf.uri.fsPath;
-    if (!(await this.tutorialService.isTutorialInPath(workspacePath))) {
-      this.userInteraction.showErrorMessage('There is no Gitorial in the current Workspace');
-      return;
-    };
 
     // Determine if we should auto-open
     const pending = autoOpenState.get();
@@ -244,18 +240,16 @@ export class TutorialController implements IWebviewTutorialMessageHandler {
   ): Promise<void> {
     const { repoUrl, commitHash } = options;
     console.log(`TutorialController: Handling external request. RepoURL: ${repoUrl}, Commit: ${commitHash}`);
+    await this.tutorialUIManager.showLoadingScreen();
 
     try {
       // Scenario 1: Tutorial is already active in the service and matches the repoUrl.
       const activeTutorialInstance = this.tutorialService.tutorial;
       if (activeTutorialInstance?.repoUrl === repoUrl) {
         console.log("TutorialController: External request for already active tutorial. Reloading and Syncing to commit.");
-        const reloadedTutorial = await this.tutorialService.loadTutorialFromPath(activeTutorialInstance.localPath, { initialStepCommitHash: commitHash });
-        if (reloadedTutorial) {
-          await this._processLoadedTutorial(reloadedTutorial, commitHash);
-          await this.tutorialUIManager.display(reloadedTutorial);
-        } else {
-          await this._promptCloneOrOpenLocalForExternal(repoUrl, commitHash);
+        if (commitHash) {
+          await this.tutorialService.forceStepCommitHash(commitHash);
+          await this.tutorialUIManager.display(activeTutorialInstance);
         }
         return;
       }
@@ -264,24 +258,24 @@ export class TutorialController implements IWebviewTutorialMessageHandler {
       const workspaceFolders = vscode.workspace.workspaceFolders;
       if (workspaceFolders && workspaceFolders.length > 0) {
         const workspacePath = workspaceFolders[0].uri.fsPath;
-        const isTutorialHere = await this.tutorialService.isTutorialInPath(workspacePath);
-        if (isTutorialHere) {
-          const potentialTutorial = await this.tutorialService.loadTutorialFromPath(workspacePath, { initialStepCommitHash: commitHash });
-          if (potentialTutorial && potentialTutorial.repoUrl === repoUrl) {
+        const maybeTutorial = await this.tutorialService.loadTutorialFromPath(workspacePath, { initialStepCommitHash: commitHash });
+        if (maybeTutorial) {
+          const tutorial = maybeTutorial;
+          if (tutorial.repoUrl === repoUrl) {
             console.log("TutorialController: External request for tutorial in current workspace. Activating and syncing.");
-            await this._openTutorialFromPath(workspacePath, { initialStepCommitHash: commitHash });
+            await this._processLoadedTutorial(tutorial, commitHash);
             return;
           }
         }
       }
 
-      // Scenario 3: Tutorial is not active or not the one in the workspace. Prompt to clone or open local.
+      // Scenario 3: Tutorial is not active and not the in the workspace. Prompt to clone or open local.
       await this._promptCloneOrOpenLocalForExternal(repoUrl, commitHash);
 
     } catch (error) {
       console.error(`TutorialController: Error handling external tutorial request for ${repoUrl}:`, error);
       this.userInteraction.showErrorMessage(`Failed to process tutorial request: ${error instanceof Error ? error.message : String(error)}`);
-      this._clearActiveTutorialState(); // Ensure state is clean on error
+      this._clearActiveTutorialState();
     }
   }
 

@@ -5,7 +5,7 @@
 
 // Extension → Webview System Messages
 export type ExtensionToWebviewSystemMessage =
-  | { category: 'system'; type: 'loading-state'; payload: { isLoading: boolean } }
+  | { category: 'system'; type: 'loading-state'; payload: { isLoading: boolean, message: string } }
   | { category: 'system'; type: 'error'; payload: { message: string } };
 
 // Webview → Extension System Messages

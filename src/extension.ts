@@ -15,7 +15,6 @@ import { TutorialController } from "./ui/controllers/TutorialController";
 import { CommandHandler } from "./ui/handlers/CommandHandler";
 import { TutorialRepositoryImpl } from "./domain/repositories/TutorialRepositoryImpl";
 import { GlobalState } from "./infrastructure/state/GlobalState";
-import { IUserInteraction } from "./domain/ports/IUserInteraction";
 import { createUserInteractionAdapter } from "./infrastructure/adapters/VSCodeUserInteractionAdapter";
 import { createFileSystemAdapter } from "./infrastructure/adapters/VSCodeFileSystemAdapter";
 import { TutorialService } from "./domain/services/TutorialService";
@@ -24,17 +23,15 @@ import { StepContentRepository } from "./infrastructure/repositories/StepContent
 import { MementoActiveTutorialStateRepository } from "./infrastructure/repositories/MementoActiveTutorialStateRepository";
 import { TutorialUIManager } from "./ui/managers/TutorialUIManager";
 import { AutoOpenState } from "./infrastructure/state/AutoOpenState";
-import { IActiveTutorialStateRepository } from "./domain/repositories/IActiveTutorialStateRepository";
-import { ITutorialRepository } from "./domain/repositories/ITutorialRepository";
-import { DiffViewService } from "./ui/services/DiffViewService";
+import { DiffService } from "./domain/services/DiffService";
 import { GitChangesFactory } from "./infrastructure/factories/GitChangesFactory";
 import { TabTrackingService } from "./ui/services/TabTrackingService";
 import { SystemController } from "./ui/controllers/SystemController";
 import { WebviewMessageHandler } from "./ui/panels/WebviewMessageHandler";
 import { WebviewPanelManager } from "./ui/panels/WebviewPanelManager";
 import { TutorialDisplayOrchestrator } from "./ui/orchestrators/TutorialDisplayOrchestrator";
-import { TutorialViewModelConverter } from "./ui/converters/TutorialViewModelConverter";
-import { TutorialChangeDetector } from "./ui/utils/TutorialChangeDetector";
+import { TutorialViewModelConverter } from "./domain/converters/TutorialViewModelConverter";
+import { TutorialChangeDetector } from "./domain/utils/TutorialChangeDetector";
 import { TutorialSolutionWorkflow } from "./ui/workflows/TutorialSolutionWorkflow";
 import { TutorialInitializer } from "./ui/factories/TutorialInitializer";
 import { TutorialFileService } from "./ui/services/TutorialFileService";
@@ -79,18 +76,7 @@ export function deactivate() {
   // Clean up the active controller if it exists
 }
 
-interface BootstrappedDependencies {
-  tutorialController: TutorialController;
-  autoOpenState: AutoOpenState;
-  userInteractionAdapter: IUserInteraction;
-  activeTutorialStateRepository: IActiveTutorialStateRepository;
-  tutorialRepository: ITutorialRepository;
-  systemController: SystemController;
-  tutorialUIManager: TutorialUIManager;
-  workspaceId: string | undefined;
-}
-
-async function bootstrapApplication(context: vscode.ExtensionContext): Promise<BootstrappedDependencies> {
+async function bootstrapApplication(context: vscode.ExtensionContext) {
   // --- Adapters ---
   const globalStateMementoAdapter = createMementoAdapter(context, false);
   const workspaceStateMementoAdapter = createMementoAdapter(context, true);
@@ -133,7 +119,7 @@ async function bootstrapApplication(context: vscode.ExtensionContext): Promise<B
   );
 
   // --- UI Services ---
-  const diffViewService = new DiffViewService(diffDisplayerAdapter, fileSystemAdapter);
+  const diffService = new DiffService(diffDisplayerAdapter, fileSystemAdapter);
   const tabTrackingService = new TabTrackingService();
   
   // Create TutorialFileService (needed by orchestrator and solution manager)
@@ -142,7 +128,7 @@ async function bootstrapApplication(context: vscode.ExtensionContext): Promise<B
   // Create services for the TutorialDisplayOrchestrator
   const viewModelConverter = new TutorialViewModelConverter(markdownConverter);
   const changeDetector = new TutorialChangeDetector();
-  const solutionWorkflow = new TutorialSolutionWorkflow(diffViewService, tabTrackingService, tutorialFileService);
+  const solutionWorkflow = new TutorialSolutionWorkflow(diffService, tabTrackingService, tutorialFileService);
   const tutorialInitializer = new TutorialInitializer(gitChangesFactory, context.extensionUri, tabTrackingService);
   
   // Create the TutorialDisplayOrchestrator
@@ -151,7 +137,7 @@ async function bootstrapApplication(context: vscode.ExtensionContext): Promise<B
     changeDetector,
     solutionWorkflow,
     tutorialInitializer,
-    diffViewService,
+    diffService,
     tutorialFileService
   );
   
@@ -199,19 +185,16 @@ async function checkAndHandleAutoOpenState(
   autoOpenState: AutoOpenState
 ): Promise<void> {
   try {
-    // Check if there's a workspace folder
     const workspaceFolders = vscode.workspace.workspaceFolders;
     if (!workspaceFolders || workspaceFolders.length === 0) {
-      return; // No workspace, nothing to auto-open
+      return;
     }
 
-    // Check for pending auto-open state
     const pending = autoOpenState.get();
     if (!pending) {
-      return; // No pending auto-open
+      return;
     }
 
-    // Check if the auto-open state is still fresh (within 10 seconds)
     const ageMs = Date.now() - new Date(pending.timestamp).getTime();
     if (ageMs > 10_000) {
       console.log('Gitorial: Auto-open state expired, clearing it');
@@ -221,14 +204,12 @@ async function checkAndHandleAutoOpenState(
 
     console.log('Gitorial: Found pending auto-open state, attempting to open tutorial automatically');
     
-    // Use the existing openWorkspaceTutorial method which handles all the logic
     await tutorialController.openWorkspaceTutorial(autoOpenState, { 
       commitHash: pending.commitHash,
-      force: true // Force opening since this is from auto-open state
+      force: true
     });
   } catch (error) {
     console.error('Gitorial: Error during auto-open check:', error);
-    // Clear the auto-open state if there was an error to prevent infinite loops
     autoOpenState.clear();
   }
 }

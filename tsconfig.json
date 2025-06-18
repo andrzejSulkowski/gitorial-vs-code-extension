@@ -7,7 +7,13 @@
 		"baseUrl": ".",
 		"types": ["node", "mocha", "chai"],
 		"composite": true,
-		"skipLibCheck": false
+		"skipLibCheck": false,
+		"paths": {
+			"@infra/*": ["./src/infra/*"],
+			"@domain/*": ["./src/domain/*"],
+			"@ui/*": ["./src/ui/*"],
+			"@shared/*": ["./src/shared/*"]
+		}
 	},
 	"include": [
 		"src/**/*"

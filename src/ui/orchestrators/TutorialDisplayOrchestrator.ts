@@ -1,11 +1,12 @@
 import * as vscode from 'vscode';
 import { Tutorial } from '../../domain/models/Tutorial';
 import { TutorialViewModel } from '@gitorial/shared-types';
-import { TutorialChangeDetector, TutorialViewChangeType } from '../utils/TutorialChangeDetector';
-import { DiffViewService } from '../services/DiffViewService';
+import { TutorialChangeDetector, TutorialViewChangeType } from '../../domain/utils/TutorialChangeDetector';
+//TODO: domain service should not be imported here, we should bind to it through a interface
+import { DiffService } from '../../domain/services/DiffService';
 import { TutorialFileService } from '../services/TutorialFileService';
 import { IGitChanges } from '../ports/IGitChanges';
-import { TutorialViewModelConverter } from '../converters/TutorialViewModelConverter';
+import { TutorialViewModelConverter } from 'src/domain/converters/TutorialViewModelConverter';
 import { TutorialSolutionWorkflow } from '../workflows/TutorialSolutionWorkflow';
 import { TutorialInitializer } from '../factories/TutorialInitializer';
 
@@ -22,7 +23,7 @@ export class TutorialDisplayOrchestrator {
     private readonly changeDetector: TutorialChangeDetector,
     private readonly solutionWorkflow: TutorialSolutionWorkflow,
     private readonly initializer: TutorialInitializer,
-    private readonly diffViewService: DiffViewService,
+    private readonly diffService: DiffService,
     private readonly fileService: TutorialFileService
   ) {}
 
@@ -89,7 +90,7 @@ export class TutorialDisplayOrchestrator {
    * Handles the initial rendering of a tutorial
    */
   private async _handleInitialRender(tutorial: Readonly<Tutorial>): Promise<void> {
-    const changedFiles = await this.diffViewService.getDiffModelsForParent(tutorial, this._gitAdapter!);
+    const changedFiles = await this.diffService.getDiffModelsForParent(tutorial, this._gitAdapter!);
     await this.fileService.updateSidePanelFiles(
       tutorial.activeStep, 
       changedFiles.map(f => f.relativePath), 
@@ -101,7 +102,7 @@ export class TutorialDisplayOrchestrator {
    * Handles step changes by updating the side panel files
    */
   private async _handleStepChange(tutorial: Readonly<Tutorial>): Promise<void> {
-    const changedFiles = await this.diffViewService.getDiffModelsForParent(tutorial, this._gitAdapter!);
+    const changedFiles = await this.diffService.getDiffModelsForParent(tutorial, this._gitAdapter!);
     await this.fileService.updateSidePanelFiles(
       tutorial.activeStep, 
       changedFiles.map(f => f.relativePath), 

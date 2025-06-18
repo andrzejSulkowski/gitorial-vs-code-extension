@@ -1,7 +1,7 @@
 import { Tutorial } from '../../domain/models/Tutorial';
 import { TutorialViewModel, TutorialStepViewModel } from '@gitorial/shared-types';
 import { EnrichedStep } from '../../domain/models/EnrichedStep';
-import { IMarkdownConverter } from '../ports/IMarkdownConverter';
+import { IMarkdownConverter } from '../../ui/ports/IMarkdownConverter';
 
 /**
  * Converts domain tutorials to view models for the UI layer

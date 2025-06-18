@@ -54,14 +54,15 @@ export class TutorialService {
     this.workspaceId = workspaceId;
   }
 
-  //   ____        _ _     _ _             
-  //  |  _ \      (_) |   | (_)            
-  //  | |_) |_   _ _| | __| |_ _ __   __ _ 
-  //  |  _ <| | | | | |/ _` | | '_ \ / _` |
-  //  | |_) | |_| | | | (_| | | | | | (_| |
-  //  |____/ \__,_|_|_|\__,_|_|_| |_|\__, |
-  //                                  __/ |
-  //                                 |___/ 
+
+  //   _      _  __                     _      
+  //  | |    (_)/ _|                   | |     
+  //  | |     _| |_ ___  ___ _   _  ___| | ___ 
+  //  | |    | |  _/ _ \/ __| | | |/ __| |/ _ \
+  //  | |____| | ||  __/ (__| |_| | (__| |  __/
+  //  |______|_|_| \___|\___|\__, |\___|_|\___|
+  //                          __/ |            
+  //                         |___/             
 
   /**
    * Load a tutorial from its local path
@@ -73,13 +74,6 @@ export class TutorialService {
    * the tutorial UI. The UI must be updated separately.
    */
   public async loadTutorialFromPath(localPath: string, options: LoadTutorialOptions = {}): Promise<Tutorial | null> {
-    const isTutorial = await this.isTutorialInPath(localPath);
-    if (!isTutorial) {
-      console.warn(`TutorialService: No tutorial found at path ${localPath}`);
-      await this.activeTutorialStateRepository.clearActiveTutorial();
-      return null;
-    }
-
     this._gitOperations = this.gitOperationsFactory.fromPath(localPath);
     try {
       await this._gitOperations.ensureGitorialBranch();
@@ -93,6 +87,7 @@ export class TutorialService {
     const tutorial = await this.repository.findByPath(localPath);
     if (!tutorial) {
       console.warn(`TutorialService: No tutorial found at path ${localPath}`);
+      await this.activeTutorialStateRepository.clearActiveTutorial();
       return null;
     }
 
@@ -129,6 +124,43 @@ export class TutorialService {
     }
   }
 
+  /**
+   * Close the active tutorial
+   */
+  public async closeTutorial(): Promise<void> {
+    if (!this._tutorial) return;
+    this._tutorial = null;
+    this._gitOperations = null;
+    await this.activeTutorialStateRepository.clearActiveTutorial();
+  }
+
+  /**
+   * Activate a tutorial
+   */
+  private async _activateTutorial(tutorial: Tutorial, options: LoadTutorialOptions = {}): Promise<void> {
+    this._tutorial = tutorial;
+    const persistedState: StoredTutorialState | undefined = await this.activeTutorialStateRepository.getActiveTutorial();
+
+    this._tutorial.isShowingSolution = options.showSolution || false;
+    if (options.initialStepCommitHash) {
+      await this.forceStepCommitHash(options.initialStepCommitHash);
+    } else if (persistedState?.currentStepId) {
+      await this.forceStepId(persistedState.currentStepId);
+    } else {
+      // No step to force, so we just enrich the active step (happens automatically in force methods)
+      await this._enrichActiveStep();
+    }
+
+    let effectiveInitialTabs: string[] = [];
+    if (options.initialOpenTabFsPaths) {
+      effectiveInitialTabs = options.initialOpenTabFsPaths;
+    } else if (persistedState?.openFileUris) {
+      effectiveInitialTabs = persistedState.openFileUris;
+    }
+
+    this._tutorial.lastPersistedOpenTabFsPaths = effectiveInitialTabs;
+    await this._saveActiveTutorialState();
+  }
   //    _____      _   _                
   //   / ____|    | | | |               
   //  | |  __  ___| |_| |_ ___ _ __ ___ 
@@ -247,9 +279,9 @@ export class TutorialService {
 
   private async _afterStepChange(oldIndex: number): Promise<void> {
     try {
-      if(this._tutorial && this._gitOperations){
+      if (this._tutorial && this._gitOperations) {
         await this._gitOperations.checkoutAndClean(this._tutorial.activeStep.commitHash);
-      }else {
+      } else {
         throw new Error('TutorialService: no active tutorial, or no git operations for _afterStepChange.');
       }
       await this._enrichActiveStep();
@@ -260,90 +292,18 @@ export class TutorialService {
     }
   }
 
-  private async _enrichActiveStep(): Promise<void> {
-    if (!this._tutorial || !this._gitOperations) {
-      console.warn('TutorialService: no active tutorial, or no git operations for _enrichActiveStep.');
-      return;
-    }
 
-    const targetStep = this._tutorial.activeStep;
-    if (targetStep instanceof EnrichedStep) {
-      return;
-    } else {
-      try {
-        const markdown = await this._loadMarkdown();
-        this._tutorial.enrichStep(targetStep.index, markdown);
-      } catch (error) {
-        console.error(`TutorialService: Error during _enrichActiveStep for step ${targetStep.title}:`, error);
-      }
-    }
-  }
-  private async _saveActiveTutorialState(): Promise<void> {
-    if (!this._tutorial) {
-      console.warn('TutorialService: no active tutorial for _saveActiveTutorialState.');
-      return;
-    }
-    await this.activeTutorialStateRepository.saveActiveTutorial(
-      this._tutorial.id,
-      this._tutorial.activeStep.id,
-      this._tutorial.lastPersistedOpenTabFsPaths || []
-    );
-  }
+  //TODO: We could just check if there is a Gitorial branch and this would mean there is a tutorial instead of loading the whole thing like done preivously
+  public async isTutorial(){}
 
-  /**
-   * Toggle showing the solution
-   */
-  public async toggleSolution(show?: boolean): Promise<void> {
-    if (!this._tutorial) return;
-    this._tutorial.isShowingSolution = show ?? !this._tutorial.isShowingSolution;
-  }
-
-  /**
-   * Close the active tutorial
-   */
-  public async closeTutorial(): Promise<void> {
-    if (!this._tutorial) return;
-    this._tutorial = null;
-    this._gitOperations = null;
-    await this.activeTutorialStateRepository.clearActiveTutorial();
-  }
-
-  /**
-   * Activate a tutorial
-   */
-  private async _activateTutorial(tutorial: Tutorial, options: LoadTutorialOptions = {}): Promise<void> {
-    this._tutorial = tutorial;
-    const persistedState: StoredTutorialState | undefined = await this.activeTutorialStateRepository.getActiveTutorial();
-
-    this._tutorial.isShowingSolution = options.showSolution || false;
-    if (options.initialStepCommitHash) {
-      await this.forceStepCommitHash(options.initialStepCommitHash);
-    } else if (persistedState?.currentStepId) {
-      await this.forceStepId(persistedState.currentStepId);
-    } else {
-      // No step to force, so we just enrich the active step (happens automatically in force methods)
-      await this._enrichActiveStep();
-    }
-
-    let effectiveInitialTabs: string[] = [];
-    if (options.initialOpenTabFsPaths) {
-      effectiveInitialTabs = options.initialOpenTabFsPaths;
-    } else if (persistedState?.openFileUris) {
-      effectiveInitialTabs = persistedState.openFileUris;
-    }
-
-    this._tutorial.lastPersistedOpenTabFsPaths = effectiveInitialTabs;
-    await this._saveActiveTutorialState();
-  }
-
-  private async _loadMarkdown() {
-    if (!this._tutorial) throw new Error("_loadMarkdown - no active tutorial inside TutorialService");
-
-    const markdown = await this.stepContentRepository.getStepMarkdownContent(this._tutorial.localPath);
-    if (!markdown) throw new Error("Error occurred while processing markdown");
-    return markdown;
-  }
-
+  //    _____ _        _         __  __                                                   _   
+  //   / ____| |      | |       |  \/  |                                                 | |  
+  //  | (___ | |_ __ _| |_ ___  | \  / | __ _ _ __   __ _  __ _  ___ _ __ ___   ___ _ __ | |_ 
+  //   \___ \| __/ _` | __/ _ \ | |\/| |/ _` | '_ \ / _` |/ _` |/ _ \ '_ ` _ \ / _ \ '_ \| __|
+  //   ____) | || (_| | ||  __/ | |  | | (_| | | | | (_| | (_| |  __/ | | | | |  __/ | | | |_ 
+  //  |_____/ \__\__,_|\__\___| |_|  |_|\__,_|_| |_|\__,_|\__, |\___|_| |_| |_|\___|_| |_|\__|
+  //                                                       __/ |                              
+  //                                                      |___/                               
   //TODO: I'd actually like to move the whole tab management and state persistence into the TutorialUIManager
 
   /**
@@ -376,18 +336,68 @@ export class TutorialService {
       console.warn('TutorialService: Cannot update persisted open tabs. No active workspace, tutorial, or current step.');
     }
   }
-  /**
-   * Check if a tutorial exists in a given local path
-   * @param localPath - The local path to check
-   * @param options - Optional options
-   * @param options.tutorialId - The tutorial ID to check against
-   * @returns True if a tutorial exists in the given local path, false otherwise
-   */
-  public async isTutorialInPath(localPath: string, options? :{ tutorialId?: string }): Promise<boolean> {
-    const tutorial = await this.repository.findByPath(localPath);
-    if (options?.tutorialId) {
-      return tutorial?.id === options.tutorialId;
+
+  private async _saveActiveTutorialState(): Promise<void> {
+    if (!this._tutorial) {
+      console.warn('TutorialService: no active tutorial for _saveActiveTutorialState.');
+      return;
     }
-    return tutorial !== null;
+    await this.activeTutorialStateRepository.saveActiveTutorial(
+      this._tutorial.id,
+      this._tutorial.activeStep.id,
+      this._tutorial.lastPersistedOpenTabFsPaths || []
+    );
+  }
+
+  //    _____       _       _   _               __  __                                                   _   
+  //   / ____|     | |     | | (_)             |  \/  |                                                 | |  
+  //  | (___   ___ | |_   _| |_ _  ___  _ __   | \  / | __ _ _ __   __ _  __ _  ___ _ __ ___   ___ _ __ | |_ 
+  //   \___ \ / _ \| | | | | __| |/ _ \| '_ \  | |\/| |/ _` | '_ \ / _` |/ _` |/ _ \ '_ ` _ \ / _ \ '_ \| __|
+  //   ____) | (_) | | |_| | |_| | (_) | | | | | |  | | (_| | | | | (_| | (_| |  __/ | | | | |  __/ | | | |_ 
+  //  |_____/ \___/|_|\__,_|\__|_|\___/|_| |_| |_|  |_|\__,_|_| |_|\__,_|\__, |\___|_| |_| |_|\___|_| |_|\__|
+  //                                                                      __/ |                              
+  //                                                                     |___/                               
+  /**
+   * Toggle showing the solution
+   */
+  public async toggleSolution(show?: boolean): Promise<void> {
+    if (!this._tutorial) return;
+    this._tutorial.isShowingSolution = show ?? !this._tutorial.isShowingSolution;
+  }
+
+  //    _____            _             _     __  __                                                   _   
+  //   / ____|          | |           | |   |  \/  |                                                 | |  
+  //  | |     ___  _ __ | |_ ___ _ __ | |_  | \  / | __ _ _ __   __ _  __ _  ___ _ __ ___   ___ _ __ | |_ 
+  //  | |    / _ \| '_ \| __/ _ \ '_ \| __| | |\/| |/ _` | '_ \ / _` |/ _` |/ _ \ '_ ` _ \ / _ \ '_ \| __|
+  //  | |___| (_) | | | | ||  __/ | | | |_  | |  | | (_| | | | | (_| | (_| |  __/ | | | | |  __/ | | | |_ 
+  //   \_____\___/|_| |_|\__\___|_| |_|\__| |_|  |_|\__,_|_| |_|\__,_|\__, |\___|_| |_| |_|\___|_| |_|\__|
+  //                                                                   __/ |                              
+  //                                                                  |___/                               
+
+  private async _enrichActiveStep(): Promise<void> {
+    if (!this._tutorial || !this._gitOperations) {
+      console.warn('TutorialService: no active tutorial, or no git operations for _enrichActiveStep.');
+      return;
+    }
+
+    const targetStep = this._tutorial.activeStep;
+    if (targetStep instanceof EnrichedStep) {
+      return;
+    } else {
+      try {
+        const markdown = await this._loadMarkdown();
+        this._tutorial.enrichStep(targetStep.index, markdown);
+      } catch (error) {
+        console.error(`TutorialService: Error during _enrichActiveStep for step ${targetStep.title}:`, error);
+      }
+    }
+  }
+
+  private async _loadMarkdown() {
+    if (!this._tutorial) throw new Error("_loadMarkdown - no active tutorial inside TutorialService");
+
+    const markdown = await this.stepContentRepository.getStepMarkdownContent(this._tutorial.localPath);
+    if (!markdown) throw new Error("Error occurred while processing markdown");
+    return markdown;
   }
 }

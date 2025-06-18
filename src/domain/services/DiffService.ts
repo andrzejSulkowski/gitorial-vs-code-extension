@@ -1,11 +1,11 @@
 import { Tutorial } from "src/domain/models/Tutorial";
-import { DiffModel, DiffChangeType } from "../viewmodels/DiffModel";
-import { IGitChanges, DiffFilePayload } from "../ports/IGitChanges";
+import { DiffModel, DiffChangeType } from "../models/DiffModel";
+import { IGitChanges, DiffFilePayload } from "../../ui/ports/IGitChanges";
 import { IDiffDisplayer, DiffFile } from 'src/ui/ports/IDiffDisplayer';
 import { IFileSystem } from 'src/domain/ports/IFileSystem';
 
 
-export class DiffViewService {
+export class DiffService {
   constructor(
     private readonly diffView: IDiffDisplayer,
     private readonly fs: IFileSystem

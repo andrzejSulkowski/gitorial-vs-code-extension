@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import { Tutorial } from '../../domain/models/Tutorial';
 import { IGitChanges } from '../ports/IGitChanges';
-import { DiffViewService } from '../services/DiffViewService';
+import { DiffService } from '../../domain/services/DiffService';
 import { TabTrackingService } from '../services/TabTrackingService';
 import { TutorialFileService } from '../services/TutorialFileService';
 
@@ -12,7 +12,7 @@ import { TutorialFileService } from '../services/TutorialFileService';
 export class TutorialSolutionWorkflow {
   
   constructor(
-    private readonly diffViewService: DiffViewService,
+    private readonly diffService: DiffService,
     private readonly tabTrackingService: TabTrackingService,
     private readonly fileService: TutorialFileService
   ) {}
@@ -41,9 +41,9 @@ export class TutorialSolutionWorkflow {
       preferredFocusFile = relativePath;
     }
 
-    //TODO: we have two methods to restore/focus tabs, one is in TabTrackingService, the other is in DiffViewService.showStepSolution.
+    //TODO: we have two methods to restore/focus tabs, one is in TabTrackingService, the other is in DiffService.showStepSolution.
     //We should use one method (pref. TabTrackingService) to restore focus to the last active tutorial file only.
-    await this.diffViewService.showStepSolution(tutorial, gitAdapter, preferredFocusFile);
+    await this.diffService.showStepSolution(tutorial, gitAdapter, preferredFocusFile);
     await this.fileService.closeNonDiffTabsInGroup(vscode.ViewColumn.Two);
   }
 
@@ -52,7 +52,7 @@ export class TutorialSolutionWorkflow {
    */
   private async _hideSolution(tutorial: Readonly<Tutorial>, gitAdapter: IGitChanges): Promise<void> {
     const lastActiveTutorialFile = this.tabTrackingService.getLastActiveTutorialFile();
-    const changedFiles = await this.diffViewService.getDiffModelsForParent(tutorial, gitAdapter);
+    const changedFiles = await this.diffService.getDiffModelsForParent(tutorial, gitAdapter);
     
     await this.fileService.updateSidePanelFiles(
       tutorial.activeStep, 

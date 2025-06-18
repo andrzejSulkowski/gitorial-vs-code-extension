@@ -9,13 +9,17 @@ import { AutoOpenState } from 'src/infrastructure/state/AutoOpenState';
 export class CommandHandler {
   constructor(private tutorialController: TutorialController, private autoOpenState: AutoOpenState) {}
 
-  public async openWorkspaceTutorial(): Promise<void> {
-    await this.tutorialController.openWorkspaceTutorial(this.autoOpenState, { force: true }); //If there is a tutorial in the workspace we dont want to prompt the user first
+  /**
+   * Tries to open a tutorial in the workspace.
+   * If there is a tutorial in the workspace we dont want to prompt the user first
+   */
+  public async handleOpenWorkspaceTutorial(): Promise<void> {
+    console.log('CommandHandler: openWorkspaceTutorial called');
+    await this.tutorialController.openWorkspaceTutorial(this.autoOpenState, { force: true });
   }
 
   /**
-   * Handles the 'gitorial.openTutorial' command.
-   * Prompts the user to select a local tutorial folder and then opens it.
+   * Prompts the user to select a local tutorial folder and then tries to open it.
    */
   public async handleOpenLocalTutorial(): Promise<void> {
     console.log('CommandHandler: handleOpenLocalTutorial called');
@@ -23,7 +27,6 @@ export class CommandHandler {
   }
 
   /**
-   * Handles the 'gitorial.cloneTutorial' command.
    * Prompts the user for a Git repository URL and a destination folder, then clones and opens the tutorial.
    */
   public async handleCloneTutorial(): Promise<void> {
@@ -38,21 +41,15 @@ export class CommandHandler {
    */
   public register(context: vscode.ExtensionContext): void {
     context.subscriptions.push(
-      vscode.commands.registerCommand('gitorial.openTutorial', () => {
-        this.handleOpenLocalTutorial();
-      })
+      vscode.commands.registerCommand('gitorial.openTutorial', this.handleOpenLocalTutorial)
     );
 
     context.subscriptions.push(
-      vscode.commands.registerCommand('gitorial.cloneTutorial', () => {
-        this.handleCloneTutorial();
-      })
+      vscode.commands.registerCommand('gitorial.cloneTutorial', this.handleCloneTutorial)
     );
 
     context.subscriptions.push(
-      vscode.commands.registerCommand('gitorial.openWorkspaceTutorial', () => {
-        this.openWorkspaceTutorial();
-      })
+      vscode.commands.registerCommand('gitorial.openWorkspaceTutorial', this.handleOpenWorkspaceTutorial)
     );
     
     console.log('Gitorial commands registered.');

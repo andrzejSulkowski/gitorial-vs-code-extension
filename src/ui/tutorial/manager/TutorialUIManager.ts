@@ -1,11 +1,11 @@
 import * as vscode from 'vscode';
-import { IFileSystem } from '../../domain/ports/IFileSystem';
-import { Tutorial } from '../../domain/models/Tutorial';
+import { IFileSystem } from '@domain/ports/IFileSystem';
+import { Tutorial } from '@domain/models/Tutorial';
 import { TutorialViewModel } from '@gitorial/shared-types';
-import { WebviewPanelManager } from '../panels/WebviewPanelManager';
-import { TabTrackingService } from '../services/TabTrackingService';
-import { TutorialFileService } from '../services/TutorialFileService';
-import { TutorialDisplayOrchestrator } from '../orchestrators/TutorialDisplayOrchestrator';
+import { WebviewPanelManager } from '@ui/webview/WebviewPanelManager';
+import { TabTrackingService } from '@ui/tutorial/services/TabTrackingService';
+import { EditorManager } from './EditorManager';
+import { TutorialDisplayOrchestrator } from '../TutorialDisplayOrchestrator';
 
 /**
  * Service responsible for managing the tutorial view UI components.
@@ -13,7 +13,7 @@ import { TutorialDisplayOrchestrator } from '../orchestrators/TutorialDisplayOrc
  * Complex orchestration logic has been moved to TutorialDisplayOrchestrator.
  */
 export class TutorialUIManager {
-  private _tutorialFileService: TutorialFileService;
+  private _editorManager: EditorManager;
 
   constructor(
     fs: IFileSystem,
@@ -21,7 +21,7 @@ export class TutorialUIManager {
     private readonly tabTrackingService: TabTrackingService,
     private readonly displayOrchestrator: TutorialDisplayOrchestrator
   ) { 
-    this._tutorialFileService = new TutorialFileService(fs);
+    this._editorManager = new EditorManager(fs);
   }
 
 
@@ -67,7 +67,7 @@ export class TutorialUIManager {
    * @returns An array of fsPath strings for the relevant open tutorial files.
    */
   public getTutorialOpenTabFsPaths(tutorialLocalPath: string): string[] {
-    return this._tutorialFileService.getTutorialOpenTabFsPaths(tutorialLocalPath);
+    return this._editorManager.getOpenTabPaths(tutorialLocalPath);
   }
 
   /**
@@ -75,7 +75,7 @@ export class TutorialUIManager {
    * @param uris An array of vscode.Uri objects to open.
    */
   public async openAndFocusTabs(uris: vscode.Uri[]): Promise<void> {
-    await this._tutorialFileService.openAndFocusTabs(uris);
+    await this._editorManager.openAndFocusTabs(uris);
   }
 
   /**

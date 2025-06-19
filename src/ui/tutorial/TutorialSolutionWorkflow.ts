@@ -3,8 +3,8 @@ import * as path from 'path';
 import { Tutorial } from '../../domain/models/Tutorial';
 import { IGitChanges } from '../ports/IGitChanges';
 import { DiffService } from '../../domain/services/DiffService';
-import { TabTrackingService } from '../services/TabTrackingService';
-import { TutorialFileService } from '../services/TutorialFileService';
+import { TabTrackingService } from '../tutorial/services/TabTrackingService';
+import { EditorManager } from './manager/EditorManager';
 
 /**
  * Manages tutorial solution display logic (showing/hiding solutions)
@@ -14,7 +14,7 @@ export class TutorialSolutionWorkflow {
   constructor(
     private readonly diffService: DiffService,
     private readonly tabTrackingService: TabTrackingService,
-    private readonly fileService: TutorialFileService
+    private readonly editorManager: EditorManager
   ) {}
 
   /**
@@ -44,7 +44,7 @@ export class TutorialSolutionWorkflow {
     //TODO: we have two methods to restore/focus tabs, one is in TabTrackingService, the other is in DiffService.showStepSolution.
     //We should use one method (pref. TabTrackingService) to restore focus to the last active tutorial file only.
     await this.diffService.showStepSolution(tutorial, gitAdapter, preferredFocusFile);
-    await this.fileService.closeNonDiffTabsInGroup(vscode.ViewColumn.Two);
+    await this.editorManager.closeNonDiffTabsInGroup(vscode.ViewColumn.Two);
   }
 
   /**
@@ -54,13 +54,13 @@ export class TutorialSolutionWorkflow {
     const lastActiveTutorialFile = this.tabTrackingService.getLastActiveTutorialFile();
     const changedFiles = await this.diffService.getDiffModelsForParent(tutorial, gitAdapter);
     
-    await this.fileService.updateSidePanelFiles(
+    await this.editorManager.updateSidePanelFiles(
       tutorial.activeStep, 
       changedFiles.map(f => f.relativePath), 
       tutorial.localPath
     ); //FIXME: this and '_closeDiffTabsInGroupTwo' both close tabs
     
-    await this.fileService.closeDiffTabs(vscode.ViewColumn.Two);
+    await this.editorManager.closeDiffTabs(vscode.ViewColumn.Two);
 
     // Restore focus to the last active tutorial file if available
     if (lastActiveTutorialFile) {

@@ -1,5 +1,5 @@
 import { WebviewToExtensionSystemMessage } from "@gitorial/shared-types";
-import { IWebviewSystemMessageHandler } from "../panels/WebviewMessageHandler";
+import { IWebviewSystemMessageHandler } from "../webview/WebviewMessageHandler";
 
 /**
  * Right now this is just a placeholder for the system controller.

@@ -9,10 +9,9 @@
 		"composite": true,
 		"skipLibCheck": false,
 		"paths": {
-			"@infra/*": ["./src/infra/*"],
+			"@infra/*": ["./src/infrastructure/*"],
 			"@domain/*": ["./src/domain/*"],
 			"@ui/*": ["./src/ui/*"],
-			"@shared/*": ["./src/shared/*"]
 		}
 	},
 	"include": [

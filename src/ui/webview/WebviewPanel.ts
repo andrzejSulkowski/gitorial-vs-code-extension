@@ -45,6 +45,16 @@ export class WebViewPanel {
     this.updateWebviewContent().then(() => this._hideLoadingState());
   }
 
+  // TODO: tmp solution - we dont want to deal with models on this level, but only with messages
+  public updateTutorial(tutorial: TutorialViewModel): void {
+    const message: ExtensionToWebviewTutorialMessage = {
+      category: 'tutorial',
+      type: 'data-updated',
+      payload: tutorial
+    };
+    this.panel.webview.postMessage(message);
+  }
+
   public sendTutorialMessage(message: ExtensionToWebviewTutorialMessage): void {
     this.panel.webview.postMessage(message);
   }
@@ -144,7 +154,7 @@ export class WebViewPanel {
     const message: ExtensionToWebviewSystemMessage = {
       category: 'system',
       type: 'loading-state',
-      payload: { isLoading: true }
+      payload: { isLoading: true, message: 'Loading...' }
     };
     this.panel.webview.postMessage(message);
   }
@@ -153,7 +163,7 @@ export class WebViewPanel {
     const message: ExtensionToWebviewSystemMessage = {
       category: 'system',
       type: 'loading-state',
-      payload: { isLoading: false }
+      payload: { isLoading: false, message: 'Done!' }
     };
     this.panel.webview.postMessage(message);
   }

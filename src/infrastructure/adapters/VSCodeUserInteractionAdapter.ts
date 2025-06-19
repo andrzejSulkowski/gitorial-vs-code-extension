@@ -83,6 +83,38 @@ export class VSCodeUserInteractionAdapter implements IUserInteraction {
 
     return choice?.title === opt.confirmActionTitle;
   }
+
+  /**
+   * Presents the user with a list of options as modal buttons (not a dropdown) if there are 3 or fewer options.
+   * If there are more than 3 options, falls back to showQuickPick for usability.
+   * Always includes a "Cancel" button in the modal case.
+   */
+  public async pickOption(options: string[], prompt?: string, placeHolder?: string): Promise<string | undefined> {
+    // VS Code only allows up to 3 custom buttons in showInformationMessage/showWarningMessage.
+    if (options.length <= 3) {
+      // Use showInformationMessage as a modal with up to 3 buttons + Cancel
+      const buttons = [...options];
+      const result = await vscode.window.showInformationMessage(
+        prompt ?? 'Choose an option:',
+        { modal: true, detail: placeHolder },
+        ...buttons
+      );
+      return result;
+    } else {
+      // For more than 3 options, fallback to showQuickPick
+      const items = options.map(option => ({ label: option, description: '' }));
+      let finalPlaceHolder = placeHolder;
+      if (prompt && placeHolder) {
+        finalPlaceHolder = `${prompt} — ${placeHolder}`;
+      } else if (prompt) {
+        finalPlaceHolder = prompt;
+      }
+      const picked = await vscode.window.showQuickPick(items, {
+        placeHolder: finalPlaceHolder,
+      });
+      return picked?.label;
+    }
+  }
 }
 
 

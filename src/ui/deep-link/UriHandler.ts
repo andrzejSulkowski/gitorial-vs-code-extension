@@ -1,7 +1,7 @@
 // Handles custom URI schemes (e.g., vscode://<your-extension>/open?repoUrl=...)
 // to trigger actions like cloning and opening a tutorial. Delegates to TutorialController.
 import * as vscode from 'vscode';
-import { TutorialController } from '../controllers/TutorialController';
+import { TutorialController } from '../tutorial/controller';
 import { UriParser, UriCommand, ParseResult } from '../../utils/uri-parser/UriParser'; // Adjusted path
 
 export class TutorialUriHandler implements vscode.UriHandler {

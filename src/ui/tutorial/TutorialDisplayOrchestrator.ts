@@ -4,11 +4,11 @@ import { TutorialViewModel } from '@gitorial/shared-types';
 import { TutorialChangeDetector, TutorialViewChangeType } from '../../domain/utils/TutorialChangeDetector';
 //TODO: domain service should not be imported here, we should bind to it through a interface
 import { DiffService } from '../../domain/services/DiffService';
-import { TutorialFileService } from '../services/TutorialFileService';
+import { EditorManager } from './manager/EditorManager';
 import { IGitChanges } from '../ports/IGitChanges';
 import { TutorialViewModelConverter } from 'src/domain/converters/TutorialViewModelConverter';
-import { TutorialSolutionWorkflow } from '../workflows/TutorialSolutionWorkflow';
-import { TutorialInitializer } from '../factories/TutorialInitializer';
+import { TutorialSolutionWorkflow } from './TutorialSolutionWorkflow';
+import { TutorialInitializer } from './TutorialInitializer';
 
 /**
  * Orchestrates the tutorial display pipeline by coordinating various services
@@ -24,7 +24,7 @@ export class TutorialDisplayOrchestrator {
     private readonly solutionWorkflow: TutorialSolutionWorkflow,
     private readonly initializer: TutorialInitializer,
     private readonly diffService: DiffService,
-    private readonly fileService: TutorialFileService
+    private readonly editorManager: EditorManager
   ) {}
 
   /**
@@ -91,7 +91,7 @@ export class TutorialDisplayOrchestrator {
    */
   private async _handleInitialRender(tutorial: Readonly<Tutorial>): Promise<void> {
     const changedFiles = await this.diffService.getDiffModelsForParent(tutorial, this._gitAdapter!);
-    await this.fileService.updateSidePanelFiles(
+    await this.editorManager.updateSidePanelFiles(
       tutorial.activeStep, 
       changedFiles.map(f => f.relativePath), 
       tutorial.localPath
@@ -103,7 +103,7 @@ export class TutorialDisplayOrchestrator {
    */
   private async _handleStepChange(tutorial: Readonly<Tutorial>): Promise<void> {
     const changedFiles = await this.diffService.getDiffModelsForParent(tutorial, this._gitAdapter!);
-    await this.fileService.updateSidePanelFiles(
+    await this.editorManager.updateSidePanelFiles(
       tutorial.activeStep, 
       changedFiles.map(f => f.relativePath), 
       tutorial.localPath
@@ -114,7 +114,7 @@ export class TutorialDisplayOrchestrator {
    * Handles editor group focusing logic
    */
   private async _handleEditorGroupFocus(tutorial: Readonly<Tutorial>): Promise<void> {
-    const groupTwoTabs = this.fileService.getTabsInGroup(vscode.ViewColumn.Two);
+    const groupTwoTabs = this.editorManager.getTabsInGroup(vscode.ViewColumn.Two);
     const isShowingSolutionInGroupTwo = tutorial.isShowingSolution && groupTwoTabs.some(tab => {
       const input = tab.input as any;
       return input && input.original && input.modified;

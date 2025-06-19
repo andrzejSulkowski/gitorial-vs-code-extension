@@ -13,7 +13,7 @@ export class TutorialViewModelConverter {
   /**
    * Converts a tutorial to its view model representation
    */
-  convert(tutorial: Readonly<Tutorial>): TutorialViewModel | null {
+  convert(tutorial: Readonly<Tutorial>): TutorialViewModel {
     const currentStepId = tutorial.activeStep.id;
     const currentStepIndex = tutorial.activeStep.index;
 

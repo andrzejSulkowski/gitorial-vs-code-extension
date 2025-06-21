@@ -6,6 +6,8 @@ import { TutorialService } from "@domain/services/TutorialService";
 import * as vscode from 'vscode';
 import { AutoOpenState } from "@infra/state/AutoOpenState";
 import { asTutorialId } from "@gitorial/shared-types";
+import { IGitChanges } from "@ui/ports/IGitChanges";
+import { IGitChangesFactory } from "@ui/ports/IGitChangesFactory";
 
 /**
  * SIMPLIFIED TUTORIAL LIFECYCLE CONTROLLER
@@ -27,6 +29,13 @@ export type OpenOptions = {
     force?: boolean;
 }
 
+
+export type LifecylceResult =
+    | { success: true, tutorial: Tutorial, gitChanges: IGitChanges }
+    | { success: false, reason: 'user-cancelled' }
+    | { success: false, reason: 'error', error: string };
+
+
 const DEFAULT_CLONE_REPO_URL = 'https://github.com/shawntabrizi/rust-state-machine' as const;
 
 export class Controller {
@@ -35,7 +44,8 @@ export class Controller {
         private readonly fs: IFileSystem,
         private readonly tutorialService: TutorialService,
         private readonly autoOpenState: AutoOpenState,
-        private readonly userInteraction: IUserInteraction
+        private readonly userInteraction: IUserInteraction,
+        private readonly gitChangesFactory: IGitChangesFactory
     ) { }
 
     // === PUBLIC API ===
@@ -45,55 +55,66 @@ export class Controller {
      * Handles all user prompts, progress reporting, and error messages internally.
      * @returns Tutorial object on success, null on failure or cancellation
      */
-    public async cloneAndOpen(options?: CloneOptions): Promise<Tutorial | null> {
+    public async cloneAndOpen(options?: CloneOptions): Promise<LifecylceResult> {
         const repoUrl = await this._getRepositoryUrl(options?.repoUrl);
-        if (!repoUrl) return null; // User cancelled
+        if (!repoUrl) return { success: false, reason: 'user-cancelled' }; // User cancelled
 
         const destinationFolder = await this._promptForCloneDestination();
-        if (!destinationFolder) return null; // User cancelled
+        if (!destinationFolder) return { success: false, reason: 'user-cancelled' }; // User cancelled
 
         const repoName = this._extractRepoName(repoUrl);
         const clonePath = await this._prepareCloneTarget(destinationFolder, repoName);
-        if (!clonePath) return null; // User cancelled or prep failed
+        if (!clonePath) return { success: false, reason: 'user-cancelled' }; // User cancelled or prep failed
 
         const tutorial = await this._performClone(repoUrl, clonePath, options?.commitHash);
-        if (!tutorial) return null; // Clone failed (error already shown to user)
+        if (!tutorial) return { success: false, reason: 'error', error: 'Clone failed' }; // Clone failed (error already shown to user)
+
+        const gitChanges = this.gitChangesFactory.createFromPath(tutorial.localPath);
 
         await this._handleSuccessfulClone(tutorial, clonePath, {
             wasInitiatedProgrammatically: !!options?.repoUrl,
             commitHash: options?.commitHash
         });
 
-        return tutorial;
+        return { success: true, tutorial, gitChanges };
     }
 
     /**
      * Opens a tutorial from the current workspace.
      * @returns Tutorial object on success, null on failure
      */
-    public async openFromWorkspace(options?: OpenOptions): Promise<Tutorial | null> {
+    public async openFromWorkspace(options?: OpenOptions): Promise<LifecylceResult> {
         const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
         if (!workspaceFolder) {
             this.userInteraction.showErrorMessage('No workspace is open');
-            return null;
+            return { success: false, reason: 'error', error: 'No workspace is open' };
         }
 
-        return this.openFromPath(workspaceFolder.uri.fsPath, options);
+        return await this.openFromPath({ path: workspaceFolder.uri.fsPath, ...options });
     }
 
     /**
      * Opens a tutorial from a specific file system path.
      * @returns Tutorial object on success, null on failure
      */
-    public async openFromPath(path: string, options?: OpenOptions): Promise<Tutorial | null> {
-        // Check for auto-open state and get the commit hash if available
+    public async openFromPath(options?: OpenOptions & { path?: string }): Promise<LifecylceResult> {
+        let path = options?.path;
+        if (!options?.path) {
+            path = await this.userInteraction.selectPath({
+                canSelectFolders: true,
+                canSelectFiles: false,
+                openLabel: 'Select Gitorial Folder',
+                title: 'Select Gitorial Folder'
+            });
+        }
+
+        if (!path) return { success: false, reason: 'user-cancelled' };
+
         const autoOpenCommitHash = await this._handleAutoOpenState(options);
-        
-        // Use provided options commit hash otherwise auto-open commit hash if available
         const effectiveCommitHash = options?.commitHash || autoOpenCommitHash || undefined;
 
         const tutorial = await this._loadTutorialFromPath(path, effectiveCommitHash);
-        if (!tutorial) return null; // Error already shown to user
+        if (!tutorial) return { success: false, reason: 'error', error: `failed to load tutorial from path (${path})` };
 
         // Handle workspace switching if needed
         if (!this._isCurrentWorkspace(path)) {
@@ -102,7 +123,9 @@ export class Controller {
             // The tutorial will be loaded again in the new workspace context
         }
 
-        return tutorial;
+        const gitChanges = this.gitChangesFactory.createFromPath(tutorial.localPath);
+
+        return { success: true, tutorial, gitChanges };
     }
 
     /**
@@ -196,7 +219,7 @@ export class Controller {
         if (shouldAutoOpen || options?.force) {
             this.autoOpenState.clear();
             console.log(`LifecycleController: Auto-opening tutorial ${pending.tutorialId} with commit ${pending.commitHash}`);
-            
+
             // Return the commit hash from auto-open state to use in the current operation
             return pending.commitHash || null;
         }

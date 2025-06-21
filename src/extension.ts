@@ -41,6 +41,7 @@ import { SystemController } from "@ui/system/SystemController";
 import { WebviewMessageHandler } from "@ui/webview/WebviewMessageHandler";
 import { WebviewPanelManager } from "@ui/webview/WebviewPanelManager";
 import { TutorialDisplayOrchestrator } from "@ui/tutorial/TutorialDisplayOrchestrator";
+import { TutorialDisplayService } from "@domain/services/TutorialDisplayService";
 
 /**
  * Main extension activation point.
@@ -124,8 +125,11 @@ async function bootstrapApplication(context: vscode.ExtensionContext) {
     workspaceId
   );
 
-  // --- UI Services ---
   const diffService = new DiffService(diffDisplayerAdapter, fileSystemAdapter);
+  const tutorialViewModelConverter = new TutorialViewModelConverter(markdownConverter);
+  const tutorialDisplayService = new TutorialDisplayService(tutorialViewModelConverter, diffService);
+
+  // --- UI Services ---
   const tabTrackingService = new TabTrackingService();
   
   // Create TutorialFileService (needed by orchestrator and solution manager)
@@ -166,7 +170,11 @@ async function bootstrapApplication(context: vscode.ExtensionContext) {
     fileSystemAdapter,
     tutorialService,
     tutorialUIManager,
-    autoOpenState
+    autoOpenState,
+    tutorialDisplayService,
+    solutionWorkflow,
+    changeDetector,
+    gitChangesFactory
   );
   const systemController = new SystemController();
 
@@ -210,7 +218,7 @@ async function checkAndHandleAutoOpenState(
 
     console.log('Gitorial: Found pending auto-open state, attempting to open tutorial automatically');
     
-    await tutorialController.openWorkspaceTutorial({ commitHash: pending.commitHash,force: true });
+    await tutorialController.openFromWorkspace({ commitHash: pending.commitHash,force: true });
   } catch (error) {
     console.error('Gitorial: Error during auto-open check:', error);
     autoOpenState.clear();

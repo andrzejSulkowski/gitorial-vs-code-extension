@@ -14,9 +14,10 @@ import * as Navigation from './navigation';
 import * as External from './external';
 import * as Editor from './editor';
 import { TutorialDisplayService } from '@domain/services/TutorialDisplayService';
-import { IGitChanges } from '@ui/ports/IGitChanges';
 import { TutorialSolutionWorkflow } from '../TutorialSolutionWorkflow';
 import { TutorialChangeDetector } from '@domain/utils/TutorialChangeDetector';
+import { IGitChangesFactory } from '@ui/ports/IGitChangesFactory';
+import { IGitChanges } from '@ui/ports/IGitChanges';
 /**
  * Controller responsible for orchestrating tutorial-related UI interactions and actions.
  * It bridges user actions (from commands, UI panels) with the domain logic (TutorialService)
@@ -28,6 +29,8 @@ export class TutorialController implements IWebviewTutorialMessageHandler {
     private readonly navigationController: Navigation.Controller;
     private readonly externalController: External.Controller;
     private readonly editorController: Editor.Controller;
+
+    private _gitChanges: IGitChanges | null = null;
 
     /**
      * Constructs a TutorialController instance.
@@ -47,14 +50,14 @@ export class TutorialController implements IWebviewTutorialMessageHandler {
         private readonly tutorialUIManager: TutorialUIManager,
         private autoOpenState: AutoOpenState,
         tutorialDisplayService: TutorialDisplayService,
-        gitChanges: IGitChanges,
         solutionWorkflow: TutorialSolutionWorkflow,
-        changeDetector: TutorialChangeDetector
+        changeDetector: TutorialChangeDetector,
+        gitChangesFactory: IGitChangesFactory
     ) {
-        this.lifecycleController = new Lifecycle.Controller(progressReporter, fs, this.tutorialService, this.autoOpenState, this.userInteraction);
+        this.lifecycleController = new Lifecycle.Controller(progressReporter, fs, this.tutorialService, this.autoOpenState, this.userInteraction, gitChangesFactory);
         this.navigationController = new Navigation.Controller(this.tutorialService, this.userInteraction);
         this.externalController = new External.Controller(this.tutorialService, this.userInteraction);
-        this.editorController = new Editor.Controller(fs, tutorialDisplayService, gitChanges, solutionWorkflow, changeDetector);
+        this.editorController = new Editor.Controller(fs, tutorialDisplayService, solutionWorkflow, changeDetector);
     }
 
 
@@ -74,13 +77,8 @@ export class TutorialController implements IWebviewTutorialMessageHandler {
      * After successful cloning, it may trigger opening the tutorial in a new VS Code window.
      * @param options Optional parameters including repoUrl and commitHash
      */
-    public async cloneTutorial(options?: Lifecycle.CloneOptions): Promise<void> {
-        const tutorial = await this.lifecycleController.cloneAndOpen(options);
-        if (tutorial) {
-            await this.editorController.prepareForTutorial();
-            await this.editorController.displayStep(tutorial.activeStep, tutorial);
-            await this.tutorialUIManager.display(tutorial);
-        }
+    public async cloneAndOpen(options?: Lifecycle.CloneOptions): Promise<void> {
+        await this._handleLifecycleResult(this.lifecycleController.cloneAndOpen(options));
     }
 
     /**
@@ -89,16 +87,28 @@ export class TutorialController implements IWebviewTutorialMessageHandler {
      * and prompt the user to open it
      * @param options Optional parameters including commitHash and force flags
      */
-    public async openWorkspaceTutorial(options?: Lifecycle.OpenOptions): Promise<void> {
-        const tutorial = await this.lifecycleController.openFromWorkspace(options);
-        if (tutorial) {
-            await this.editorController.prepareForTutorial();
-            await this.editorController.displayStep(tutorial.activeStep, tutorial);
-            await this.tutorialUIManager.display(tutorial);
-        }
+    public async openFromWorkspace(options?: Lifecycle.OpenOptions): Promise<void> {
+        await this._handleLifecycleResult(this.lifecycleController.openFromWorkspace(options));
     }
 
+    public async openFromPath(options?: Lifecycle.OpenOptions): Promise<void> {
+        await this._handleLifecycleResult(this.lifecycleController.openFromPath(options));
+    }
 
+    private async _handleLifecycleResult(promise: Promise<Lifecycle.LifecylceResult>): Promise<void> {
+        const result = await promise;
+        if (result.success) {
+            const { tutorial, gitChanges } = result;
+            this._gitChanges = gitChanges;
+            await this.editorController.prepareForTutorial();
+            await this.editorController.display(tutorial, gitChanges);
+            await this.tutorialUIManager.display(tutorial);
+        } else {
+            if (result.reason === "error") {
+                this.userInteraction.showErrorMessage(`Failed to clone and open tutorial: ${result.error}`);
+            } 
+        }
+    }
     //   _    _      _   _    _                 _ _           
     //  | |  | |    (_) | |  | |               | | |          
     //  | |  | |_ __ _  | |__| | __ _ _ __   __| | | ___ _ __ 
@@ -135,13 +145,13 @@ export class TutorialController implements IWebviewTutorialMessageHandler {
                 this.userInteraction.showErrorMessage(`Failed to navigate to step with commit hash: ${commitHash}`);
             }
         } else if (result.action === External.TutorialStatus.FoundInWorkspace) {
-            await this.openWorkspaceTutorial({ commitHash });
+            await this.openFromWorkspace({ commitHash });
             this.userInteraction.showInformationMessage(`Opened tutorial in current workspace.`);
         } else if (result.action === External.TutorialStatus.NotFound) {
             // TypeScript now properly narrows the type to include userChoice
             switch (result.userChoice) {
                 case 'clone':
-                    await this.cloneTutorial({ repoUrl, commitHash });
+                    await this.cloneAndOpen({ repoUrl, commitHash });
                     break;
                 case 'open-local':
                     await this._openLocalTutorial({ commitHash });
@@ -160,10 +170,7 @@ export class TutorialController implements IWebviewTutorialMessageHandler {
         });
 
         if (path) {
-            const tutorial = await this.lifecycleController.openFromPath(path, options);
-            if (tutorial) {
-                await this.tutorialUIManager.display(tutorial);
-            }
+            await this._handleLifecycleResult(this.lifecycleController.openFromPath({ path, ...options }));
         }
     }
 
@@ -318,14 +325,19 @@ export class TutorialController implements IWebviewTutorialMessageHandler {
 
 
     public async handleWebviewMessage(message: WebviewToExtensionTutorialMessage) {
+        if (!this._gitChanges) {
+            console.error('TutorialController: No git changes available');
+            this.userInteraction.showErrorMessage('No git changes available');
+            return;
+        }
+
         const hasEffect = await this.navigationController.handleNavigationMessage(message);
         if (hasEffect) {
             const tutorial = this.tutorialService.tutorial!;
-            await this.editorController.displayStep(tutorial.activeStep, tutorial);
+            await this.editorController.display(tutorial, this._gitChanges);
             await this.tutorialUIManager.display(tutorial);
         } else {
             console.warn('Received unknown command from webview:', message);
-
         }
     }
 }

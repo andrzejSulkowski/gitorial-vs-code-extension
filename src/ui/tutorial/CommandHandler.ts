@@ -15,7 +15,7 @@ export class CommandHandler {
    */
   public async handleOpenWorkspaceTutorial(): Promise<void> {
     console.log('CommandHandler: openWorkspaceTutorial called');
-    await this.tutorialController.openWorkspaceTutorial({ force: true });
+    await this.tutorialController.openFromWorkspace({ force: true });
   }
 
   /**
@@ -23,7 +23,7 @@ export class CommandHandler {
    */
   public async handleOpenLocalTutorial(): Promise<void> {
     console.log('CommandHandler: handleOpenLocalTutorial called');
-    await this.tutorialController.openLocalTutorial();
+    await this.tutorialController.openFromPath();
   }
 
   /**
@@ -31,7 +31,7 @@ export class CommandHandler {
    */
   public async handleCloneTutorial(): Promise<void> {
     console.log('CommandHandler: handleCloneTutorial called');
-    await this.tutorialController.cloneTutorial();
+    await this.tutorialController.cloneAndOpen();
   }
 
   /**

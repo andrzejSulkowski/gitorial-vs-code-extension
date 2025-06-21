@@ -4,7 +4,6 @@ import { Step } from '@domain/models/Step';
 import { IFileSystem } from '@domain/ports/IFileSystem';
 import { TutorialDisplayService } from '@domain/services/TutorialDisplayService';
 import * as vscode from 'vscode';
-import { TutorialService } from '@domain/services/TutorialService';
 import { IGitChanges } from '@ui/ports/IGitChanges';
 import { TutorialSolutionWorkflow } from '../TutorialSolutionWorkflow';
 import { TutorialViewModel } from '@gitorial/shared-types';
@@ -69,7 +68,6 @@ export class Controller {
     constructor(
         private readonly fs: IFileSystem,
         private readonly tutorialDisplayService: TutorialDisplayService,
-        private readonly gitChanges: IGitChanges,
         private readonly solutionWorkflow: TutorialSolutionWorkflow,
         private readonly changeDetector: TutorialChangeDetector,
     ) {
@@ -86,10 +84,11 @@ export class Controller {
     /**
      * Updates editor state when navigating to a new step
      */
-    public async displayStep(step: Step, tutorial: Readonly<Tutorial>): Promise<void> {
-        const { viewModel } = await this.tutorialDisplayService.prepareTutorialDisplay(tutorial, this.gitChanges);
+    public async display(tutorial: Readonly<Tutorial>, gitChanges: IGitChanges): Promise<void> {
+        const step = tutorial.activeStep;
+        const { viewModel } = await this.tutorialDisplayService.prepareTutorialDisplay(tutorial, gitChanges);
 
-        await this._handleDisplayChanges(step, tutorial, viewModel);
+        await this._handleDisplayChanges(step, tutorial, viewModel, gitChanges);
         await this._handleEditorGroupFocus(tutorial);
 
         this._lastViewModel = viewModel;
@@ -100,10 +99,10 @@ export class Controller {
  * Handles display changes based on detected change type
  * Moved from TutorialDisplayOrchestrator
  */
-    private async _handleDisplayChanges(step: Step, tutorial: Readonly<Tutorial>, viewModel: TutorialViewModel): Promise<void> {
+    private async _handleDisplayChanges(step: Step, tutorial: Readonly<Tutorial>, viewModel: TutorialViewModel, gitChanges: IGitChanges): Promise<void> {
         if (!this._lastViewModel) {
             // Initial render
-            await this._handleInitialRender(step, tutorial);
+            await this._handleInitialRender(step, tutorial, gitChanges);
             return;
         }
 
@@ -111,16 +110,16 @@ export class Controller {
 
         switch (changeType) {
             case TutorialViewChangeType.SolutionToggle:
-                await this.solutionWorkflow.toggleSolution(tutorial, this.gitChanges);
+                await this.solutionWorkflow.toggleSolution(tutorial, gitChanges);
                 break;
 
             case TutorialViewChangeType.StepChange:
-                await this._handleStepChange(step, tutorial);
+                await this._handleStepChange(step, tutorial, gitChanges);
                 break;
 
             case TutorialViewChangeType.StepSolutionChange:
-                await this.solutionWorkflow.toggleSolution(tutorial, this.gitChanges);
-                await this._handleStepChange(step, tutorial);
+                await this.solutionWorkflow.toggleSolution(tutorial, gitChanges);
+                await this._handleStepChange(step, tutorial, gitChanges);
                 break;
 
             default:
@@ -133,8 +132,8 @@ export class Controller {
     * Handles initial render
     * Moved from TutorialDisplayOrchestrator
     */
-    private async _handleInitialRender(step: Step, tutorial: Readonly<Tutorial>): Promise<void> {
-        const { filesToDisplay } = await this.tutorialDisplayService.prepareTutorialDisplay(tutorial, this.gitChanges);
+    private async _handleInitialRender(step: Step, tutorial: Readonly<Tutorial>, gitChanges: IGitChanges): Promise<void> {
+        const { filesToDisplay } = await this.tutorialDisplayService.prepareTutorialDisplay(tutorial, gitChanges);
         await this.editorManager.updateSidePanelFiles(step, filesToDisplay, tutorial.localPath);
     }
 
@@ -142,8 +141,8 @@ export class Controller {
      * Handles step changes
      * Moved from TutorialDisplayOrchestrator
      */
-    private async _handleStepChange(step: Step, tutorial: Readonly<Tutorial>): Promise<void> {
-        const { filesToDisplay } = await this.tutorialDisplayService.prepareTutorialDisplay(tutorial, this.gitChanges);
+    private async _handleStepChange(step: Step, tutorial: Readonly<Tutorial>, gitChanges: IGitChanges): Promise<void> {
+        const { filesToDisplay } = await this.tutorialDisplayService.prepareTutorialDisplay(tutorial, gitChanges);
         await this.editorManager.updateSidePanelFiles(step, filesToDisplay, tutorial.localPath);
     }
 
@@ -161,32 +160,6 @@ export class Controller {
         if (groupTwoTabs.length > 0 || isShowingSolutionInGroupTwo) {
             await this.editorManager.focusEditorGroup(vscode.ViewColumn.Two);
         }
-    }
-
-    /**
-     * Restores previously open tabs for a tutorial
-     */
-    public async restoreTabsForTutorial(tutorial: Readonly<Tutorial>, tabPaths: string[]): Promise<void> {
-        if (!tutorial.localPath || !tabPaths.length) return;
-
-        const uris = tabPaths.map(fsPath => vscode.Uri.file(fsPath));
-        await this.editorManager.openAndFocusTabs(uris);
-    }
-
-    /**
-     * Gets currently open tutorial-related tabs
-     */
-    public getCurrentTutorialTabs(tutorial: Readonly<Tutorial>): string[] {
-        return this.editorManager.getOpenTabPaths(tutorial.localPath);
-    }
-
-    /**
-     * Manages diff view display
-     */
-    public async showDiffForStep(_step: Readonly<Step>): Promise<void> {
-        // Close regular files in group 2, keep diffs
-        await this.editorManager.closeNonDiffTabsInGroup(vscode.ViewColumn.Two);
-        // Logic for opening diffs would go here
     }
 
     /**

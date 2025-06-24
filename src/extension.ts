@@ -33,14 +33,11 @@ import { TutorialSolutionWorkflow } from "@ui/tutorial/TutorialSolutionWorkflow"
 import { TutorialUriHandler } from "@ui/deep-link/UriHandler";
 import { TutorialController } from "@ui/tutorial/controller";
 import { CommandHandler } from "@ui/tutorial/CommandHandler";
-import { TutorialInitializer } from "@ui/tutorial/TutorialInitializer";
 import { EditorManager } from "@ui/tutorial/manager/EditorManager";
-import { TutorialUIManager } from "@ui/tutorial/manager/TutorialUIManager";
 import { TabTrackingService } from "@ui/tutorial/services/TabTrackingService";
 import { SystemController } from "@ui/system/SystemController";
 import { IWebviewTutorialMessageHandler, WebviewMessageHandler } from "@ui/webview/WebviewMessageHandler";
 import { WebviewPanelManager } from "@ui/webview/WebviewPanelManager";
-import { TutorialDisplayOrchestrator } from "@ui/tutorial/TutorialDisplayOrchestrator";
 import { TutorialDisplayService } from "@domain/services/TutorialDisplayService";
 
 /**
@@ -128,37 +125,15 @@ async function bootstrapApplication(context: vscode.ExtensionContext) {
 
   // --- UI Services ---
   const tabTrackingService = new TabTrackingService();
-  
-  // Create TutorialFileService (needed by orchestrator and solution manager)
+
   const editorManager = new EditorManager(fileSystemAdapter);
-  
-  // Create services for the TutorialDisplayOrchestrator
-  const viewModelConverter = new TutorialViewModelConverter(markdownConverter);
+
   const changeDetector = new TutorialChangeDetector();
   const solutionWorkflow = new TutorialSolutionWorkflow(diffService, tabTrackingService, editorManager);
-  const tutorialInitializer = new TutorialInitializer(gitChangesFactory, context.extensionUri, tabTrackingService);
-  
-  // Create the TutorialDisplayOrchestrator
-  const tutorialDisplayOrchestrator = new TutorialDisplayOrchestrator(
-    viewModelConverter,
-    changeDetector,
-    solutionWorkflow,
-    tutorialInitializer,
-    diffService,
-    editorManager
-  );
-  
-  // Create TutorialUIManager with the orchestrator
-  const tutorialUIManager = new TutorialUIManager(
-    fileSystemAdapter, 
-    context.extensionUri, 
-    tabTrackingService,
-    tutorialDisplayOrchestrator
-  );
+
 
   // Add services to context subscriptions for proper disposal
   context.subscriptions.push(tabTrackingService);
-  context.subscriptions.push(tutorialUIManager);
 
   // --- UI Layer Controllers ---
   const systemController = new SystemController();
@@ -190,7 +165,6 @@ async function bootstrapApplication(context: vscode.ExtensionContext) {
     activeTutorialStateRepository,
     tutorialRepository,
     systemController,
-    tutorialUIManager,
     workspaceId
   };
 }
@@ -222,8 +196,8 @@ async function checkAndHandleAutoOpenState(
     }
 
     console.log('Gitorial: Found pending auto-open state, attempting to open tutorial automatically');
-    
-    await tutorialController.openFromWorkspace({ commitHash: pending.commitHash,force: true });
+
+    await tutorialController.openFromWorkspace({ commitHash: pending.commitHash, force: true });
   } catch (error) {
     console.error('Gitorial: Error during auto-open check:', error);
     autoOpenState.clear();

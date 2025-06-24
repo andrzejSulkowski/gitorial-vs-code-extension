@@ -24,7 +24,6 @@ import { IMarkdownConverter } from '@ui/ports/IMarkdownConverter';
 /**
  * Controller responsible for orchestrating tutorial-related UI interactions and actions.
  * It bridges user actions (from commands, UI panels) with the domain logic (TutorialService)
- * and UI-specific services (TutorialUIManager).
  */
 export class TutorialController implements IWebviewTutorialMessageHandler {
 
@@ -43,7 +42,6 @@ export class TutorialController implements IWebviewTutorialMessageHandler {
      * @param userInteraction For showing messages, dialogs, and confirmations to the user.
      * @param fs Abstraction for file system operations.
      * @param tutorialService Domain service for managing tutorial logic and state.
-     * @param tutorialUIManager UI service for managing tutorial-specific view updates (editors, tabs).
      * @param autoOpenState Service for managing the state for auto-opening cloned tutorials.
      */
     constructor(
@@ -215,11 +213,3 @@ export class TutorialController implements IWebviewTutorialMessageHandler {
         }
     }
 }
-
-
-
-/*
-interface IExtensionToWebviewMessageSender<T> {
-    toWebviewMessage(data: T) : ExtensionToWebviewMessage
-}
-*/

@@ -39,7 +39,7 @@ export class TutorialViewModelConverter {
       steps: stepsViewModel,
       currentStep: {
         id: currentStepId,
-        index: currentStepIndex
+        index: currentStepIndex,
       },
       isShowingSolution: tutorial.isShowingSolution
     };

@@ -184,7 +184,6 @@ The extension follows **Clean Architecture** principles with clear separation of
 - **Controllers** (`src/ui/controllers/`): Orchestrate user actions and coordinate between domain services and UI services
   - `TutorialController.ts`: Main controller handling tutorial operations
 - **Services** (`src/ui/services/`): Manage UI-specific operations
-  - `TutorialUIManager.ts`: Manages tutorial display, file views, and editor groups
   - `DiffViewService.ts`: Handles diff view generation and display
 - **Panels** (`src/ui/panels/`): Manage VS Code webview panels
   - `TutorialPanelManager.ts`: Singleton manager for tutorial panels

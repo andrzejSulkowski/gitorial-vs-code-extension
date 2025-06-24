@@ -42,6 +42,7 @@ export const tutorialStore = {
   subscribe: tutorialState.subscribe,
   
   handleMessage(message: ExtensionToWebviewTutorialMessage) {
+    console.log('TutorialStore: Received message:', message);
     switch (message.type) {
       case 'data-updated':
         tutorialState.update(state => ({
@@ -56,9 +57,11 @@ export const tutorialStore = {
       case 'step-changed':
         tutorialState.update(state => {
           if (!state.tutorial) return state;
+          const currentStep = state.tutorial.steps[message.payload.stepIndex];
+          currentStep.htmlContent = message.payload.htmlContent;
           return {
             ...state,
-            currentStep: state.tutorial.steps[message.payload.stepIndex],
+            currentStep,
             tutorial: {
               ...state.tutorial,
               currentStep: {

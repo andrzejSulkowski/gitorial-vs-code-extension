@@ -97,7 +97,6 @@ export class Controller {
 
     /**
  * Handles display changes based on detected change type
- * Moved from TutorialDisplayOrchestrator
  */
     private async _handleDisplayChanges(step: Step, tutorial: Readonly<Tutorial>, viewModel: TutorialViewModel, gitChanges: IGitChanges): Promise<void> {
         if (!this._lastViewModel) {
@@ -130,7 +129,6 @@ export class Controller {
 
     /**
     * Handles initial render
-    * Moved from TutorialDisplayOrchestrator
     */
     private async _handleInitialRender(step: Step, tutorial: Readonly<Tutorial>, gitChanges: IGitChanges): Promise<void> {
         const { filesToDisplay } = await this.tutorialDisplayService.prepareTutorialDisplay(tutorial, gitChanges);
@@ -139,7 +137,6 @@ export class Controller {
 
     /**
      * Handles step changes
-     * Moved from TutorialDisplayOrchestrator
      */
     private async _handleStepChange(step: Step, tutorial: Readonly<Tutorial>, gitChanges: IGitChanges): Promise<void> {
         const { filesToDisplay } = await this.tutorialDisplayService.prepareTutorialDisplay(tutorial, gitChanges);
@@ -148,7 +145,6 @@ export class Controller {
 
     /**
      * Handles editor group focusing
-     * Moved from TutorialDisplayOrchestrator
      */
     private async _handleEditorGroupFocus(tutorial: Readonly<Tutorial>): Promise<void> {
         const groupTwoTabs = this.editorManager.getTabsInGroup(vscode.ViewColumn.Two);

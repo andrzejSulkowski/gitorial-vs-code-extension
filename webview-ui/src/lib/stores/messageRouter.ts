@@ -10,9 +10,9 @@ export function createMessageRouter() {
   return {
     handleMessage(message: ExtensionToWebviewMessage) {
       if (message.category === 'tutorial') {
-        tutorialStore.handleMessage(message as any);
+        tutorialStore.handleMessage(message);
       } else if (message.category === 'system') {
-        systemStore.handleMessage(message as any);
+        systemStore.handleMessage(message);
       }
     }
   };

@@ -304,7 +304,6 @@ export class TutorialService {
   //  |_____/ \__\__,_|\__\___| |_|  |_|\__,_|_| |_|\__,_|\__, |\___|_| |_| |_|\___|_| |_|\__|
   //                                                       __/ |                              
   //                                                      |___/                               
-  //TODO: I'd actually like to move the whole tab management and state persistence into the TutorialUIManager
 
   /**
    * Gets the URIs of files that were open when the tutorial state was last persisted.

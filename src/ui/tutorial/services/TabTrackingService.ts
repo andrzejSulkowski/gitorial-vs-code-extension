@@ -4,6 +4,7 @@ import * as path from 'path';
 /**
  * Service responsible for tracking user tab interactions and maintaining
  * the last active tutorial file for focus restoration purposes.
+ * this is being used when toggeling between showing/hiding solutions
  */
 export class TabTrackingService {
   private _lastActiveTutorialFile: vscode.Uri | null = null;

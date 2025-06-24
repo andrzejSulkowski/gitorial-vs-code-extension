@@ -132,7 +132,7 @@ export class TutorialController implements IWebviewTutorialMessageHandler {
     public async handleExternalTutorialRequest(options: External.Args): Promise<void> {
         const { repoUrl, commitHash } = options;
         console.log(`TutorialController: Handling external request. RepoURL: ${repoUrl}, Commit: ${commitHash}`);
-        await this.webviewController.showLoading();
+        await this.webviewController.showLoading(`Preparing tutorial from ${repoUrl} with commit ${commitHash}...`);
 
         const result = await this.externalController.handleExternalTutorialRequest(options);
         if (!result.success) {
@@ -160,6 +160,7 @@ export class TutorialController implements IWebviewTutorialMessageHandler {
                     await this._openLocalTutorial({ commitHash });
                     break;
                 case 'cancel':
+                    await this.webviewController.hideLoading();
                     this.userInteraction.showInformationMessage('Tutorial request cancelled.');
                     break;
             }

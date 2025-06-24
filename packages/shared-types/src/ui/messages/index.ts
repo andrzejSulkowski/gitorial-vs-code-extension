@@ -12,6 +12,8 @@ import type {
 
 /**
  * All possible messages sent from Extension → Webview
+ * 
+ * @note These messages must be serializable
  */
 export type ExtensionToWebviewMessage =
     | ExtensionToWebviewTutorialMessage
@@ -19,6 +21,8 @@ export type ExtensionToWebviewMessage =
 
 /**
  * All possible messages sent from Webview → Extension  
+ * 
+ * @note These messages must be serializable
  */
 export type WebviewToExtensionMessage =
     | WebviewToExtensionTutorialMessage

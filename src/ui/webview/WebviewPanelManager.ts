@@ -1,129 +1,121 @@
-// Manages the lifecycle of the tutorial webview panel. This includes creating the panel,
-// handling its messages to/from the webview content, and displaying tutorial data.
-// It interacts with the TutorialController.
 import * as vscode from 'vscode';
+import { ExtensionToWebviewMessage } from '@gitorial/shared-types';
 import { WebViewPanel } from './WebviewPanel';
-import { TutorialViewModel } from '@gitorial/shared-types';
 
+/**
+ * WebviewPanelManager - Instance-based Panel Lifecycle Management
+ */
 export class WebviewPanelManager {
-  private static currentPanelInstance: WebViewPanel | undefined;
-  private static currentPanelManagerDisposables: vscode.Disposable[] = [];
-  private static messageHandler: ((message: any) => void) | null = null;
+    private currentPanel: WebViewPanel | undefined;
+    private disposables: vscode.Disposable[] = [];
 
-  /**
-   * Sets the global message handler for all webview panels.
-   * This should be called once during extension activation.
-   */
-  public static setMessageHandler(handler: (message: any) => void): void {
-    console.log('WebviewPanelManager: Setting global message handler');
-    this.messageHandler = handler;
-    
-    // If a panel already exists, apply the handler immediately
-    if (this.currentPanelInstance) {
-      console.log('WebviewPanelManager: Applying handler to existing panel');
-      this.currentPanelInstance.onDidReceiveMessage = handler;
-    }
-  }
+    constructor(
+        private readonly extensionUri: vscode.Uri,
+        private readonly messageHandler: (message: any) => void
+    ) {}
 
-  /**
-   * Creates a new panel if one doesn't exist, and shows the tutorial by sending it to the webview panel.
-   */
-  public static renderTutorial(extensionUri: vscode.Uri, tutorial: TutorialViewModel): void {
-      this._create(extensionUri, tutorial.title);
-      this._show(tutorial);
-  }
-  public static renderSystem(extensionUri: vscode.Uri): void {
-    this._create(extensionUri, 'Gitorial Tutorial');
-  }
-
-  /**
-   * Disposes of disposables held by the manager itself, 
-   * primarily the onDidDispose subscription for the current panel.
-   */
-  private static disposeManagerDisposables(): void {
-    while (WebviewPanelManager.currentPanelManagerDisposables.length) {
-      const d = WebviewPanelManager.currentPanelManagerDisposables.pop();
-      if (d) {
-        d.dispose();
-      }
-    }
-  }
-
-  /**
-   * Optionally, provide a way to explicitly close the current panel from other parts of the extension.
-   */
-  public static disposeCurrentPanel(): void {
-    if (WebviewPanelManager.currentPanelInstance) {
-      WebviewPanelManager.currentPanelInstance.panel.dispose(); 
-    }
-  }
-
-  public static isPanelVisible(): boolean {
-    return !!WebviewPanelManager.currentPanelInstance;
-  }
-
-  /**
-   * Get the current panel instance if it exists
-   */
-  public static getCurrentPanelInstance(): WebViewPanel | undefined {
-    return WebviewPanelManager.currentPanelInstance;
-  }
-
-  /**
-  * returns true if the panel got updated, false if the panel is not present and therefore can't be updated
-  */
-  private static _show(tutorial: TutorialViewModel): boolean {
-    if(WebviewPanelManager.currentPanelInstance){
-      WebviewPanelManager.currentPanelInstance.updateTutorial(tutorial);
-      return true;
-    }else {
-      return false;
-    }
-  }
-  private static _create(extensionUri: vscode.Uri, title: string){
-    if(WebviewPanelManager.currentPanelInstance) {
-      console.log('WebviewPanelManager: Panel already exists, reusing it');
-      return;
-    }
-    console.log('WebviewPanelManager: Creating new panel');
-    this.disposeManagerDisposables();
-
-    const vscodePanel = vscode.window.createWebviewPanel(
-      'tutorialPanel',
-      title,
-      vscode.ViewColumn.One,
-      {
-        enableScripts: true,
-        localResourceRoots: [
-          vscode.Uri.joinPath(extensionUri, "out"),
-          vscode.Uri.joinPath(extensionUri, "webview-ui", "dist")
-        ],
-        retainContextWhenHidden: true,
-      }
-    );
-
-    vscodePanel.onDidDispose(
-      () => {
-        console.log('WebviewPanelManager: Panel disposed, cleaning up');
-        newTutorialPanel.cleanupDisposables();
-        WebviewPanelManager.currentPanelInstance = undefined;
-        this.disposeManagerDisposables();
-      },
-      null,
-      WebviewPanelManager.currentPanelManagerDisposables
-    );
-
-    const newTutorialPanel = new WebViewPanel(vscodePanel, extensionUri);
-    WebviewPanelManager.currentPanelInstance = newTutorialPanel;
-
-    // Apply the message handler immediately when creating the panel
-    if (this.messageHandler) {
-      console.log('WebviewPanelManager: Applying message handler to new panel');
-      newTutorialPanel.onDidReceiveMessage = this.messageHandler;
-    } else {
-      console.warn('WebviewPanelManager: No message handler set when creating panel');
+    /**
+     * Send message to webview panel, creating panel if needed
+     * This is the main interface used by WebviewController
+     */
+    public async sendMessage(message: ExtensionToWebviewMessage): Promise<void> {
+        this._ensurePanel();
+        this.currentPanel!.sendMessage(message);
     }
 
-    WebviewPanelManager.currentPanelInstance.panel.reveal(vscode.ViewColumn.One);
-  }
-} 
+    /**
+     * Check if panel is currently visible
+     */
+    public isVisible(): boolean {
+        return !!this.currentPanel;
+    }
+
+    /**
+     * Explicitly show/reveal the panel
+     */
+    public show(): void {
+        if (this.currentPanel) {
+            this.currentPanel.panel.reveal(vscode.ViewColumn.One);
+        }
+    }
+
+    /**
+     * Dispose of the current panel and cleanup resources
+     */
+    public dispose(): void {
+        if (this.currentPanel) {
+            this.currentPanel.panel.dispose();
+            this.currentPanel = undefined;
+        }
+        this._disposeDisposables();
+    }
+
+    /**
+     * Get current panel instance (for advanced use cases)
+     */
+    public getCurrentPanel(): WebViewPanel | undefined {
+        return this.currentPanel;
+    }
+
+    // ============ PRIVATE IMPLEMENTATION ============
+
+    /**
+     * Ensure a panel exists, creating one if necessary
+     */
+    private _ensurePanel(): void {
+        if (this.currentPanel) {
+            return;
+        }
+
+        console.log('WebviewPanelManager: Creating new panel');
+        this._disposeDisposables();
+
+        // Create VS Code webview panel
+        const vscodePanel = vscode.window.createWebviewPanel(
+            'tutorialPanel',
+            'Gitorial Tutorial', // Default title, can be updated later
+            vscode.ViewColumn.One,
+            {
+                enableScripts: true,
+                localResourceRoots: [
+                    vscode.Uri.joinPath(this.extensionUri, "out"),
+                    vscode.Uri.joinPath(this.extensionUri, "webview-ui", "dist")
+                ],
+                retainContextWhenHidden: true,
+            }
+        );
+
+        // Handle panel disposal
+        vscodePanel.onDidDispose(
+            () => {
+                console.log('WebviewPanelManager: Panel disposed, cleaning up');
+                if (this.currentPanel) {
+                    this.currentPanel.cleanupDisposables();
+                    this.currentPanel = undefined;
+                }
+                this._disposeDisposables();
+            },
+            null,
+            this.disposables
+        );
+
+        // Create our wrapper and wire up message handling
+        this.currentPanel = new WebViewPanel(vscodePanel, this.extensionUri);
+        this.currentPanel.onDidReceiveMessage = this.messageHandler;
+
+        // Show the panel
+        this.currentPanel.panel.reveal(vscode.ViewColumn.One);
+    }
+
+    /**
+     * Clean up disposables
+     */
+    private _disposeDisposables(): void {
+        while (this.disposables.length) {
+            const d = this.disposables.pop();
+            if (d) {
+                d.dispose();
+            }
+        }
+    }
+}

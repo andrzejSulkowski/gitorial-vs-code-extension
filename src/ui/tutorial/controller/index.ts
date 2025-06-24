@@ -5,7 +5,6 @@ import { Tutorial } from '@domain/models/Tutorial';
 import { WebviewPanelManager } from '@ui/webview/WebviewPanelManager';
 import { IFileSystem } from '@domain/ports/IFileSystem';
 import { TutorialService } from '@domain/services/TutorialService';
-import { TutorialUIManager } from '@ui/tutorial/manager/TutorialUIManager';
 import { AutoOpenState } from '@infra/state/AutoOpenState';
 import { WebviewToExtensionTutorialMessage } from '@gitorial/shared-types';
 import { IWebviewTutorialMessageHandler } from '@ui/webview/WebviewMessageHandler';
@@ -13,11 +12,15 @@ import * as Lifecycle from './lifecycle';
 import * as Navigation from './navigation';
 import * as External from './external';
 import * as Editor from './editor';
+import * as Webview from './webview';
 import { TutorialDisplayService } from '@domain/services/TutorialDisplayService';
 import { TutorialSolutionWorkflow } from '../TutorialSolutionWorkflow';
 import { TutorialChangeDetector } from '@domain/utils/TutorialChangeDetector';
 import { IGitChangesFactory } from '@ui/ports/IGitChangesFactory';
 import { IGitChanges } from '@ui/ports/IGitChanges';
+import { TutorialViewModelConverter } from '@domain/converters/TutorialViewModelConverter';
+import { IMarkdownConverter } from '@ui/ports/IMarkdownConverter';
+
 /**
  * Controller responsible for orchestrating tutorial-related UI interactions and actions.
  * It bridges user actions (from commands, UI panels) with the domain logic (TutorialService)
@@ -29,6 +32,7 @@ export class TutorialController implements IWebviewTutorialMessageHandler {
     private readonly navigationController: Navigation.Controller;
     private readonly externalController: External.Controller;
     private readonly editorController: Editor.Controller;
+    private readonly webviewController: Webview.Controller;
 
     private _gitChanges: IGitChanges | null = null;
 
@@ -47,17 +51,21 @@ export class TutorialController implements IWebviewTutorialMessageHandler {
         private readonly userInteraction: IUserInteraction,
         fs: IFileSystem,
         private readonly tutorialService: TutorialService,
-        private readonly tutorialUIManager: TutorialUIManager,
         private autoOpenState: AutoOpenState,
         tutorialDisplayService: TutorialDisplayService,
         solutionWorkflow: TutorialSolutionWorkflow,
         changeDetector: TutorialChangeDetector,
-        gitChangesFactory: IGitChangesFactory
+        gitChangesFactory: IGitChangesFactory,
+        markdownConverter: IMarkdownConverter,
+        webviewPanelManager: WebviewPanelManager
     ) {
         this.lifecycleController = new Lifecycle.Controller(progressReporter, fs, this.tutorialService, this.autoOpenState, this.userInteraction, gitChangesFactory);
         this.navigationController = new Navigation.Controller(this.tutorialService, this.userInteraction);
         this.externalController = new External.Controller(this.tutorialService, this.userInteraction);
         this.editorController = new Editor.Controller(fs, tutorialDisplayService, solutionWorkflow, changeDetector);
+
+        const viewModelConverter = new TutorialViewModelConverter(markdownConverter);
+        this.webviewController = new Webview.Controller(viewModelConverter, webviewPanelManager, this);
     }
 
 
@@ -102,11 +110,11 @@ export class TutorialController implements IWebviewTutorialMessageHandler {
             this._gitChanges = gitChanges;
             await this.editorController.prepareForTutorial();
             await this.editorController.display(tutorial, gitChanges);
-            await this.tutorialUIManager.display(tutorial);
+            await this.webviewController.display(tutorial);
         } else {
             if (result.reason === "error") {
                 this.userInteraction.showErrorMessage(`Failed to clone and open tutorial: ${result.error}`);
-            } 
+            }
         }
     }
     //   _    _      _   _    _                 _ _           
@@ -123,12 +131,10 @@ export class TutorialController implements IWebviewTutorialMessageHandler {
      * It gives the user options to clone the tutorial or open an existing local copy.
      * @param options Contains the repository URL and an optional commit hash (step ID) to sync to.
      */
-    public async handleExternalTutorialRequest(
-        options: External.Args
-    ): Promise<void> {
+    public async handleExternalTutorialRequest(options: External.Args): Promise<void> {
         const { repoUrl, commitHash } = options;
         console.log(`TutorialController: Handling external request. RepoURL: ${repoUrl}, Commit: ${commitHash}`);
-        await this.tutorialUIManager.showLoadingScreen();
+        await this.webviewController.showLoading();
 
         const result = await this.externalController.handleExternalTutorialRequest(options);
         if (!result.success) {
@@ -139,7 +145,7 @@ export class TutorialController implements IWebviewTutorialMessageHandler {
         if (result.action === External.TutorialStatus.AlreadyActive) {
             const navResult = await this.navigationController.navigateToStep({ commitHash });
             if (navResult.success) {
-                await this.tutorialUIManager.display(navResult.tutorial);
+                await this.webviewController.display(navResult.tutorial);
                 this.userInteraction.showInformationMessage(`Navigated to step with commit hash: ${commitHash}`);
             } else {
                 this.userInteraction.showErrorMessage(`Failed to navigate to step with commit hash: ${commitHash}`);
@@ -148,7 +154,6 @@ export class TutorialController implements IWebviewTutorialMessageHandler {
             await this.openFromWorkspace({ commitHash });
             this.userInteraction.showInformationMessage(`Opened tutorial in current workspace.`);
         } else if (result.action === External.TutorialStatus.NotFound) {
-            // TypeScript now properly narrows the type to include userChoice
             switch (result.userChoice) {
                 case 'clone':
                     await this.cloneAndOpen({ repoUrl, commitHash });
@@ -183,137 +188,6 @@ export class TutorialController implements IWebviewTutorialMessageHandler {
         });
     }
 
-
-    //   _____       _                        _   _____                             _             
-    //  |_   _|     | |                      | | |  __ \                           (_)            
-    //    | |  _ __ | |_ ___ _ __ _ __   __ _| | | |__) | __ ___   ___ ___  ___ ___ _ _ __   __ _ 
-    //    | | | '_ \| __/ _ \ '__| '_ \ / _` | | |  ___/ '__/ _ \ / __/ _ \/ __/ __| | '_ \ / _` |
-    //   _| |_| | | | ||  __/ |  | | | | (_| | | | |   | | | (_) | (_|  __/\__ \__ \ | | | | (_| |
-    //  |_____|_| |_|\__\___|_|  |_| |_|\__,_|_| |_|   |_|  \___/ \___\___||___/___/_|_| |_|\__, |
-    //                                                                                       __/ |
-    //                                                                                      |___/ 
-
-    /**
-     * Opens a tutorial from a specified local folder path.
-     * It loads the tutorial using TutorialService and then activates it.
-     * If the tutorial is not in the current workspace, it forces a workspace switch.
-     * @param folderPath The absolute file system path to the tutorial folder.
-     * @param options Optional parameters, e.g., initialStepCommitHash to activate.
-     */
-    private async _openTutorialFromPath(folderPath: string, options?: { initialStepCommitHash?: string }): Promise<void> {
-        try {
-            await this.tutorialUIManager.showLoadingScreen();
-            const tutorial = await this.tutorialService.loadTutorialFromPath(folderPath, {
-                initialStepCommitHash: options?.initialStepCommitHash,
-            });
-
-            if (tutorial) {
-                const workspaceFolders = vscode.workspace.workspaceFolders;
-                const currentWorkspacePath = workspaceFolders?.[0]?.uri.fsPath;
-
-                if (currentWorkspacePath !== tutorial.localPath) {
-                    console.log(`TutorialController: Tutorial at ${folderPath} is not in current workspace. Forcing workspace switch.`);
-                    await this._forceWorkspaceSwitch(tutorial, options);
-                    return;
-                }
-
-                // Tutorial is in current workspace - proceed with loading
-                console.log(`TutorialController: Tutorial at ${folderPath} is in current workspace. Loading directly.`);
-                await this._processLoadedTutorial(tutorial, options?.initialStepCommitHash);
-            } else {
-                this.userInteraction.showErrorMessage(`Could not load Gitorial from: ${folderPath}`);
-                this._clearActiveTutorialState();
-            }
-        } catch (error) {
-            console.error('TutorialController: Error opening local tutorial from path:', error);
-            this.userInteraction.showErrorMessage(`Failed to open local tutorial: ${error instanceof Error ? error.message : String(error)}`);
-            this._clearActiveTutorialState();
-        }
-    }
-
-    /**
-     * Handles the common tasks after a tutorial has been successfully loaded by the TutorialService.
-     * This includes checking for the Git adapter, showing success messages, and activating the tutorial mode.
-     * @param tutorial The loaded Tutorial object.
-     * @param initialStepId Optional ID of the step to activate initially.
-     */
-    private async _processLoadedTutorial(tutorial: Tutorial, initialStepCommitHash?: string): Promise<void> {
-        const activeGitOperations = this.tutorialService.gitOperations;
-        if (!activeGitOperations) {
-            console.error("TutorialController: GitOperations is null after loading tutorial from service.");
-            this.userInteraction.showErrorMessage("Failed to initialize Git operations for the tutorial.");
-            this._clearActiveTutorialState();
-            return;
-        }
-
-        await this.tutorialUIManager.resetEditorLayout();
-        try {
-            if (initialStepCommitHash) {
-                await this.tutorialService.forceStepCommitHash(initialStepCommitHash);
-            }
-        } catch (error) {
-            console.error('TutorialController: Error activating tutorial mode:', error);
-        }
-
-        console.log(`TutorialController: Successfully opened/loaded tutorial '${tutorial.title}'.`);
-        this.userInteraction.showInformationMessage(`Tutorial "${tutorial.title}" is now active.`);
-
-        // After activation and initial step selection, attempt to restore previously open tabs
-        const pathsToRestore = this.tutorialService.getRestoredOpenTabFsPaths();
-        if (pathsToRestore && pathsToRestore.length > 0 && tutorial.localPath) {
-            console.log('TutorialController: Restoring open tabs:', pathsToRestore);
-            const urisToRestore = pathsToRestore.map(fsPath => vscode.Uri.file(fsPath));
-            await this.tutorialUIManager.openAndFocusTabs(urisToRestore);
-        }
-
-        if (tutorial.localPath) {
-            const currentOpenTabs = this.tutorialUIManager.getTutorialOpenTabFsPaths(tutorial.localPath);
-            await this.tutorialService.updatePersistedOpenTabs(currentOpenTabs);
-            console.log('TutorialController: Persisted current open tabs after tutorial load/activation:', currentOpenTabs);
-        }
-        await this.tutorialUIManager.display(tutorial);
-    }
-
-
-    /**
-     * Clears any active tutorial state from the application.
-     * This involves closing the tutorial in the TutorialService, disposing of the UI panel,
-     * and resetting the VS Code context flag.
-     */
-    private _clearActiveTutorialState(): void {
-        if (this.tutorialService.tutorial) {
-            this.tutorialService.closeTutorial();
-        }
-        WebviewPanelManager.disposeCurrentPanel();
-        vscode.commands.executeCommand('setContext', 'gitorial.tutorialActive', false);
-        console.log('TutorialController: Active tutorial state cleared.');
-    }
-
-    /**
-     * Forces a workspace switch to the tutorial directory.
-     * Saves the current state to auto-open the tutorial after the workspace switch.
-     * @param tutorial The tutorial to switch to.
-     * @param options Optional parameters to preserve across workspace switch.
-     */
-    private async _forceWorkspaceSwitch(tutorial: Tutorial, options?: { initialStepCommitHash?: string }): Promise<void> {
-        try {
-            // Save state for auto-opening after workspace switch
-            await this.autoOpenState.set({
-                tutorialId: tutorial.id, // Will be determined after loading
-                timestamp: Date.now(),
-                commitHash: options?.initialStepCommitHash,
-            });
-
-            const folderUri = vscode.Uri.file(tutorial.localPath);
-            console.log(`TutorialController: Switching workspace to ${tutorial.localPath}`);
-
-            // This will cause the extension to restart in the new workspace
-            await vscode.commands.executeCommand('vscode.openFolder', folderUri, {});
-        } catch (error) {
-            console.error('TutorialController: Error forcing workspace switch:', error);
-            this.userInteraction.showErrorMessage(`Failed to switch workspace: ${error instanceof Error ? error.message : String(error)}`);
-        }
-    }
     //  __          __  _          _                 _    _                 _ _               
     //  \ \        / / | |        (_)               | |  | |               | | |              
     //   \ \  /\  / /__| |____   ___  _____      __ | |__| | __ _ _ __   __| | | ___ _ __ ___ 
@@ -335,9 +209,17 @@ export class TutorialController implements IWebviewTutorialMessageHandler {
         if (hasEffect) {
             const tutorial = this.tutorialService.tutorial!;
             await this.editorController.display(tutorial, this._gitChanges);
-            await this.tutorialUIManager.display(tutorial);
+            await this.webviewController.display(tutorial);
         } else {
             console.warn('Received unknown command from webview:', message);
         }
     }
 }
+
+
+
+/*
+interface IExtensionToWebviewMessageSender<T> {
+    toWebviewMessage(data: T) : ExtensionToWebviewMessage
+}
+*/

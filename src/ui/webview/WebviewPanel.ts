@@ -7,7 +7,7 @@ import * as vscode from 'vscode';
 import { Uri } from 'vscode';
 import path from 'node:path';
 import fs from 'fs';
-import { TutorialViewModel, ExtensionToWebviewTutorialMessage, ExtensionToWebviewSystemMessage } from '@gitorial/shared-types';
+import { TutorialViewModel, ExtensionToWebviewTutorialMessage, ExtensionToWebviewSystemMessage, ExtensionToWebviewMessage } from '@gitorial/shared-types';
 
 function getNonce() {
   let text = '';
@@ -46,6 +46,9 @@ export class WebViewPanel {
   }
 
   // TODO: tmp solution - we dont want to deal with models on this level, but only with messages
+  /**
+   * @deprecated Use sendMessage instead
+   */
   public updateTutorial(tutorial: TutorialViewModel): void {
     const message: ExtensionToWebviewTutorialMessage = {
       category: 'tutorial',
@@ -55,14 +58,27 @@ export class WebViewPanel {
     this.panel.webview.postMessage(message);
   }
 
+  public async sendMessage(msg: ExtensionToWebviewMessage): Promise<void> {
+    await this.panel.webview.postMessage(msg);
+  }
+
+  /**
+   * @deprecated Use sendMessage instead
+   */
   public sendTutorialMessage(message: ExtensionToWebviewTutorialMessage): void {
     this.panel.webview.postMessage(message);
   }
 
+  /**
+   * @deprecated Use sendMessage instead
+   */
   public sendSystemMessage(message: ExtensionToWebviewSystemMessage): void {
     this.panel.webview.postMessage(message);
   }
 
+  /**
+   * @deprecated Use sendMessage instead
+   */
   public displayError(error: string): void {
     this.panel.webview.postMessage({ command: 'error', data: error });
   }

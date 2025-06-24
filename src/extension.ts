@@ -38,7 +38,7 @@ import { EditorManager } from "@ui/tutorial/manager/EditorManager";
 import { TutorialUIManager } from "@ui/tutorial/manager/TutorialUIManager";
 import { TabTrackingService } from "@ui/tutorial/services/TabTrackingService";
 import { SystemController } from "@ui/system/SystemController";
-import { WebviewMessageHandler } from "@ui/webview/WebviewMessageHandler";
+import { IWebviewTutorialMessageHandler, WebviewMessageHandler } from "@ui/webview/WebviewMessageHandler";
 import { WebviewPanelManager } from "@ui/webview/WebviewPanelManager";
 import { TutorialDisplayOrchestrator } from "@ui/tutorial/TutorialDisplayOrchestrator";
 import { TutorialDisplayService } from "@domain/services/TutorialDisplayService";
@@ -64,9 +64,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<vscode
 
   commandHandler.register(context);
   uriHandler.register(context);
-
-  const webviewMessageHandler = new WebviewMessageHandler(tutorialController, systemController);
-  WebviewPanelManager.setMessageHandler((msg) => webviewMessageHandler.handleMessage(msg));
 
   await checkAndHandleAutoOpenState(tutorialController, autoOpenState);
 
@@ -164,19 +161,27 @@ async function bootstrapApplication(context: vscode.ExtensionContext) {
   context.subscriptions.push(tutorialUIManager);
 
   // --- UI Layer Controllers ---
+  const systemController = new SystemController();
+  const tutorialMessageHandler: IWebviewTutorialMessageHandler = {
+    handleWebviewMessage: (msg) => tutorialController.handleWebviewMessage(msg)
+  };
+  const webviewMessageHandler = new WebviewMessageHandler(tutorialMessageHandler, systemController);
+  const webviewPanelManager = new WebviewPanelManager(context.extensionUri, (msg) => webviewMessageHandler.handleMessage(msg));
+
+
   const tutorialController = new TutorialController(
     progressReportAdapter,
     userInteractionAdapter,
     fileSystemAdapter,
     tutorialService,
-    tutorialUIManager,
     autoOpenState,
     tutorialDisplayService,
     solutionWorkflow,
     changeDetector,
-    gitChangesFactory
+    gitChangesFactory,
+    markdownConverter,
+    webviewPanelManager
   );
-  const systemController = new SystemController();
 
   return {
     tutorialController,

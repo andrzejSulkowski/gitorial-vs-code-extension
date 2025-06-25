@@ -113,6 +113,8 @@ export class EditorManager {
             }
         }
 
+        await vscode.window.tabGroups.close(tabsToClose, false);
+
         const urisToActuallyOpen = targetUris.filter(uri => !currentTabsInGroupTwo.find(tab => (tab.input as any)?.uri?.toString() === uri.toString()));
         if (urisToActuallyOpen.length > 0) {
             for (let i = 0; i < urisToActuallyOpen.length; i++) {
@@ -124,14 +126,6 @@ export class EditorManager {
                 } catch (error) {
                     console.error(`EditorManager: Error opening file ${uriToOpen.fsPath} in group two:`, error);
                 }
-            }
-        }
-
-        if (tabsToClose.length > 0) {
-            try {
-                await vscode.window.tabGroups.close(tabsToClose, false);
-            } catch (error) {
-                console.error("EditorManager: Error closing tabs in group two:", error);
             }
         }
 

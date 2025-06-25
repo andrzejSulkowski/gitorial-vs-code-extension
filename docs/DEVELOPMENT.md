@@ -28,7 +28,7 @@ This comprehensive guide provides information for developers looking to contribu
 ```bash
 # 1. Clone the repository
 git clone https://github.com/andrzejSulkowski/gitorial-vs-code-plugin.git
-cd gitorial-vs-code-plugin/project
+cd gitorial-vs-code-plugin
 
 # 2. Install dependencies (both root and webview-ui)
 pnpm install
@@ -75,7 +75,7 @@ For faster development, you can run components in watch mode:
 cd webview-ui && pnpm run dev
 
 # Terminal 2: Watch extension changes  
-pnpm run compile:extension -- --watch
+pnpm run build:extension -- --watch
 
 # Then press F5 in VS Code to start debugging
 ```

@@ -101,7 +101,7 @@ For comprehensive information on setting up the development environment, underst
 ```bash
 # Clone the repository
 git clone https://github.com/andrzejSulkowski/gitorial-vs-code-plugin.git
-cd gitorial-vs-code-plugin/project
+cd gitorial-vs-code-plugin
 
 # Install dependencies
 pnpm install

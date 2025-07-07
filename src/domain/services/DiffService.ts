@@ -9,7 +9,42 @@ export class DiffService {
   constructor(
     private readonly diffView: IDiffDisplayer,
     private readonly fs: IFileSystem
-  ){}
+  ) { }
+
+  private readonly EDUCATIONAL_PATTERNS = [
+    /TODO:/i,
+    /FIXME:/i,
+    /unimplemented!\(\)/,
+    /todo!\(\)/,
+    /\?\?\?/,
+    /\/\*\s*.*implement.*\*\//i,
+  ];
+
+  private readonly NOISE_FILES = [
+    /\.lock$/,
+    /package-lock\.json$/,
+    /yarn\.lock$/,
+    /Cargo\.lock$/,
+    /\.DS_Store$/,
+    /node_modules/,
+    /target\/debug/,
+    /target\/release/,
+    /\.git\//,
+    /\.vscode\//,
+    /\.idea\//,
+    /dist\//,
+    /build\//,
+  ];
+
+
+  private hasEducationalContent(content: string): boolean {
+    return this.EDUCATIONAL_PATTERNS.some(pattern => pattern.test(content));
+  }
+
+  private isNoiseFile(filePath: string): boolean {
+    return this.NOISE_FILES.some(pattern => pattern.test(filePath));
+  }
+
 
   /**
    * Get the diff models for changes between the current commit and its parent
@@ -74,20 +109,23 @@ export class DiffService {
 
       const excludedFileNames = ['readme.md', '.gitignore'];
       const filteredDiffPayloads = commitDiffPayloads.filter(payload => {
-        const baseName = payload.relativeFilePath.substring(payload.relativeFilePath.lastIndexOf('/') + 1).toLowerCase();
-        if (excludedFileNames.includes(baseName)) {
+
+        if (this.isNoiseFile(payload.relativeFilePath)) {
           return false;
         }
 
-        // Check if the file in the *current step's state* (originalContent) had a "TODO:".
-        // payload.originalContent is from currentStep.commitHash because we called getCommitDiff(nextStep.commitHash).
-        if (payload.originalContent && payload.originalContent.includes("TODO:")) {
-          // This includes files Modified or Deleted in nextStep that had a TODO in currentStep.
+        // Include files with educational content
+        if (payload.originalContent && this.hasEducationalContent(payload.originalContent)) {
           return true;
         }
 
-        // Files new in nextStep (payload.isNew = true) didn't exist in currentStep, so no prior TODO.
-        // Files modified/deleted whose originalContent (currentStep state) didn't have TODO are also excluded.
+        // Include files explicitly marked as educational (see Option 2)
+        if (payload.modifiedContent && this.hasEducationalContent(payload.modifiedContent)) {
+          return true;
+        }
+
+        // Files new in nextStep (payload.isNew = true) didn't exist in currentStep, so no prior educational content.
+        // Files modified/deleted whose originalContent (currentStep state) didn't have educational content are also excluded.
         return false;
       });
 
@@ -97,10 +135,10 @@ export class DiffService {
       }
 
       const filesToDisplay: DiffFile[] = [];
-      
+
       for (const payload of filteredDiffPayloads) {
         const absoluteFilePath = this.fs.join(tutorial.localPath, payload.relativeFilePath);
-        
+
         filesToDisplay.push({
           leftContentProvider: async () => {
             try {
@@ -130,3 +168,5 @@ export class DiffService {
     }
   }
 }
+
+"use std::collections::BTreeMap;\n\n/// This is the Balances Module.\n/// It is a simple module which keeps track of how much balance each account has in this state\n/// machine.\npub struct Pallet {\n\t// A simple storage mapping from accounts (`String`) to their balances (`u128`).\n\tbalances: BTreeMap<String, u128>,\n}\n\nimpl Pallet {\n\t/// Create a new instance of the balances module.\n\tpub fn new() -> Self {\n\t\tSelf { balances: BTreeMap::new() }\n\t}\n\n\t/// Set the balance of an account `who` to some `amount`.\n\tpub fn set_balance(&mut self, who: &String, amount: u128) {\n\t\tself.balances.insert(who.clone(), amount);\n\t}\n\n\t/// Get the balance of an account `who`.\n\t/// If the account has no stored balance, we return zero.\n\tpub fn balance(&self, who: &String) -> u128 {\n\t\t*self.balances.get(who).unwrap_or(&0)\n\t}\n}\n"

@@ -10,17 +10,21 @@ import { EditorManager } from './manager/EditorManager';
  * Manages tutorial solution display logic (showing/hiding solutions)
  */
 export class TutorialSolutionWorkflow {
-  
+  private readonly tabTrackingService: TabTrackingService;
+
   constructor(
     private readonly diffService: DiffService,
-    private readonly tabTrackingService: TabTrackingService,
     private readonly editorManager: EditorManager
-  ) {}
+  ) {
+    this.tabTrackingService = new TabTrackingService();
+  }
 
   /**
    * Handles toggling between showing/hiding solutions for a tutorial step
    */
   async toggleSolution(tutorial: Readonly<Tutorial>, gitAdapter: IGitChanges): Promise<void> {
+    this.tabTrackingService.setTutorialPath(tutorial.localPath);
+
     if (tutorial.isShowingSolution) {
       await this._showSolution(tutorial, gitAdapter);
     } else {
@@ -53,13 +57,13 @@ export class TutorialSolutionWorkflow {
   private async _hideSolution(tutorial: Readonly<Tutorial>, gitAdapter: IGitChanges): Promise<void> {
     const lastActiveTutorialFile = this.tabTrackingService.getLastActiveTutorialFile();
     const changedFiles = await this.diffService.getDiffModelsForParent(tutorial, gitAdapter);
-    
+
     await this.editorManager.updateSidePanelFiles(
-      tutorial.activeStep, 
-      changedFiles.map(f => f.relativePath), 
+      tutorial.activeStep,
+      changedFiles.map(f => f.relativePath),
       tutorial.localPath
     ); //FIXME: this and '_closeDiffTabsInGroupTwo' both close tabs
-    
+
     await this.editorManager.closeDiffTabs(vscode.ViewColumn.Two);
 
     // Restore focus to the last active tutorial file if available
@@ -70,5 +74,9 @@ export class TutorialSolutionWorkflow {
         console.error('TutorialSolutionManager: Error restoring focus using TabTrackingService:', error);
       }
     }
+  }
+
+  public dispose(): void {
+    this.tabTrackingService.dispose();
   }
 } 

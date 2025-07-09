@@ -78,6 +78,14 @@ This project is proudly **funded by Polkadot OpenGov**. We're grateful for the c
 
 For information on creating Gitorial-compatible tutorials, please refer to the official [Gitorial SDK documentation](https://github.com/gitorial-sdk).
 
+#### Education Content Keywords
+- `TODO:`
+- `FIXME:`
+- `unimplemented!()`
+- `todo!()`
+- `???`
+- `/* ... implement ... */`
+
 > 🏗️ **Coming Soon**: In an upcoming version, the extension will support creating new Gitorials directly from within VS Code.
 
 ## Installation

@@ -30,7 +30,6 @@ export class TutorialDisplayService {
     public async prepareTutorialDisplay(tutorial: Readonly<Tutorial>, gitChanges: IGitChanges): Promise<TutorialDisplayResult> {
         const viewModel = this.viewModelConverter.convert(tutorial);
 
-
         const diffs = await this.diffService.getDiffModelsForParent(tutorial, gitChanges);
         
         return {

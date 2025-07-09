@@ -1,10 +1,3 @@
-// ___  ___      _       
-// |  \/  |     (_)      
-// | .  . | __ _ _ _ __  
-// | |\/| |/ _` | | '_ \ 
-// | |  | | (_| | | | | |
-// \_|  |_/\__,_|_|_| |_|
-
 import * as vscode from "vscode";
 
 // Infrastructure
@@ -27,6 +20,7 @@ import { TutorialRepositoryImpl } from "@domain/repositories/TutorialRepositoryI
 import { TutorialService } from "@domain/services/TutorialService";
 import { TutorialViewModelConverter } from "@domain/converters/TutorialViewModelConverter";
 import { TutorialChangeDetector } from "@domain/utils/TutorialChangeDetector";
+import { TutorialDisplayService } from "@domain/services/TutorialDisplayService";
 
 // UI
 import { TutorialSolutionWorkflow } from "@ui/tutorial/TutorialSolutionWorkflow";
@@ -34,17 +28,13 @@ import { TutorialUriHandler } from "@ui/deep-link/UriHandler";
 import { TutorialController } from "@ui/tutorial/controller";
 import { CommandHandler } from "@ui/tutorial/CommandHandler";
 import { EditorManager } from "@ui/tutorial/manager/EditorManager";
-import { TabTrackingService } from "@ui/tutorial/services/TabTrackingService";
 import { SystemController } from "@ui/system/SystemController";
-import { IWebviewTutorialMessageHandler, WebviewMessageHandler } from "@ui/webview/WebviewMessageHandler";
+import { IWebviewSystemMessageHandler, IWebviewTutorialMessageHandler, WebviewMessageHandler } from "@ui/webview/WebviewMessageHandler";
 import { WebviewPanelManager } from "@ui/webview/WebviewPanelManager";
-import { TutorialDisplayService } from "@domain/services/TutorialDisplayService";
 
 /**
  * Main extension activation point.
  * This function is called when the extension is activated.
- * It sets up global state, registers URI handlers, commands,
- * and handles initial tutorial loading logic.
  */
 export async function activate(context: vscode.ExtensionContext): Promise<vscode.ExtensionContext> {
   console.log("📖 Gitorial extension active");
@@ -124,26 +114,28 @@ async function bootstrapApplication(context: vscode.ExtensionContext) {
   const tutorialDisplayService = new TutorialDisplayService(tutorialViewModelConverter, diffService);
 
   // --- UI Services ---
-  const tabTrackingService = new TabTrackingService();
 
   const editorManager = new EditorManager(fileSystemAdapter);
 
   const changeDetector = new TutorialChangeDetector();
-  const solutionWorkflow = new TutorialSolutionWorkflow(diffService, tabTrackingService, editorManager);
+  const solutionWorkflow = new TutorialSolutionWorkflow(diffService, editorManager);
 
 
   // Add services to context subscriptions for proper disposal
-  context.subscriptions.push(tabTrackingService);
+  context.subscriptions.push(solutionWorkflow);
 
-  // --- UI Layer Controllers ---
-  const systemController = new SystemController();
+
   const tutorialMessageHandler: IWebviewTutorialMessageHandler = {
     handleWebviewMessage: (msg) => tutorialController.handleWebviewMessage(msg)
   };
-  const webviewMessageHandler = new WebviewMessageHandler(tutorialMessageHandler, systemController);
+  const systemMessageHandler: IWebviewSystemMessageHandler = {
+    handleWebviewMessage: (msg) => systemController.handleWebviewMessage(msg)
+  };
+  const webviewMessageHandler = new WebviewMessageHandler(tutorialMessageHandler, systemMessageHandler);
   const webviewPanelManager = new WebviewPanelManager(context.extensionUri, (msg) => webviewMessageHandler.handleMessage(msg));
 
-
+  // --- UI Layer Controllers ---
+  const systemController = new SystemController(context, webviewPanelManager);
   const tutorialController = new TutorialController(
     progressReportAdapter,
     userInteractionAdapter,

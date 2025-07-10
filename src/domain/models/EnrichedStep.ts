@@ -2,7 +2,7 @@
 // (e.g., pending, active, completed).
 
 import { Step } from './Step';
-import { StepData } from '@gitorial/shared-types'
+import { StepData } from '@gitorial/shared-types';
 import { Markdown } from './Markdown';
 
 export interface EnrichedStepData extends StepData{

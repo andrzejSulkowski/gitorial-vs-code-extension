@@ -168,5 +168,3 @@ export class DiffService {
     }
   }
 }
-
-"use std::collections::BTreeMap;\n\n/// This is the Balances Module.\n/// It is a simple module which keeps track of how much balance each account has in this state\n/// machine.\npub struct Pallet {\n\t// A simple storage mapping from accounts (`String`) to their balances (`u128`).\n\tbalances: BTreeMap<String, u128>,\n}\n\nimpl Pallet {\n\t/// Create a new instance of the balances module.\n\tpub fn new() -> Self {\n\t\tSelf { balances: BTreeMap::new() }\n\t}\n\n\t/// Set the balance of an account `who` to some `amount`.\n\tpub fn set_balance(&mut self, who: &String, amount: u128) {\n\t\tself.balances.insert(who.clone(), amount);\n\t}\n\n\t/// Get the balance of an account `who`.\n\t/// If the account has no stored balance, we return zero.\n\tpub fn balance(&self, who: &String) -> u128 {\n\t\t*self.balances.get(who).unwrap_or(&0)\n\t}\n}\n"

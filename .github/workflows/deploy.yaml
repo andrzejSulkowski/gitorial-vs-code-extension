@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       dry_run:
-        description: 'Run in dry-run mode (build but do not publish)'
+        description: "Run in dry-run mode (build but do not publish)"
         type: boolean
         required: false
         default: false
@@ -24,27 +24,43 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        
+
       - name: Setup pnpm
         uses: pnpm/action-setup@v2
         with:
           version: 10
-          
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'pnpm'
-          
+          cache: "pnpm"
+
       - name: Install dependencies
         run: pnpm install
-        
-      - name: Build extension
-        run: pnpm run build
-        
+
+      - name: Package extension
+        id: package
+        run: |
+          pnpm run package
+          VSIX_FILE=$(ls *.vsix)
+          echo "vsix-file=$VSIX_FILE" >> $GITHUB_OUTPUT
+          echo "📦 Packaged: $VSIX_FILE"
+
       - name: Publish to VS Code Marketplace
-        uses: HaaLeo/publish-vscode-extension@v1
+        uses: HaaLeo/publish-vscode-extension@v2
         with:
-          pat: ${{ github.event.inputs.dry_run == 'true' && 'stub' || secrets.VSCE_PAT }}
+          pat: ${{ github.event.inputs.dry_run == 'true' && 'stub' || secrets.VS_MARKETPLACE_TOKEN }}
+          extensionFile: ./${{ steps.package.outputs.vsix-file }}
           registryUrl: https://marketplace.visualstudio.com
           dryRun: ${{ github.event.inputs.dry_run == 'true' }}
+          dependencies: false
+
+      - name: Publish to Open VSX Registry
+        uses: HaaLeo/publish-vscode-extension@v2
+        with:
+          pat: ${{ github.event.inputs.dry_run == 'true' && 'stub' || secrets.OPEN_VSX_TOKEN }}
+          extensionFile: ./${{ steps.package.outputs.vsix-file }}
+          registryUrl: https://open-vsx.org
+          dryRun: ${{ github.event.inputs.dry_run == 'true' }}
+          dependencies: false

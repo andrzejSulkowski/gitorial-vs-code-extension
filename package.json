@@ -127,8 +127,5 @@
     "typescript": "^5.8.2",
 
     "undici-types": "^7.10.0"
-  },
-  "workspaces": [
-    "webview-ui"
-  ]
+  }
 }

@@ -6,10 +6,10 @@ on:
   workflow_dispatch:
     inputs:
       dry_run:
-        description: 'Run in dry-run mode (build but don't publish)'
+        description: 'Run in dry-run mode (build but do not publish)'
+        type: boolean
         required: false
         default: false
-        type: boolean
 
 jobs:
   test:
@@ -20,7 +20,7 @@ jobs:
     name: Publish Extension
     needs: test
     runs-on: ubuntu-latest
-    environment: production  # Requires manual approval
+    environment: production
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -45,6 +45,6 @@ jobs:
       - name: Publish to VS Code Marketplace
         uses: HaaLeo/publish-vscode-extension@v1
         with:
-          pat: ${{ inputs.dry_run && 'stub' || secrets.VSCE_PAT }}
+          pat: ${{ github.event.inputs.dry_run == 'true' && 'stub' || secrets.VSCE_PAT }}
           registryUrl: https://marketplace.visualstudio.com
-          dryRun: ${{ inputs.dry_run }}
+          dryRun: ${{ github.event.inputs.dry_run == 'true' }}

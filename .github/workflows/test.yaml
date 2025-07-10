@@ -2,10 +2,10 @@ name: Test
 
 on:
   push:
-    branches: [main, dev]
+    branches: [dev]
   pull_request:
     branches: [main, dev]
-  workflow_call:  # Makes this workflow reusable
+  workflow_call:
 
 jobs:
   test:

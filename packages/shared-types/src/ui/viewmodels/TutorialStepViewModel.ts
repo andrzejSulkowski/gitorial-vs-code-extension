@@ -1,4 +1,4 @@
-import type { StepType } from '@gitorial/shared-types';
+import type { StepType } from '../../domain/StepType';
 
 export interface TutorialStepViewModel {
   id: string;

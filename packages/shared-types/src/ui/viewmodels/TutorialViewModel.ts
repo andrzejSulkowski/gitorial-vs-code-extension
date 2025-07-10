@@ -1,4 +1,4 @@
-import type { TutorialId } from '@gitorial/shared-types';
+import type { TutorialId } from '../../domain/TutorialId';
 import type { TutorialStepViewModel } from './TutorialStepViewModel';
 
 export interface TutorialViewModel {

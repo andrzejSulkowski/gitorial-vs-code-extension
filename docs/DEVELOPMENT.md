@@ -1,416 +1,172 @@
 # Gitorial Development Guide
 
-This comprehensive guide provides information for developers looking to contribute to or understand the Gitorial VS Code extension.
-
-## Table of Contents
-
-- [Prerequisites](#prerequisites)
-- [Quick Start](#quick-start)
-- [Development Workflow](#development-workflow)
-- [Architecture Overview](#architecture-overview)
-- [Project Structure](#project-structure)
-- [Data Flow Examples](#data-flow-examples)
-- [Testing](#testing)
-- [Debugging](#debugging)
-- [Building and Packaging](#building-and-packaging)
-- [Contributing Guidelines](#contributing-guidelines)
-- [Troubleshooting](#troubleshooting)
-
-## Prerequisites
-
-- **Node.js** (v20 or higher) and **pnpm** (v10 or higher)
-- **VS Code** (v1.87.0 or higher)
-- **Git** (for cloning and testing with tutorial repositories)
-- Basic understanding of TypeScript, VS Code extensions, and Hexagonal Architecture
+Quick guide for developers contributing to the Gitorial VS Code extension.
 
 ## Quick Start
 
 ```bash
-# 1. Clone the repository
-git clone https://github.com/andrzejSulkowski/gitorial-vs-code-plugin.git
-cd gitorial-vs-code-plugin/project
-
-# 2. Install dependencies (both root and webview-ui)
+# 1. Setup
+git clone https://github.com/andrzejSulkowski/gitorial-vs-code-extension.git
+cd gitorial-vs-code-extension
 pnpm install
 
-# 3. Compile the extension
-pnpm run dev
-
-# 4. Open in VS Code
-code .
-
-# 5. Press F5 to run in Extension Development Host
-# This opens a new VS Code window with the extension loaded
+# 2. Key Commands
+pnpm run build      # Build everything
+pnpm run test       # Run all tests
+pnpm run lint       # Check code style
+pnpm run package    # Create .vsix package
 ```
 
-## Development Workflow
-
-### Available Scripts
-
-| Script | Description |
-|--------|-------------|
-| `pnpm run compile` | Full build: typecheck + webview + extension + post-build |
-| `pnpm run typecheck` | TypeScript type checking without compilation |
-| `pnpm run compile:webview` | Build the Svelte webview UI |
-| `pnpm run compile:extension` | Build the extension backend using esbuild |
-| `pnpm run lint` | Run ESLint on the source code |
-| `pnpm run test` | Run all tests using VS Code test runner |
-| `pnpm run test:unit` | Run unit tests with Mocha |
-| `pnpm run vscode:package` | Package the extension as .vsix file |
-
-### Development Loop
-
-1. **Make changes** to TypeScript/Svelte code
-2. **Compile**: Run `pnpm run compile` or use watch mode
-3. **Test**: Press `F5` in VS Code to launch Extension Development Host
-4. **Debug**: Use VS Code debugger or console logs
-5. **Iterate**: Reload the Extension Development Host (`Ctrl+R`/`Cmd+R`)
-
-### Watch Mode (Recommended)
-
-For faster development, you can run components in watch mode:
-
-```bash
-# Terminal 1: Watch webview changes
-cd webview-ui && pnpm run dev
-
-# Terminal 2: Watch extension changes  
-pnpm run compile:extension -- --watch
-
-# Then press F5 in VS Code to start debugging
-```
-
-### Webview Development
-
-The webview UI is a separate Svelte application with its own build process:
-
-```bash
-# Navigate to webview directory
-cd webview-ui
-
-# Install webview dependencies
-pnpm install
-
-# Development server with hot reload
-pnpm run dev
-
-# Production build
-pnpm run build
-```
-
-**Key webview files:**
-- `src/App.svelte`: Main Svelte component
-- `src/lib/`: Reusable Svelte components
-- `src/assets/`: Static assets (CSS, images)
-- `public/`: Public assets served directly
-
-## URI Commands and External Integration
-
-The extension supports URI-based commands for external integration, allowing other applications or websites to trigger tutorial operations.
-
-### Sync Command
-
-The sync command allows external sources to open a specific tutorial at a particular commit state.
-
-#### URI Schema
-
-```
-<IDE_NAME>://AndrzejSulkowski.gitorial/sync?platform=<platform>&creator=<creator>&repo=<repo>&commitHash=<commitHash>
-```
-
-#### Parameters
-
-| Parameter | Description | Required | Supported Values |
-|-----------|-------------|----------|------------------|
-| `platform` | Git hosting platform | Yes | `github`, `gitlab` |
-| `creator` | Repository owner/organization | Yes | Any valid username/org |
-| `repo` | Repository name | Yes | Any valid repository name |
-| `commitHash` | Specific commit to sync to | Yes | Full SHA commit hash |
-
-#### Example URIs
-
-```bash
-# GitHub repository example
-cursor://AndrzejSulkowski.gitorial/sync?platform=github&creator=shawntabrizi&repo=rust-state-machine&commitHash=b74e58d9b3165a2e18f11f0fead411a754386c75
-
-# GitLab repository example  
-cursor://AndrzejSulkowski.gitorial/sync?platform=gitlab&creator=myorg&repo=my-tutorial&commitHash=a1b2c3d4e5f6789012345678901234567890abcd
-```
-
-#### How It Works
-
-1. **URI Registration**: Extension registers as a URI handler for the `cursor://AndrzejSulkowski.gitorial` scheme
-2. **URI Parsing**: `UriParser` validates and extracts parameters from the URI
-3. **Repository Construction**: Builds the full repository URL (e.g., `https://github.com/creator/repo`)
-4. **Tutorial Processing**: Clones repository, checks out specified commit, and loads tutorial
-5. **UI Display**: Opens tutorial in VS Code with the webview panel
-
-#### Testing URI Commands
-
-For development and testing, you can trigger URI commands programmatically:
-
-```typescript
-// In extension development
-const uri = vscode.Uri.parse("cursor://AndrzejSulkowski.gitorial/sync?platform=github&creator=shawntabrizi&repo=rust-state-machine&commitHash=b74e58d9b3165a2e18f11f0fead411a754386c75");
-const uriHandler = new TutorialUriHandler(controller);
-await uriHandler.handleUri(uri);
-```
-
-#### URI Components
-
-- **`CommandHandler.ts`**: Registers VS Code commands and handles the debug command
-- **`UriHandler.ts`**: Implements `vscode.UriHandler` interface and processes incoming URIs
-- **`UriParser.ts`**: Parses and validates URI structure and parameters
-- **`TutorialController`**: Handles the actual tutorial operations triggered by URI commands
-
-#### Error Handling
-
-The URI system includes comprehensive error handling:
-
-- **Invalid URI format**: Shows error message to user
-- **Unsupported platform**: Validates against supported platforms list
-- **Missing parameters**: Checks for required parameters
-- **Repository access**: Handles Git clone and checkout failures
-- **Tutorial loading**: Manages tutorial parsing and loading errors
+**Prerequisites**: Node.js v20+, pnpm v10+, VS Code v1.87+, Git
 
 ## Architecture Overview
 
-The extension follows **Clean Architecture** principles with clear separation of concerns across three main layers:
+**Clean Architecture** with three layers and clear dependency direction (UI → Domain ← Infrastructure):
 
-### 1. UI Layer (`src/ui/`, `webview-ui/`, `shared/types/viewmodels/`)
+### 1. UI Layer (`src/ui/`, `webview-ui/`, `packages/shared-types/src/ui/`)
+**Purpose**: Orchestrates user interactions between VS Code APIs and domain services.
 
-**Purpose**: Handles all user interface concerns and VS Code API interactions.
+**Key Modules**:
+- **Tutorial** (`src/ui/tutorial/`): Modular controller pattern - lifecycle, navigation, webview, editor management
+- **Webview** (`src/ui/webview/`): Panel management and extension-webview communication  
+- **System** (`src/ui/system/`): Extension-wide operations and global commands
+- **Frontend** (`webview-ui/`): Svelte-based tutorial interface with reactive state management
+- **Shared Types** (`packages/shared-types/src/ui/`): Shared types between extension and webview
 
-- **Controllers** (`src/ui/controllers/`): Orchestrate user actions and coordinate between domain services and UI services
-  - `TutorialController.ts`: Main controller handling tutorial operations
-- **Services** (`src/ui/services/`): Manage UI-specific operations
-  - `DiffViewService.ts`: Handles diff view generation and display
-- **Panels** (`src/ui/panels/`): Manage VS Code webview panels
-  - `TutorialPanelManager.ts`: Singleton manager for tutorial panels
-  - `TutorialPanel.ts`: Individual webview panel instances
-- **Handlers** (`src/ui/handlers/`): Process messages between webview and extension
-  - `WebviewMessageHandler.ts`: Translates webview messages to controller actions
-- **Ports** (`src/ui/ports/`): Interfaces for UI-specific abstractions
-  - `IMarkdownConverter.ts`, `IGitChanges.ts`, etc.
-- **ViewModels** (`src/ui/viewmodels/`): UI-specific data structures
-- **Webview UI** (`webview-ui/`): Svelte application for the tutorial panel
+**Common Tasks**:
+- Add tutorial step behavior → `src/ui/tutorial/controller/navigation.ts`
+- Modify webview interface → `webview-ui/src/lib/components/`
+- Add new commands → `src/ui/tutorial/CommandHandler.ts`
 
 ### 2. Domain Layer (`src/domain/`)
+**Purpose**: Core business logic, independent of UI/infrastructure.
 
-**Purpose**: Contains core business logic, independent of UI or infrastructure concerns.
+**Key Modules**:
+- **Models**: `Tutorial`, `Step`, `EnrichedStep` (core entities)
+- **Services**: `TutorialService`, `TutorialBuilder`, `DiffService` (business logic)
+- **Repositories**: `ITutorialRepository`, `IActiveTutorialStateRepository` (data interfaces)
+- **Ports**: `IGitOperations`, `IFileSystem`, `IUserInteraction` (external interfaces)
 
-- **Models** (`src/domain/models/`): Core entities with minimal business logic
-  - `Tutorial.ts`, `Step.ts`, `EnrichedStep.ts`, `StepState.ts`
-- **Services** (`src/domain/services/`): Business logic and use cases
-  - `TutorialService.ts`: Core tutorial operations
-  - `StepProgressService.ts`: Step navigation and progress tracking
-  - `TutorialBuilder.ts`: Constructs tutorial objects from Git repositories
-- **Repositories** (`src/domain/repositories/`): Data persistence interfaces
-  - `ITutorialRepository.ts`, `IStepStateRepository.ts`
-- **Ports** (`src/domain/ports/`): External operation interfaces
-  - `IGitOperations.ts`, `IFileSystem.ts`, `IUserInteraction.ts`
+**Common Tasks**:
+- Add business logic → `src/domain/services/`
+- Modify tutorial structure → `src/domain/models/`
+- Add external dependencies → `src/domain/ports/`
 
 ### 3. Infrastructure Layer (`src/infrastructure/`)
+**Purpose**: Implements domain ports, handles VS Code APIs and external systems.
 
-**Purpose**: Implements domain and UI ports, handles external systems and VS Code APIs.
+**Key Modules**:
+- **Adapters**: Concrete implementations of domain ports
+- **Repositories**: Data persistence implementations
+- **Factories**: Component creation and dependency injection
+- **State**: Extension state management
 
-- **Adapters** (`src/infrastructure/adapters/`): Concrete implementations of ports
-  - Git adapters, file system adapters, VS Code API adapters
-- **Repositories** (`src/infrastructure/repositories/`): Data persistence implementations
-- **Factories** (`src/infrastructure/factories/`): Create infrastructure components
-  - `GitAdapterFactory.ts`, `GitChangesFactory.ts`
-- **State** (`src/infrastructure/state/`): Extension state management
+**Common Tasks**:
+- Add VS Code integration → `src/infrastructure/adapters/`
+- Implement data persistence → `src/infrastructure/repositories/`
+- Add external service → `src/infrastructure/adapters/`
 
-### 4. Shared Layer (`shared/`)
+## Key Workflows
 
-**Purpose**: Types and utilities shared across layers.
+### Adding a New Tutorial Feature
+1. **Define the interface** in `src/domain/ports/`
+2. **Add business logic** in `src/domain/services/`
+3. **Implement adapter** in `src/infrastructure/adapters/`
+4. **Wire up UI** in `src/ui/tutorial/controller/`
+5. **Update frontend** in `webview-ui/src/lib/components/`
 
-- **Types** (`shared/types/`): TypeScript definitions
-  - `viewmodels/`: Shared between extension backend and webview frontend
-  - `domain-primitives/`: Basic reusable types
+### Debugging Common Issues
+- **Extension not loading**: Check `pnpm run build` output and console errors
+- **Webview not displaying**: Open webview dev tools (`Developer: Open Webview Developer Tools`)
+- **TypeScript errors**: Run `pnpm run typecheck` for detailed errors
 
+## URI Integration
 
-## Data Flow Examples
+Support for external tutorial launching via URI protocol:
 
-### Example 1: User Selects a Step in the Webview
+```
+<IDE_NAME>://AndrzejSulkowski.gitorial/sync?platform=github&creator=user&repo=tutorial&commitHash=abc123
+```
 
-1. **User Action**: User clicks "Next Step" in the webview
-2. **Message Passing**: Svelte app posts message `{command: 'stepSelected', stepId: '...'}`
-3. **Handler Processing**: `WebviewMessageHandler` receives and processes the message
-4. **Controller Action**: Calls `TutorialController.requestPreviousStep()` or `TutorialController.requestNextStep()`
-5. **Domain Update**: Controller updates step progress via domain services
-6. **UI Refresh**: Controller calls `TutorialViewService.display(updatedTutorial)`
-7. **View Management**: `TutorialViewService` updates file views and diff displays
-8. **Panel Update**: Updates webview panel with new `TutorialViewModel`
-9. **Frontend Render**: Svelte app receives updated data and re-renders UI
+**Implementation**: `src/ui/deep-link/UriHandler.ts`
 
-### Example 2: Opening an Existing Local Tutorial
+## Development Patterns
 
-1. **User Action**: Runs `Gitorial: Open Tutorial` command
-2. **Command Handling**: `extension.ts` invokes `TutorialController.openLocalTutorial()`
-3. **User Interaction**: Controller shows folder selection dialog via `IUserInteraction` port
-4. **Domain Processing**: Controller calls `TutorialService.loadTutorialFromPath()`
-5. **Data Loading**: Service uses `ITutorialRepository` and `IGitOperations` to build `Tutorial` object
-6. **UI Update**: Controller calls `TutorialViewService.display()` to show tutorial and open files
-7. **Panel Management**: `TutorialViewService` updates webview via `TutorialPanelManager`
-8. **Frontend Rendering**: Svelte app receives `TutorialViewModel` and renders UI
+### Message-Driven Communication
+Webview ↔ Extension communication uses strongly-typed messages:
+- **Messages**: `packages/shared-types/src/ui/messages/`
+- **ViewModels**: `packages/shared-types/src/ui/viewmodels/`
+- **Handler**: `src/ui/webview/WebviewMessageHandler.ts`
 
-### Example 3: URI-based Tutorial Sync
+### Modular Controllers
+Tutorial controller split by responsibility:
+- `lifecycle.ts`: Loading, initialization, cleanup
+- `navigation.ts`: Step navigation and progress
+- `webview.ts`: Panel management
+- `editor.ts`: VS Code editor integration
 
-1. **External Trigger**: User clicks a URI link or extension receives URI via protocol handler
-2. **URI Parsing**: `TutorialUriHandler` receives and parses the URI using `UriParser`
-3. **Command Processing**: Handler identifies sync command and extracts repository information
-4. **Controller Action**: Calls `TutorialController.handleExternalTutorialRequest()`
-5. **Repository Operations**: Controller clones repository and checks out specific commit
-6. **Tutorial Loading**: Loads tutorial from cloned repository
-7. **UI Display**: Shows tutorial in webview and opens relevant files
+### Resource Management
+Dedicated managers:
+- `EditorManager`: VS Code editor tabs and diff views
+- `WebviewPanelManager`: Webview panel lifecycle
+- `TabTrackingService`: Open tab tracking
 
 ## Testing
 
-### Running Tests
+```bash
+pnpm run test        # All tests + linting
+pnpm run test:unit   # Unit tests only
+```
+
+**Structure**: 
+- Unit tests alongside source files (`*.test.ts`)
+- Integration tests in `src/test/`
+- Framework: Mocha + Chai
+
+## Building & Packaging
 
 ```bash
-# Run all tests
-pnpm run test
-
-# Run unit tests only
-pnpm run test:unit
-
-# Run with coverage (if configured)
-pnpm run test:unit -- --coverage
+pnpm run build      # Production build
+pnpm run package    # Create .vsix file
 ```
 
-### Test Structure
+**Process**: TypeScript compilation → Webview build (Vite) → Extension bundle (esbuild)
 
-- **Unit Tests**: Located alongside source files (`*.test.ts`)
-- **Integration Tests**: In `src/test/` directory
-- **Test Framework**: Mocha with Chai assertions
-- **VS Code Testing**: Uses `@vscode/test-electron` for extension testing
-
-### Writing Tests
-
-```typescript
-// Example unit test
-import { expect } from 'chai';
-import { TutorialService } from '../services/TutorialService';
-
-describe('TutorialService', () => {
-  it('should load tutorial from valid path', async () => {
-    // Test implementation
-  });
-});
-```
-
-## Debugging
-
-### Extension Debugging
-
-1. **Set Breakpoints**: In VS Code, set breakpoints in your TypeScript code
-2. **Launch Debugger**: Press `F5` to start Extension Development Host
-3. **Trigger Code**: Perform actions that execute your code
-4. **Debug**: Use VS Code's debugging features (variables, call stack, etc.)
-
-### Webview Debugging
-
-1. **Open Developer Tools**: In Extension Development Host, run `Developer: Open Webview Developer Tools`
-2. **Debug Svelte**: Use browser dev tools to debug the Svelte application
-3. **Message Debugging**: Log messages between webview and extension
-
-### Logging
-
-```typescript
-// Extension logging
-console.log('Debug info:', data);
-
-// Webview logging (appears in webview dev tools)
-console.log('Webview debug:', data);
-```
-
-## Building and Packaging
-
-### Development Build
-
-```bash
-pnpm run compile
-```
-
-### Production Package
-
-```bash
-# Create .vsix package
-pnpm run vscode:package
-
-# The package will be created as gitorial-0.1.8.vsix
-```
-
-### Build Process
-
-1. **TypeScript Compilation**: Checks types and compiles
-2. **Webview Build**: Builds Svelte app with Vite
-3. **Extension Bundle**: Creates optimized bundle with esbuild
-4. **Post-build**: Copies assets and finalizes structure
-
-## Contributing Guidelines
+## Contributing
 
 ### Code Style
-
-- Follow existing TypeScript and Svelte conventions
-- Use ESLint configuration: `pnpm run lint`
-- Prefer functional programming for utilities
-- Use classes for domain models with behavior
+- Follow existing TypeScript/Svelte conventions
+- Use `pnpm run lint` for style checking
 - Follow Clean Architecture dependency rules
 
 ### Dependency Rules
-
-- **UI Layer**: Can depend on Domain layer
-- **Domain Layer**: Cannot depend on UI or Infrastructure
-- **Infrastructure Layer**: Can depend on Domain layer
-- **No circular dependencies** between layers
+- **UI Layer**: Can depend on Domain
+- **Domain Layer**: Cannot depend on UI or Infrastructure  
+- **Infrastructure Layer**: Can depend on Domain
 
 ### Pull Request Process
+1. Fork repository and create feature branch
+2. Make changes following code style
+3. Add tests for new functionality
+4. Run `pnpm run test` and `pnpm run lint`
+5. Create PR with clear description
 
-1. **Fork** the repository
-2. **Create feature branch**: `git checkout -b feature/your-feature`
-3. **Make changes** following code style guidelines
-4. **Add tests** for new functionality
-5. **Run tests**: `pnpm run test`
-6. **Lint code**: `pnpm run lint`
-7. **Commit changes**: Use conventional commit messages
-8. **Push branch**: `git push origin feature/your-feature`
-9. **Create Pull Request** with clear description
+## Educational Content Detection
 
-## Troubleshooting
+The extension automatically opens files containing these keywords:
+- `TODO:`, `FIXME:`, `unimplemented!()`, `todo!()`, `???`
+- `/* ... implement ... */`
 
-### Common Development Issues
+**Implementation**: `src/domain/services/DiffService.ts` (EDUCATIONAL_PATTERNS)
 
-**Extension not loading in Development Host**
-- Check console for compilation errors
-- Ensure `pnpm run compile` completed successfully
-- Verify `package.json` contributions are correct
-
-**Webview not displaying**
-- Check webview build: `pnpm run compile:webview`
-- Verify webview HTML and assets are generated
-- Check browser console in webview dev tools
-
-**TypeScript errors**
-- Run `pnpm run typecheck` to see all type errors
-- Ensure all dependencies are installed
-- Check `tsconfig.json` configuration
-
-**Git operations failing**
-- Verify Git is installed and in PATH
-- Check repository permissions
-- Ensure test repositories are valid Git repos
-
-### Performance Considerations
+## Performance Considerations
 
 - **Lazy Loading**: Load heavy operations only when needed
-- **Debouncing**: Debounce frequent operations like file watching
-- **Memory Management**: Dispose of VS Code resources properly
+- **Debouncing**: Debounce frequent operations like file watching  
+- **Memory Management**: Dispose VS Code resources properly
 - **Bundle Size**: Monitor extension bundle size
 
-### Getting Help
+## Resources
 
 - 📖 [VS Code Extension API](https://code.visualstudio.com/api)
 - 🏗️ [Clean Architecture](https://blog.cleancoder.com/uncle-bob/2012/08/13/the-clean-architecture.html)
@@ -419,4 +175,4 @@ pnpm run vscode:package
 
 ---
 
-This architecture promotes maintainability, testability, and scalability while keeping the codebase organized and easy to understand. 
+This architecture aims to promote maintainability, testability, and scalability while keeping the codebase organized and easy to understand. 

@@ -1,6 +1,6 @@
 # Gitorial
 
-![Version](https://img.shields.io/badge/version-0.1.8-yellow)
+![Version](https://img.shields.io/badge/version-0.1.9-yellow)
 ![Status](https://img.shields.io/badge/status-preview-orange)
 ![VS Code](https://img.shields.io/badge/VS%20Code-1.87.0+-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
@@ -30,13 +30,12 @@ This project is proudly **funded by Polkadot OpenGov**. We're grateful for the c
 
 ## Features
 
-- **📚 Interactive Learning**: Clone and navigate through structured, step-by-step tutorials
-- **📝 Rich Content**: View beautifully rendered Markdown content for each tutorial step
-- **🔄 Git Integration**: Seamlessly work with Git-based tutorial repositories
+- **📚 Interactive Learning**: Clone, navigate, edit, compile and test through structured, step-by-step tutorials
+- **📝 Rich Content**: View rendered Markdown content for each tutorial step
+- **🔄 Git Integration**: Seamlessly work with tutorial following the Gitorial specification
 - **💾 Persistent State**: Automatically remembers your progress across VS Code sessions
 - **🎯 Focused Learning**: Automatically opens relevant files for each step
 - **🔍 Solution Viewing**: Compare your work with step solutions using built-in diff views
-- **⚡ Smart Navigation**: Easy step-by-step progression with intuitive controls
 - **🎨 Clean UI**: Dedicated tutorial panel that doesn't interfere with your coding workflow
 
 ## How to Use
@@ -51,40 +50,23 @@ This project is proudly **funded by Polkadot OpenGov**. We're grateful for the c
 4. Select a **parent directory** where the tutorial folder will be created
 5. The extension clones the repository into a new sub-folder named after the repository
 6. A **new VS Code window** automatically opens with the cloned tutorial folder
-7. The Gitorial panel loads automatically when the tutorial is detected
+7. The Gitorial panel loads automatically
 
 #### 2. Open an Existing Local Tutorial
 
 **Option A: Automatic Detection**
 1. Open a folder containing a Gitorial project in VS Code (`File > Open Folder...`)
-2. Run the command **`Gitorial: Open Tutorial in Workspace`**
-3. The Gitorial extension will activate and detect the tutorial
-4. Click **"Load Tutorial"** when prompted to open the tutorial panel
+2. Run the command **`Gitorial: Open Tutorial (Workspace)`**
+3. The Gitorial extension will activate, detect the tutorial and open the panel
 
 **Option B: Manual Opening**
 1. Use the command **`Gitorial: Open Tutorial`**
 2. Choose **"Use Current Workspace"** (if the workspace is the tutorial root) or **"Select Directory..."** to browse to the tutorial folder
 3. If you select a directory, it will open in a new VS Code window and trigger tutorial detection
 
-#### 3. Using the Gitorial Panel
-
-- **Navigation**: Use **"Next"** and **"Previous"** buttons to move through tutorial steps
-- **Content**: Read step instructions and explanations in the main panel
-- **Files**: Relevant files for each step automatically open in the editor
-- **Solutions**: Click **"Show Solution"** to view differences and compare your progress
-- **Progress**: Your current position is automatically saved and restored
-
 ### For Tutorial Authors
 
 For information on creating Gitorial-compatible tutorials, please refer to the official [Gitorial SDK documentation](https://github.com/gitorial-sdk).
-
-#### Education Content Keywords
-- `TODO:`
-- `FIXME:`
-- `unimplemented!()`
-- `todo!()`
-- `???`
-- `/* ... implement ... */`
 
 > 🏗️ **Coming Soon**: In an upcoming version, the extension will support creating new Gitorials directly from within VS Code.
 
@@ -127,40 +109,17 @@ pnpm run package
 code .
 ```
 
-### Available Scripts
-- **`pnpm run dev`** - Start development mode with watch
-- **`pnpm run build`** - Build everything for production
-- **`pnpm run test`** - Run all tests and quality checks
-- **`pnpm run package`** - Create .vsix package
-- **`pnpm run clean`** - Clean all build artifacts
-
-See [DEVELOPMENT.md](./DEVELOPMENT.md) for complete script documentation.
+See [DEVELOPMENT.md](./DEVELOPMENT.md) for the developer documentation.
 
 ## Commands
 
 | Command | ID | Description |
 |---------|----|-----------| 
 | **Gitorial: Clone New Tutorial** | `gitorial.cloneTutorial` | Clones a new tutorial repository into a selected parent folder and opens it |
-| **Gitorial: Open Tutorial** | `gitorial.openTutorial` | Opens an existing local tutorial from current workspace or selected directory |
+| **Gitorial: Open Tutorial** | `gitorial.openTutorial` | Opens an existing local tutorial from selected directory |
+| **Gitorial: Open Tutorial (Workspace)** | `gitorial.openTutorialWorkspace` | Opens an existing local tutorial from current workspace |
 
 ## Troubleshooting
-
-### Common Issues
-
-**Tutorial not detected after opening folder**
-- Ensure the folder contains a valid Gitorial configuration
-- Try running `Gitorial: Open Tutorial` manually
-- Check that the folder is a Git repository
-
-**Files not opening automatically**
-- Verify that the tutorial repository has the expected file structure
-- Check VS Code's file associations and permissions
-- Restart VS Code if the issue persists
-
-**Git operations failing**
-- Ensure Git is installed and accessible from your PATH
-- Verify you have proper permissions for the tutorial repository
-- Check that the repository is not corrupted
 
 ### Getting Help
 

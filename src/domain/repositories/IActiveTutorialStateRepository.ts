@@ -1,4 +1,4 @@
-import { TutorialId } from "shared/types/domain-primitives/TutorialId";
+import { TutorialId } from "@gitorial/shared-types";
 
 export interface StoredTutorialState {
   tutorialId: TutorialId;

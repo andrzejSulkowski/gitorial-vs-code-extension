@@ -1,50 +1,36 @@
+# Exclude everything by default
+**
+
+# Include only essential files
+!out/**
+!webview-ui/dist/**
+!package.json
+!README.md
+!CHANGELOG.md
+!LICENSE
+!images/**
+
+# Explicitly exclude problematic directories
 .vscode/**
 .vscode-test/**
 .git/**
 .github/**
-
-# Source code (keep only compiled output)
+.cursor/**
 src/**
 shared/**
-
-# Node modules (both root and webview)
-node_modules/**
-webview-ui/node_modules/**
-
-# Webview source and config (keep only dist)
-webview-ui/src/**
-webview-ui/public/**
-webview-ui/.vscode/**
-webview-ui/package.json
-webview-ui/package-lock.json
-webview-ui/tsconfig*
-webview-ui/svelte.config.js
-webview-ui/vite.config.ts
-webview-ui/.gitignore
-webview-ui/README.md
-webview-ui/index.html
-
-# Build artifacts and configs (keep only /out)
+packages/**
 scripts/**
-**/*.tsbuildinfo
+webview-ui/**
+!webview-ui/dist/**
+node_modules/**
+*.tsbuildinfo
 tsconfig.*
-!tsconfig.json # Keep base tsconfig if needed by runtime? Usually no.
-
-# Other dev files
+eslint.config.mjs
 .gitignore
 .DS_Store
 *.vsix
-eslint.config.mjs # Exclude ESLint config
-
-# Exclude tests
-src/test/**
 .vscode-test.mjs
-
-# Keep specific necessary files (ensure these are correct)
-!out/** # Keep the compiled output
-!webview-ui/dist/** # Keep the webview build
-!package.json # Keep the manifest
-!README.md
-!CHANGELOG.md
-!LICENSE # Keep license file
-!images/** # Keep images
+pnpm-lock.yaml
+pnpm-workspace.yaml
+DEVELOPMENT.md
+SYNC_IMPLEMENTATION.md

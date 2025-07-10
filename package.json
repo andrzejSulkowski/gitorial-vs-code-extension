@@ -2,8 +2,7 @@
   "name": "gitorial",
   "displayName": "Gitorial",
   "description": "Interactive VS Code extension that guides you step-by-step through Git-based tutorials with inline explanations and easy navigation.",
-  "version": "0.1.8",
-  "preview": true,
+  "version": "0.1.9",
   "private": true,
   "publisher": "AndrzejSulkowski",
   "icon": "images/gitorial-icon.png",
@@ -13,21 +12,37 @@
   },
   "type": "commonjs",
   "engines": {
-    "vscode": "^1.87.0"
+    "vscode": "^1.87.0",
+    "node": ">=20.0.0",
+    "pnpm": ">=10.0.0"
   },
   "scripts": {
-    "typecheck": "tsc --noEmit",
-    "vscode:prepublish": "npm run compile",
-    "compile": "npm run typecheck && npm run compile:webview && npm run compile:extension && npm run post-build",
-    "compile:webview": "cd webview-ui && npm run build && cd ..",
-    "compile:extension": "node ./esbuild.config.mjs",
-    "post-build": "node scripts/post-build.js",
-    "pretest": "npm run compile && npm run lint",
-    "lint": "eslint src",
-    "test": "vscode-test",
-    "vscode:package": "vsce package",
-    "test:unit:js": "mocha dist/test/unit",
-    "test:unit": "mocha --require ts-node/register \"src/**/*.test.ts\" --exclude \"src/test/**/*.test.ts\""
+    "// Development": "=== Development Commands ===",
+    "dev": "pnpm run build:shared && pnpm run build:watch",
+    "build": "pnpm run build:shared && pnpm run typecheck && pnpm run build:webview && pnpm run build:extension",
+    "build:watch": "concurrently \"pnpm run build:extension:watch\" \"pnpm run build:webview:watch\"",
+    "build:shared": "cd packages/shared-types && pnpm run build && cd ../..",
+    "build:webview": "cd webview-ui && pnpm run build",
+    "build:webview:watch": "cd webview-ui && pnpm run dev",
+    "build:extension": "node ./scripts/esbuild.js",
+    "build:extension:watch": "node ./scripts/esbuild.js --watch",
+    "build:extension:production": "node ./scripts/esbuild.js --production",
+    "// Quality": "=== Code Quality ===",
+    "typecheck": "tsc --noEmit && cd webview-ui && pnpm run typecheck && cd ..",
+    "typecheck:extension": "tsc --noEmit",
+    "typecheck:webview": "cd webview-ui && pnpm run typecheck",
+    "lint": "eslint src --max-warnings 0",
+    "lint:fix": "eslint src --fix",
+    "// Testing": "=== Testing Commands ===",
+    "test": "pnpm run build && pnpm run lint && vscode-test",
+    "test:unit": "mocha --require ts-node/register \"src/**/*.test.ts\" --exclude \"src/test/**/*.test.ts\"",
+    "// Publishing": "=== VS Code Extension ===",
+    "vscode:prepublish": "pnpm run build:extension:production",
+    "package": "pnpm run build && pnpx vsce package --no-dependencies",
+    "publish": "pnpm run build && pnpx vsce publish --no-dependencies",
+    "// Utilities": "=== Utility Commands ===",
+    "clean": "rm -rf out dist node_modules/.cache packages/*/dist webview-ui/dist",
+    "reset": "pnpm run clean && pnpm install && pnpm run build:shared"
   },
   "categories": [
     "Education",
@@ -48,8 +63,9 @@
     "guide"
   ],
   "activationEvents": [
+    "onUri",
     "onStartupFinished",
-    "onUri"
+    "workspaceContains:.git"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -57,6 +73,10 @@
       {
         "command": "gitorial.cloneTutorial",
         "title": "Gitorial: Clone New Tutorial"
+      },
+      {
+        "command": "gitorial.openWorkspaceTutorial",
+        "title": "Gitorial: Open Tutorial (Workspace)"
       },
       {
         "command": "gitorial.openTutorial",
@@ -70,28 +90,43 @@
       }
     ]
   },
+  "dependencies": {
+    "@gitorial/shared-types": "workspace:*",
+    "markdown-it": "^14.1.0",
+    "simple-git": "^3.28.0",
+    "ws": "^8.18.0"
+  },
   "devDependencies": {
+    "@sinonjs/fake-timers": "^14.0.0",
     "@types/chai": "^5.2.2",
+    "@types/deep-eql": "^4.0.2",
+    "@types/linkify-it": "^5.0.0",
     "@types/markdown-it": "^14.1.2",
+    "@types/mdurl": "^2.0.0",
     "@types/mocha": "^10.0.10",
-    "@types/node": "20.x",
+    "@types/node": "~20.17.51",
     "@types/sinon": "^17.0.4",
+    "@types/sinonjs__fake-timers": "^8.1.5",
     "@types/vscode": "^1.87.0",
+    "@types/ws": "^8.18.1",
     "@typescript-eslint/eslint-plugin": "^8.28.0",
     "@typescript-eslint/parser": "^8.28.0",
     "@vscode/test-cli": "^0.0.10",
     "@vscode/test-electron": "^2.4.1",
+    "@vscode/vsce": "^3.4.2",
     "chai": "^5.2.0",
-    "esbuild": "^0.25.3",
+    "concurrently": "^9.1.2",
+    "deep-eql": "^5.0.2",
+    "esbuild": "^0.25.5",
     "eslint": "^9.23.0",
+    "linkify-it": "^5.0.0",
+    "mdurl": "^2.0.0",
     "mocha": "^11.2.2",
     "sinon": "^20.0.0",
     "ts-node": "^10.9.2",
-    "typescript": "^5.8.2"
-  },
-  "dependencies": {
-    "markdown-it": "^14.1.0",
-    "simple-git": "^3.28.0"
+    "typescript": "^5.8.2",
+
+    "undici-types": "^7.10.0"
   },
   "workspaces": [
     "webview-ui"

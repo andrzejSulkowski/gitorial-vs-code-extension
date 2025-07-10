@@ -1,38 +1,25 @@
 {
+	"extends": "./tsconfig.base.json",
 	"compilerOptions": {
-		"module": "CommonJS",
-		"target": "ES2022",
 		"outDir": "out",
-		"lib": [
-			"ES2022",
-			"DOM"
-		],
-		"sourceMap": true,
 		"rootDir": ".",
-		"strict": true,
-		//"noImplicitReturns": true,
-		"noFallthroughCasesInSwitch": true,
-		"noUnusedParameters": true,
-		"moduleResolution": "node",
-		"esModuleInterop": true,
-		"skipLibCheck": false,
+		"lib": ["ES2022", "DOM"],
 		"baseUrl": ".",
+		"types": ["node", "mocha", "chai"],
+		"composite": true,
+		"skipLibCheck": false,
 		"paths": {
-			"@shared/*": ["./shared/*"]
-		},
-		"types": [
-			"node",
-			"mocha",
-			"chai"
-		]
+			"@infra/*": ["./src/infrastructure/*"],
+			"@domain/*": ["./src/domain/*"],
+			"@ui/*": ["./src/ui/*"],
+		}
 	},
 	"include": [
-		"src/**/*",
-		"shared/**/*"
+		"src/**/*"
 	],
 	"exclude": [
 		"node_modules",
-		"out",
+		"out", 
 		"example-tutorial",
 		"**/*.md",
 		"webview-ui/node_modules"

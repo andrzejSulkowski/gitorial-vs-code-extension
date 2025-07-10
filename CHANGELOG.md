@@ -33,3 +33,8 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 ## [0.1.8] - 2025-06-06
 
 - Fix Gitorial branch setup when user is on a commit that belongs to the gitorial branch and has not fetched the remote branch
+
+## [0.1.9] - 2025-07-07
+
+- Feature diff view scans changed files for 'educational content' keywords and filters out noise files
+- Fix focus of the last active tutorial file when toggling the solution

@@ -1,5 +1,5 @@
-import { HTML } from "@shared/types/viewmodels/HTML";
-import { Markdown } from "src/domain/models/Markdown";
+import { HTML } from "@gitorial/shared-types";
+import { Markdown } from "../../domain/models/Markdown";
 
 /** 
  * Port for converting Markdown source into HTML for rendering.

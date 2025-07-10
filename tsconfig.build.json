@@ -7,7 +7,7 @@
 	},
 	"include": [
 		"src/**/*",
-		"shared/**/*"
+		"packages/shared-types/**/*"
 	],
 	"exclude": [
 		"node_modules",

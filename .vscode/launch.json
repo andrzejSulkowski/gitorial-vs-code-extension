@@ -16,6 +16,90 @@
 				"${workspaceFolder}/out/**/*.js"
 			],
 			"preLaunchTask": "${defaultBuildTask}"
+		},
+		{
+			"name": "Debug Gitorial-Sync Integration Tests (No Timeout)",
+			"type": "node",
+			"request": "launch",
+			"program": "${workspaceFolder}/packages/gitorial-sync/node_modules/mocha/bin/mocha.js",
+			"args": [
+				"--config",
+				".mocharc.integration.json",
+				"--timeout",
+				"0"
+			],
+			"cwd": "${workspaceFolder}/packages/gitorial-sync",
+			"runtimeArgs": ["--inspect-brk"],
+			"sourceMaps": true,
+			"console": "integratedTerminal",
+			"internalConsoleOptions": "neverOpen",
+			"env": {
+				"NODE_ENV": "test"
+			}
+		},
+		{
+			"name": "Debug Gitorial-Sync Module Tests",
+			"type": "node",
+			"request": "launch",
+			"program": "${workspaceFolder}/packages/gitorial-sync/node_modules/mocha/bin/mocha.js",
+			"args": [
+				"--config",
+				".mocharc.modules.json"
+			],
+			"cwd": "${workspaceFolder}/packages/gitorial-sync",
+			"runtimeArgs": ["--inspect-brk"],
+			"sourceMaps": true,
+			"console": "integratedTerminal",
+			"internalConsoleOptions": "neverOpen",
+			"env": {
+				"NODE_ENV": "test"
+			}
+		},
+		{
+			"name": "Debug Single Test (No Timeout)",
+			"type": "node",
+			"request": "launch",
+			"program": "${workspaceFolder}/packages/gitorial-sync/node_modules/mocha/bin/mocha.js",
+			"args": [
+				"--config",
+				".mocharc.integration.json",
+				"--timeout",
+				"0",
+				"--grep",
+				"should handle sync direction assignment"
+			],
+			"cwd": "${workspaceFolder}/packages/gitorial-sync",
+			"runtimeArgs": ["--inspect-brk"],
+			"sourceMaps": true,
+			"console": "integratedTerminal",
+			"internalConsoleOptions": "neverOpen",
+			"env": {
+				"NODE_ENV": "test"
+			}
+		},
+		{
+			"name": "Debug via pnpm test (Alternative)",
+			"type": "node",
+			"request": "launch",
+			"runtimeExecutable": "pnpm",
+			"runtimeArgs": [
+				"run",
+				"test:integration"
+			],
+			"cwd": "${workspaceFolder}/packages/gitorial-sync",
+			"console": "integratedTerminal",
+			"internalConsoleOptions": "neverOpen",
+			"env": {
+				"NODE_OPTIONS": "--inspect-brk"
+			}
+		}
+	],
+	"inputs": [
+		{
+			"id": "testName",
+			"description": "Test name pattern to run",
+			"default": "should handle sync direction assignment",
+			"type": "promptString"
 		}
 	]
 }

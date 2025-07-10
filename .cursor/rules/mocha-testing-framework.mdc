@@ -1,0 +1,84 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Mocha Testing Framework
+
+Standard for using Mocha as the primary testing framework across the project.
+
+<rule>
+name: mocha_testing_framework
+description: Enforces the use of Mocha testing framework for consistency with VS Code extension development toolkit and maintains unified testing approach across the project.
+
+# Testing Framework Requirements:
+
+## Primary Framework
+- **Use Mocha** as the primary testing framework for all TypeScript/JavaScript tests
+- Mocha is already used by the VS Code extension development toolkit
+- Maintains consistency across the entire project ecosystem
+
+## Configuration Standards:
+- Use `@types/mocha` for TypeScript support
+- Configure Mocha with TypeScript compilation via `ts-node` or similar
+- Use `.mocharc.json` or `mocha` section in `package.json` for configuration
+- Set appropriate timeouts for async operations (especially WebSocket tests)
+
+## Test Structure:
+- Use `describe()` blocks for test suites
+- Use `it()` blocks for individual test cases
+- Use `beforeEach()`, `afterEach()`, `before()`, `after()` for setup/teardown
+- Prefer `async/await` over callbacks for async tests
+
+## Assertion Library:
+- Use Node.js built-in `assert` module or
+- Use `chai` assertion library for more expressive assertions
+- Avoid mixing multiple assertion libraries
+
+## Test File Organization:
+- Place test files in `test/` or `tests/` directories
+- Use `.test.ts` or `.spec.ts` suffixes for test files
+- Mirror source directory structure in test directories when appropriate
+
+## Example Configuration:
+```json
+// package.json
+{
+  "scripts": {
+    "test": "mocha",
+    "test:watch": "mocha --watch"
+  },
+  "devDependencies": {
+    "mocha": "^10.0.0",
+    "@types/mocha": "^10.0.0",
+    "ts-node": "^10.0.0"
+  }
+}
+```
+
+```json
+// .mocharc.json
+{
+  "require": ["ts-node/register"],
+  "extensions": ["ts"],
+  "spec": ["test/**/*.test.ts", "tests/**/*.test.ts"],
+  "timeout": 5000,
+  "recursive": true
+}
+```
+
+## Prohibited Frameworks:
+- Do not use Jest in this project (conflicts with VS Code extension toolkit)
+- Do not use Jasmine or other testing frameworks
+- Maintain consistency by using only Mocha
+
+## Migration Guidelines:
+- When converting from other frameworks, update:
+  - Test syntax (describe/it instead of test())
+  - Assertion methods
+  - Configuration files
+  - Package.json scripts and dependencies
+  - Mock/spy libraries if needed
+
+This rule ensures testing consistency across the VS Code extension and all related packages.
+</rule>

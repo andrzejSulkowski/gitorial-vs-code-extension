@@ -1,0 +1,73 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Package.json Scripts Lookup
+
+<rule>
+name: package_json_scripts_lookup
+description: Always check package.json scripts before suggesting how to run code, tests, builds, or other project tasks.
+
+filters:
+  # Match when discussing running code, tests, builds, etc.
+  - type: content
+    pattern: "(?i)(run|execute|start|test|build|compile|lint|format|deploy|serve|dev|development|production)"
+  # Match when user asks about scripts or commands
+  - type: content
+    pattern: "(?i)(script|command|npm|yarn|pnpm|how to)"
+  # Match test-related discussions
+  - type: content
+    pattern: "(?i)(test|spec|jest|mocha|vitest|cypress)"
+  # Match build/development discussions
+  - type: content
+    pattern: "(?i)(build|compile|bundle|webpack|vite|rollup|esbuild)"
+
+actions:
+  - type: suggest
+    message: |
+      Before suggesting how to run code, always check the package.json scripts first.
+
+      **Required Steps:**
+      1. Look up the package.json file in the current workspace or relevant package
+      2. Check the "scripts" section for available commands
+      3. Suggest using the appropriate npm/yarn/pnpm script if available
+      4. If no relevant script exists, then suggest the direct command
+
+      **Examples:**
+      - Instead of: `npx mocha test/my-test.js`
+      - First check: `package.json` scripts section
+      - If `"test": "mocha"` exists, suggest: `pnpm test`
+      - If `"test:unit": "mocha test/unit"` exists, suggest: `pnpm run test:unit`
+
+      **Common script patterns to look for:**
+      - `test`, `test:unit`, `test:integration`, `test:e2e`
+      - `build`, `build:dev`, `build:prod`
+      - `dev`, `start`, `serve`
+      - `lint`, `format`, `typecheck`
+      - `clean`, `install`, `setup`
+
+      **Package manager detection:**
+      - Check for `pnpm-lock.yaml` → use `pnpm`
+
+examples:
+  - input: |
+      User: "How do I run the tests?"
+      AI suggests: "npx mocha test/"
+    output: "Should first check package.json scripts and suggest `pnpm test` if available"
+
+  - input: |
+      User: "How do I build the project?"
+      AI suggests: "npx webpack"
+    output: "Should first check package.json scripts and suggest `pnpm run build` if available"
+
+  - input: |
+      User: "How do I start the development server?"
+      AI response: "First checking package.json... Found `dev` script, use: `pnpm run dev`"
+    output: "Correct approach - checked scripts first"
+
+metadata:
+  priority: high
+  version: 1.0
+  applies_to: ["package.json", "npm", "yarn", "pnpm", "scripts", "commands"]
+</rule>

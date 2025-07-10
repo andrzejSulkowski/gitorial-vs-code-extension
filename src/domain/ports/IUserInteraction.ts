@@ -22,7 +22,7 @@ export type OpenDialogOptions = {
 export interface IUserInteraction {
   showOpenDialog(options: OpenDialogOptions): Promise<undefined | string>;
   showInputBox(options: {prompt: string, placeHolder?: string, defaultValue?: string}): Promise<undefined | string>;
-  showInformationMessage(message: string): Promise<void>;
+  showInformationMessage(message: string, options?: { copy?: { data: string } }): Promise<void>;
   showWarningMessage(message: string): Promise<void>;
   showErrorMessage(message: string): Promise<void>;
 
@@ -51,4 +51,13 @@ export interface IUserInteraction {
    * @returns A promise that resolves to true if the user confirmed, false otherwise.
    */
   askConfirmation(opt: {message: string, detail?: string, confirmActionTitle?: string, cancelActionTitle?: string}): Promise<boolean>;
+
+  /**
+   * Presents the user with a list of options to choose from.
+   * @param options An array of string options to present.
+   * @param prompt Optional prompt message to display above the options.
+   * @param placeHolder Optional placeholder text for the quick pick input.
+   * @returns The selected option string, or undefined if the user cancels.
+   */
+  pickOption(options: string[], prompt?: string, placeHolder?: string): Promise<string | undefined>;
 } 

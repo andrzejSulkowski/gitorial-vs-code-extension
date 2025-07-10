@@ -1,4 +1,4 @@
-import { TutorialId } from '@shared/types';
+import { TutorialId } from '@gitorial/shared-types';
 import { GlobalState, IDB } from './GlobalState';
 
 

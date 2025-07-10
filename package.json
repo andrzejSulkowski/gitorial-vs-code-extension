@@ -32,7 +32,7 @@
     "typecheck": "tsc --noEmit && cd webview-ui && pnpm run typecheck && cd ..",
     "typecheck:extension": "tsc --noEmit",
     "typecheck:webview": "cd webview-ui && pnpm run typecheck",
-    "lint": "eslint src",
+    "lint": "eslint src --max-warnings 0",
     "lint:fix": "eslint src --fix",
     "// Testing": "=== Testing Commands ===",
     "test": "pnpm run build && pnpm run lint && vscode-test",

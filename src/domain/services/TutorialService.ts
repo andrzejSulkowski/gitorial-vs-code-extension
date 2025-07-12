@@ -102,11 +102,12 @@ export class TutorialService {
   public async cloneAndLoadTutorial(repoUrl: string, targetPath: string, options: LoadTutorialOptions = {}): Promise<Tutorial | null> {
     try {
       this._gitOperations = await this.gitOperationsFactory.fromClone(repoUrl, targetPath);
+      //Cloning indicates "fresh start" and therefore we clear the state
+      await this.activeTutorialStateRepository.clearActiveTutorial();
       try {
         await this._gitOperations.ensureGitorialBranch();
       } catch (error) {
         console.error(`TutorialService: Failed to ensure gitorial branch for cloned repo ${targetPath}:`, error);
-        await this.activeTutorialStateRepository.clearActiveTutorial();
         this._gitOperations = null;
         return null;
       }
@@ -147,6 +148,8 @@ export class TutorialService {
     } else if (persistedState?.currentStepId) {
       await this.forceStepId(persistedState.currentStepId);
     } else {
+      // The default gitorial commit is the first commit in the "gitorial" branch
+      await this.gitOperations?.checkout(tutorial.activeStep.commitHash);
       // No step to force, so we just enrich the active step (happens automatically in force methods)
       await this._enrichActiveStep();
     }

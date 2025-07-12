@@ -74,14 +74,13 @@ export class Controller {
 
         if (changes.tutorialChanged) {
             await this._handleTutorialChange(vm);
-        } else if (changes.stepChanged) {
-            await this._handleStepChange(vm);
-        } else if (changes.solutionStateChanged) {
-            await this._handleSolutionToggle(vm);
-        } else {
-            console.log('WebviewController: No changes detected, skipping update');
-            return;
         }
+        if (changes.stepChanged) {
+            await this._handleStepChange(vm);
+        } 
+        if (changes.solutionStateChanged) {
+            await this._handleSolutionToggle(vm);
+        } 
 
         // Update internal state after successful operation
         this._updateInternalState(vm);

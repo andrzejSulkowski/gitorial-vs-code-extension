@@ -64,3 +64,8 @@ jobs:
           registryUrl: https://open-vsx.org
           dryRun: ${{ github.event.inputs.dry_run == 'true' }}
           dependencies: false
+
+      - name: GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: *.vsix

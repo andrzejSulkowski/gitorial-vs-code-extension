@@ -1,8 +1,8 @@
 import type { 
   ExtensionToWebviewMessage
 } from '@gitorial/shared-types';
-import { tutorialStore } from './tutorialStore';
-import { systemStore } from './systemStore';
+import { tutorialStore } from './tutorialStore.svelte';
+import { systemStore } from './systemStore.svelte';
 
 export { sendMessage } from '../utils/messaging';
 

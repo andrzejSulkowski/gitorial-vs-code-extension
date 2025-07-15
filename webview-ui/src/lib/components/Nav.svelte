@@ -1,20 +1,17 @@
 <script lang="ts">
   import Button from "./Button.svelte";
   import type { StepType } from "@gitorial/shared-types";
-  import { tutorialStore } from '../stores/tutorialStore';
+  import { tutorialStore } from '../stores/tutorialStore.svelte';
 
   interface Props {
-    currentStep: number;
-    totalSteps: number;
     stepType: StepType;
     isShowingSolution: boolean;
+    hasNext: boolean;
+    hasPrev: boolean;
   }
 
-  const { currentStep, totalSteps, stepType, isShowingSolution }: Props =
+  const { stepType, isShowingSolution, hasPrev, hasNext }: Props =
     $props();
-
-  const isPrevDisabled = $derived(currentStep === 0);
-  const isNextDisabled = $derived(currentStep === totalSteps - 1);
 
   function handlePrev() {
     tutorialStore.prevStep();
@@ -32,13 +29,12 @@
     tutorialStore.hideSolution();
   }
 
-  $inspect(stepType);
 </script>
 
 <div class="nav">
   <div>
-    <Button label="← Back" onClick={handlePrev} disabled={isPrevDisabled} />
-    <Button label="Next →" onClick={handleNext} disabled={isNextDisabled} />
+    <Button label="← Back" onClick={handlePrev} disabled={!hasPrev} />
+    <Button label="Next →" onClick={handleNext} disabled={!hasNext} />
   </div>
   {#if stepType === "template" && isShowingSolution}
     <Button label="Hide Solution" onClick={handleHideSolution} />

@@ -2,7 +2,7 @@
   import Tutorial from "./lib/components/Tutorial.svelte";
   import { onMount } from "svelte";
   import { createMessageRouter } from "./lib/stores/messageRouter";
-  import { systemStore } from "./lib/stores/systemStore";
+  import { systemStore } from "./lib/stores/systemStore.svelte";
 
   const messageRouter = createMessageRouter();
 
@@ -15,7 +15,7 @@
     return () => window.removeEventListener('message', handleMessage);
   });
 
-  const isLoading = $systemStore.isLoading;
+  const isLoading = systemStore.isLoading;
 
 </script>
 

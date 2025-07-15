@@ -1,4 +1,3 @@
-import { writable } from 'svelte/store';
 import type { ExtensionToWebviewSystemMessage } from '@gitorial/shared-types';
 import { sendMessage } from '../utils/messaging';
 
@@ -12,34 +11,27 @@ const initialState: SystemState = {
   lastError: null,
 };
 
-const systemState = writable<SystemState>(initialState);
+let systemState = $state<SystemState>(initialState);
 
 export const systemStore = {
-  subscribe: systemState.subscribe,
+  get isLoading() { return systemState.isLoading; },
+  get lastError() { return systemState.lastError; },
   
   handleMessage(message: ExtensionToWebviewSystemMessage) {
+    console.log('SystemStore: Received message:', message);
     switch (message.type) {
       case 'loading-state':
-        systemState.update(state => ({
-          ...state,
-          isLoading: message.payload.isLoading,
-        }));
+        systemState.isLoading = message.payload.isLoading;
         break;
         
       case 'error':
-        systemState.update(state => ({
-          ...state,
-          lastError: message.payload.message,
-        }));
+        systemState.lastError = message.payload.message;
         break;
     }
   },
 
   setError(message: string) {
-    systemState.update(state => ({
-      ...state,
-      lastError: message,
-    }));
+    systemState.lastError = message;
     sendMessage({
       category: 'system',
       type: 'error',
@@ -48,9 +40,6 @@ export const systemStore = {
   },
 
   clearError() {
-    systemState.update(state => ({
-      ...state,
-      lastError: null,
-    }));
+    systemState.lastError = null;
   }
 };

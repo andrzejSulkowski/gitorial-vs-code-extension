@@ -1,16 +1,35 @@
 <script lang="ts">
-  import Nav from './Nav.svelte';
-  import StepContent from './StepContent.svelte';
-  import { tutorialStore, currentStepIndex, totalSteps, isShowingSolution } from '../stores/tutorialStore';
-  import PolkadotTokenPink from './../PolkadotTokenPink.svelte';
+  import Nav from "./Nav.svelte";
+  import StepContent from "./StepContent.svelte";
+  import { tutorialStore } from "../stores/tutorialStore.svelte";
+  import PolkadotTokenPink from "./../PolkadotTokenPink.svelte";
 
-  let tutorial = $derived($tutorialStore.tutorial);
-  let currentStep = $derived($tutorialStore.currentStep);
-  let stepIndex = $derived($currentStepIndex);
-  let steps = $derived($totalSteps);
-  let showingSolution = $derived($isShowingSolution);
-  let isLoading = $derived($tutorialStore.isLoading);
+  let currentStep = $derived(tutorialStore.currentStep);
+  let isLoading = $derived(tutorialStore.isLoading);
+  let tutorial = $derived(tutorialStore.tutorial);
 
+  let currentStepIndex = $derived(tutorial?.currentStep.index ?? 0);
+  let isShowingSolution = $derived(tutorial?.isShowingSolution ?? false);
+
+  let hasNext = $derived.by(() => {
+    let target = currentStepIndex + 1;
+    while (
+      tutorial &&
+      target < tutorial.steps.length &&
+      tutorial?.steps[target].type === "solution"
+    ) {
+      target++;
+    }
+    return target < (tutorial?.steps.length ?? 0);
+  });
+
+  let hasPrev = $derived.by(() => {
+    let target = currentStepIndex - 1;
+    while (target >= 0 && tutorial?.steps[target].type === "solution") {
+      target--;
+    }
+    return target >= 0;
+  });
 </script>
 
 {#if currentStep && !isLoading}
@@ -19,22 +38,20 @@
       <PolkadotTokenPink />
     </div>
     <div class="content-area">
-      <StepContent
-        content={currentStep.htmlContent || ''}
-      />
+      <StepContent content={currentStep.htmlContent || ""} />
     </div>
     <div class="nav-area">
       <Nav
-        currentStep={stepIndex}
-        totalSteps={steps}
         stepType={currentStep.type}
-        isShowingSolution={showingSolution}
+        {isShowingSolution}
+        {hasNext}
+        {hasPrev}
       />
     </div>
   </div>
 {:else}
   <div class="loading">
-    {isLoading ? 'Loading tutorial...' : 'No tutorial loaded'}
+    {isLoading ? "Loading tutorial..." : "No tutorial loaded"}
   </div>
 {/if}
 

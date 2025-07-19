@@ -1,49 +1,50 @@
-import * as vscode from "vscode";
+import * as vscode from 'vscode';
 
 // Infrastructure
-import { createDiffDisplayerAdapter } from "@infra/adapters/DiffDisplayerAdapter";
-import { createMementoAdapter } from "@infra/adapters/MementoAdapter";
-import { createProgressReportAdapter } from "@infra/adapters/ProgressReportAdapter";
-import { GitOperationsFactory } from "@infra/factories/GitOperationsFactory";
-import { AutoOpenState } from "@infra/state/AutoOpenState";
-import { createMarkdownConverterAdapter } from "@infra/adapters/MarkdownConverter";
-import { StepContentRepository } from "@infra/repositories/StepContentRepository";
-import { MementoActiveTutorialStateRepository } from "@infra/repositories/MementoActiveTutorialStateRepository";
-import { GitChangesFactory } from "@infra/factories/GitChangesFactory";
-import { GlobalState } from "@infra/state/GlobalState";
-import { createUserInteractionAdapter } from "@infra/adapters/VSCodeUserInteractionAdapter";
-import { createFileSystemAdapter } from "@infra/adapters/VSCodeFileSystemAdapter";
+import { createDiffDisplayerAdapter } from '@infra/adapters/DiffDisplayerAdapter';
+import { createMementoAdapter } from '@infra/adapters/MementoAdapter';
+import { createProgressReportAdapter } from '@infra/adapters/ProgressReportAdapter';
+import { GitOperationsFactory } from '@infra/factories/GitOperationsFactory';
+import { AutoOpenState } from '@infra/state/AutoOpenState';
+import { createMarkdownConverterAdapter } from '@infra/adapters/MarkdownConverter';
+import { StepContentRepository } from '@infra/repositories/StepContentRepository';
+import { MementoActiveTutorialStateRepository } from '@infra/repositories/MementoActiveTutorialStateRepository';
+import { GitChangesFactory } from '@infra/factories/GitChangesFactory';
+import { GlobalState } from '@infra/state/GlobalState';
+import { createUserInteractionAdapter } from '@infra/adapters/VSCodeUserInteractionAdapter';
+import { createFileSystemAdapter } from '@infra/adapters/VSCodeFileSystemAdapter';
 
 // Domain
-import { DiffService } from "@domain/services/DiffService";
-import { TutorialRepositoryImpl } from "@domain/repositories/TutorialRepositoryImpl";
-import { TutorialService } from "@domain/services/TutorialService";
-import { TutorialViewModelConverter } from "@domain/converters/TutorialViewModelConverter";
-import { TutorialChangeDetector } from "@domain/utils/TutorialChangeDetector";
-import { TutorialDisplayService } from "@domain/services/TutorialDisplayService";
+import { DiffService } from '@domain/services/DiffService';
+import { TutorialRepositoryImpl } from '@domain/repositories/TutorialRepositoryImpl';
+import { TutorialService } from '@domain/services/TutorialService';
+import { TutorialViewModelConverter } from '@domain/converters/TutorialViewModelConverter';
+import { TutorialChangeDetector } from '@domain/utils/TutorialChangeDetector';
+import { TutorialDisplayService } from '@domain/services/TutorialDisplayService';
 
 // UI
-import { TutorialSolutionWorkflow } from "@ui/tutorial/TutorialSolutionWorkflow";
-import { TutorialUriHandler } from "@ui/deep-link/UriHandler";
-import { TutorialController } from "@ui/tutorial/controller";
-import { CommandHandler } from "@ui/tutorial/CommandHandler";
-import { EditorManager } from "@ui/tutorial/manager/EditorManager";
-import { SystemController } from "@ui/system/SystemController";
-import { IWebviewSystemMessageHandler, IWebviewTutorialMessageHandler, WebviewMessageHandler } from "@ui/webview/WebviewMessageHandler";
-import { WebviewPanelManager } from "@ui/webview/WebviewPanelManager";
+import { TutorialSolutionWorkflow } from '@ui/tutorial/TutorialSolutionWorkflow';
+import { TutorialUriHandler } from '@ui/deep-link/UriHandler';
+import { TutorialController } from '@ui/tutorial/controller';
+import { CommandHandler } from '@ui/tutorial/CommandHandler';
+import { EditorManager } from '@ui/tutorial/manager/EditorManager';
+import { SystemController } from '@ui/system/SystemController';
+import {
+  IWebviewSystemMessageHandler,
+  IWebviewTutorialMessageHandler,
+  WebviewMessageHandler,
+} from '@ui/webview/WebviewMessageHandler';
+import { WebviewPanelManager } from '@ui/webview/WebviewPanelManager';
 
 /**
  * Main extension activation point.
  * This function is called when the extension is activated.
  */
 export async function activate(context: vscode.ExtensionContext): Promise<vscode.ExtensionContext> {
-  console.log("📖 Gitorial extension active");
+  console.log('📖 Gitorial extension active');
 
-  const {
-    tutorialController,
-    autoOpenState,
-    systemController,
-  } = await bootstrapApplication(context);
+  const { tutorialController, autoOpenState } =
+    await bootstrapApplication(context);
 
   // --- VS Code Specific Registrations (Infrastructure concern, performed here) ---
   const commandHandler = new CommandHandler(tutorialController, autoOpenState);
@@ -54,7 +55,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<vscode
 
   await checkAndHandleAutoOpenState(tutorialController, autoOpenState);
 
-  console.log("📖 Gitorial activation complete.");
+  console.log('📖 Gitorial activation complete.');
   return context;
 }
 
@@ -63,7 +64,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<vscode
  * It can be used to clean up any resources.
  */
 export function deactivate() {
-  console.log("📖 Gitorial extension deactivated");
+  console.log('📖 Gitorial extension deactivated');
   // Clean up the active controller if it exists
 }
 
@@ -89,12 +90,16 @@ async function bootstrapApplication(context: vscode.ExtensionContext) {
   if (vscode.workspace.workspaceFolders && vscode.workspace.workspaceFolders.length > 0) {
     workspaceId = vscode.workspace.workspaceFolders[0].uri.fsPath;
   } else {
-    console.warn("Gitorial: No workspace folder open. Workspace-specific tutorial state persistence will be limited.");
+    console.warn(
+      'Gitorial: No workspace folder open. Workspace-specific tutorial state persistence will be limited.',
+    );
   }
 
   // --- Infrastructure Repositories ---
   const stepContentRepository = new StepContentRepository(fileSystemAdapter);
-  const activeTutorialStateRepository = new MementoActiveTutorialStateRepository(workspaceStateMementoAdapter);
+  const activeTutorialStateRepository = new MementoActiveTutorialStateRepository(
+    workspaceStateMementoAdapter,
+  );
   const tutorialRepository = new TutorialRepositoryImpl(
     workspaceStateMementoAdapter, // Using workspace specific state for tutorials
     gitOperationsFactory.fromPath,
@@ -106,12 +111,15 @@ async function bootstrapApplication(context: vscode.ExtensionContext) {
     gitOperationsFactory,
     stepContentRepository,
     activeTutorialStateRepository,
-    workspaceId
+    workspaceId,
   );
 
   const diffService = new DiffService(diffDisplayerAdapter, fileSystemAdapter);
   const tutorialViewModelConverter = new TutorialViewModelConverter(markdownConverter);
-  const tutorialDisplayService = new TutorialDisplayService(tutorialViewModelConverter, diffService);
+  const tutorialDisplayService = new TutorialDisplayService(
+    tutorialViewModelConverter,
+    diffService,
+  );
 
   // --- UI Services ---
 
@@ -120,19 +128,22 @@ async function bootstrapApplication(context: vscode.ExtensionContext) {
   const changeDetector = new TutorialChangeDetector();
   const solutionWorkflow = new TutorialSolutionWorkflow(diffService, editorManager);
 
-
   // Add services to context subscriptions for proper disposal
   context.subscriptions.push(solutionWorkflow);
 
-
   const tutorialMessageHandler: IWebviewTutorialMessageHandler = {
-    handleWebviewMessage: (msg) => tutorialController.handleWebviewMessage(msg)
+    handleWebviewMessage: msg => tutorialController.handleWebviewMessage(msg),
   };
   const systemMessageHandler: IWebviewSystemMessageHandler = {
-    handleWebviewMessage: (msg) => systemController.handleWebviewMessage(msg)
+    handleWebviewMessage: msg => systemController.handleWebviewMessage(msg),
   };
-  const webviewMessageHandler = new WebviewMessageHandler(tutorialMessageHandler, systemMessageHandler);
-  const webviewPanelManager = new WebviewPanelManager(context.extensionUri, (msg) => webviewMessageHandler.handleMessage(msg));
+  const webviewMessageHandler = new WebviewMessageHandler(
+    tutorialMessageHandler,
+    systemMessageHandler,
+  );
+  const webviewPanelManager = new WebviewPanelManager(context.extensionUri, msg =>
+    webviewMessageHandler.handleMessage(msg),
+  );
 
   // --- UI Layer Controllers ---
   const systemController = new SystemController(context, webviewPanelManager);
@@ -147,7 +158,7 @@ async function bootstrapApplication(context: vscode.ExtensionContext) {
     changeDetector,
     gitChangesFactory,
     markdownConverter,
-    webviewPanelManager
+    webviewPanelManager,
   );
 
   return {
@@ -156,8 +167,7 @@ async function bootstrapApplication(context: vscode.ExtensionContext) {
     userInteractionAdapter,
     activeTutorialStateRepository,
     tutorialRepository,
-    systemController,
-    workspaceId
+    workspaceId,
   };
 }
 
@@ -167,7 +177,7 @@ async function bootstrapApplication(context: vscode.ExtensionContext) {
  */
 async function checkAndHandleAutoOpenState(
   tutorialController: TutorialController,
-  autoOpenState: AutoOpenState
+  autoOpenState: AutoOpenState,
 ): Promise<void> {
   try {
     const workspaceFolders = vscode.workspace.workspaceFolders;
@@ -187,7 +197,9 @@ async function checkAndHandleAutoOpenState(
       return;
     }
 
-    console.log('Gitorial: Found pending auto-open state, attempting to open tutorial automatically');
+    console.log(
+      'Gitorial: Found pending auto-open state, attempting to open tutorial automatically',
+    );
 
     await tutorialController.openFromWorkspace({ commitHash: pending.commitHash, force: true });
   } catch (error) {

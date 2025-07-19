@@ -14,7 +14,7 @@ export class TutorialSolutionWorkflow {
 
   constructor(
     private readonly diffService: DiffService,
-    private readonly editorManager: EditorManager
+    private readonly editorManager: EditorManager,
   ) {
     this.tabTrackingService = new TabTrackingService();
   }
@@ -35,7 +35,10 @@ export class TutorialSolutionWorkflow {
   /**
    * Shows the solution by displaying diff views
    */
-  private async _showSolution(tutorial: Readonly<Tutorial>, gitAdapter: IGitChanges): Promise<void> {
+  private async _showSolution(
+    tutorial: Readonly<Tutorial>,
+    gitAdapter: IGitChanges,
+  ): Promise<void> {
     // Get the preferred focus file from tab tracking service
     let preferredFocusFile: string | undefined;
     const lastActiveFile = this.tabTrackingService.getLastActiveTutorialFile();
@@ -54,14 +57,17 @@ export class TutorialSolutionWorkflow {
   /**
    * Hides the solution by closing diff views and restoring normal file tabs
    */
-  private async _hideSolution(tutorial: Readonly<Tutorial>, gitAdapter: IGitChanges): Promise<void> {
+  private async _hideSolution(
+    tutorial: Readonly<Tutorial>,
+    gitAdapter: IGitChanges,
+  ): Promise<void> {
     const lastActiveTutorialFile = this.tabTrackingService.getLastActiveTutorialFile();
     const changedFiles = await this.diffService.getDiffModelsForParent(tutorial, gitAdapter);
 
     await this.editorManager.updateSidePanelFiles(
       tutorial.activeStep,
       changedFiles.map(f => f.relativePath),
-      tutorial.localPath
+      tutorial.localPath,
     ); //FIXME: this and '_closeDiffTabsInGroupTwo' both close tabs
 
     await this.editorManager.closeDiffTabs(vscode.ViewColumn.Two);
@@ -71,7 +77,10 @@ export class TutorialSolutionWorkflow {
       try {
         await this.tabTrackingService.restoreFocusToFile(lastActiveTutorialFile);
       } catch (error) {
-        console.error('TutorialSolutionManager: Error restoring focus using TabTrackingService:', error);
+        console.error(
+          'TutorialSolutionManager: Error restoring focus using TabTrackingService:',
+          error,
+        );
       }
     }
   }
@@ -79,4 +88,4 @@ export class TutorialSolutionWorkflow {
   public dispose(): void {
     this.tabTrackingService.dispose();
   }
-} 
+}

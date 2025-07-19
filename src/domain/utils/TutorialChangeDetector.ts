@@ -8,17 +8,19 @@ export enum TutorialViewChangeType {
   SolutionToggle = 'SolutionToggle',
   // Case where the user has a solution open, and then moves to a new step
   StepSolutionChange = 'StepSolutionChange',
-  None = 'None'
+  None = 'None',
 }
 /**
  * Detects changes between tutorial view models to determine what type of update is needed
  */
 export class TutorialChangeDetector {
-  
   /**
    * Detects the type of change between two tutorial view models
    */
-  detectChange(newViewModel: TutorialViewModel, oldViewModel: TutorialViewModel | null): TutorialViewChangeType {
+  detectChange(
+    newViewModel: TutorialViewModel,
+    oldViewModel: TutorialViewModel | null,
+  ): TutorialViewChangeType {
     if (!oldViewModel) {
       return TutorialViewChangeType.None;
     }
@@ -39,4 +41,4 @@ export class TutorialChangeDetector {
 
     return changeType;
   }
-} 
+}

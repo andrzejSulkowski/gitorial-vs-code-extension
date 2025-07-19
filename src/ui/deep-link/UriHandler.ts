@@ -5,12 +5,10 @@ import { TutorialController } from '../tutorial/controller';
 import { UriParser, UriCommand, ParseResult } from '../../utils/uri-parser/UriParser'; // Adjusted path
 
 export class TutorialUriHandler implements vscode.UriHandler {
-  constructor(private tutorialController: TutorialController) { }
+  constructor(private tutorialController: TutorialController) {}
 
   public async register(context: vscode.ExtensionContext): Promise<void> {
-    context.subscriptions.push(
-      vscode.window.registerUriHandler(this)
-    );
+    context.subscriptions.push(vscode.window.registerUriHandler(this));
     console.log('TutorialUriHandler registered.');
   }
 
@@ -30,13 +28,15 @@ export class TutorialUriHandler implements vscode.UriHandler {
     }
 
     switch (parseResult.command) {
-      case UriCommand.Sync:
-        const { repoUrl, commitHash } = parseResult.payload;
-        console.log(`TutorialUriHandler: Processing '${parseResult.command}' command. RepoURL: ${repoUrl}, Commit: ${commitHash}`);
-        await this.tutorialController.handleExternalTutorialRequest({ repoUrl, commitHash });
-        break;
-      default:
-        vscode.window.showErrorMessage(`Gitorial: Unhandled URI command: ${parseResult.command}`);
+    case UriCommand.Sync:
+      const { repoUrl, commitHash } = parseResult.payload;
+      console.log(
+        `TutorialUriHandler: Processing '${parseResult.command}' command. RepoURL: ${repoUrl}, Commit: ${commitHash}`,
+      );
+      await this.tutorialController.handleExternalTutorialRequest({ repoUrl, commitHash });
+      break;
+    default:
+      vscode.window.showErrorMessage(`Gitorial: Unhandled URI command: ${parseResult.command}`);
     }
   }
-} 
+}

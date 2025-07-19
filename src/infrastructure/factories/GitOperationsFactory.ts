@@ -32,9 +32,9 @@ export class GitOperationsFactory implements IGitOperationsFactory {
    * @returns An IGitOperations instance for the cloned repository.
    */
   public async fromClone(
-    repoUrl: string, 
-    targetPath: string, 
-    progressCallback?: (message: string) => void
+    repoUrl: string,
+    targetPath: string,
+    progressCallback?: (message: string) => void,
   ): Promise<IGitOperations> {
     // Using the static clone method on GitAdapter for now.
     // In a more complex scenario, simpleGit clone might be called directly here.

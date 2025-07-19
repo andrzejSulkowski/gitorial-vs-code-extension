@@ -14,19 +14,23 @@ const initialState: SystemState = {
 let systemState = $state<SystemState>(initialState);
 
 export const systemStore = {
-  get isLoading() { return systemState.isLoading; },
-  get lastError() { return systemState.lastError; },
-  
+  get isLoading() {
+    return systemState.isLoading;
+  },
+  get lastError() {
+    return systemState.lastError;
+  },
+
   handleMessage(message: ExtensionToWebviewSystemMessage) {
     console.log('SystemStore: Received message:', message);
     switch (message.type) {
-      case 'loading-state':
-        systemState.isLoading = message.payload.isLoading;
-        break;
-        
-      case 'error':
-        systemState.lastError = message.payload.message;
-        break;
+    case 'loading-state':
+      systemState.isLoading = message.payload.isLoading;
+      break;
+
+    case 'error':
+      systemState.lastError = message.payload.message;
+      break;
     }
   },
 
@@ -41,5 +45,5 @@ export const systemStore = {
 
   clearError() {
     systemState.lastError = null;
-  }
+  },
 };

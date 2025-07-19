@@ -1,15 +1,15 @@
 <script lang="ts">
-  import Prism from "prismjs";
-  import "prismjs/themes/prism-tomorrow.css";
-  import "prismjs/components/prism-javascript";
-  import "prismjs/components/prism-typescript";
-  import "prismjs/components/prism-json";
-  import "prismjs/components/prism-bash";
-  import "prismjs/components/prism-rust";
-  import "prismjs/components/prism-python";
-  import "prismjs/components/prism-css";
-  import "prismjs/components/prism-markdown";
-  import { copy } from "svelte-copy";
+  import Prism from 'prismjs';
+  import 'prismjs/themes/prism-tomorrow.css';
+  import 'prismjs/components/prism-javascript';
+  import 'prismjs/components/prism-typescript';
+  import 'prismjs/components/prism-json';
+  import 'prismjs/components/prism-bash';
+  import 'prismjs/components/prism-rust';
+  import 'prismjs/components/prism-python';
+  import 'prismjs/components/prism-css';
+  import 'prismjs/components/prism-markdown';
+  import { copy } from 'svelte-copy';
 
   interface Props {
     code: string;
@@ -43,9 +43,7 @@
   onmouseleave={() => (isHovered = false)}
 >
   <pre class="code-container">
-    <code class="language-{language}" bind:this={codeElement}
-      >{code.trim()}</code
-    >
+    <code class="language-{language}" bind:this={codeElement}>{code.trim()}</code>
   </pre>
 
   {#if isHovered || copySuccess}
@@ -54,7 +52,7 @@
       class:success={copySuccess}
       use:copy={{
         text: code,
-        events: ["click"],
+        events: ['click'],
         onCopy() {
           handleCopy();
         },
@@ -124,9 +122,9 @@
   :global(.code-container code) {
     font-family: var(
       --vscode-editor-font-family,
-      "SFMono-Regular",
+      'SFMono-Regular',
       Consolas,
-      "Liberation Mono",
+      'Liberation Mono',
       Menlo,
       Courier,
       monospace

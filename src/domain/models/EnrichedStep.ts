@@ -5,7 +5,7 @@ import { Step } from './Step';
 import { StepData } from '@gitorial/shared-types';
 import { Markdown } from './Markdown';
 
-export interface EnrichedStepData extends StepData{
+export interface EnrichedStepData extends StepData {
   markdown: Markdown;
 }
 

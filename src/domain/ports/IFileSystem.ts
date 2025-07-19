@@ -31,7 +31,6 @@ export interface IFileSystem {
    */
   hasSubdirectory(parentDirectoryPath: string, subdirectoryName: string): Promise<boolean>;
 
-
   /**
    * Ensures that a directory exists.
    * @param path The absolute path to the directory to ensure.
@@ -63,4 +62,4 @@ export interface IFileSystem {
    * @returns The joined path.
    */
   join(path1: string, path2: string): string;
-} 
+}

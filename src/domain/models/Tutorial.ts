@@ -8,10 +8,10 @@
 // and an ordered list of Step objects. It should primarily be a data container.
 // Business logic related to a tutorial (e.g., progression) should be in domain services.
 
-import { Step } from "./Step";
-import { TutorialId } from "@gitorial/shared-types";
-import { EnrichedStep } from "./EnrichedStep";
-import { Markdown } from "./Markdown";
+import { Step } from './Step';
+import { TutorialId } from '@gitorial/shared-types';
+import { EnrichedStep } from './EnrichedStep';
+import { Markdown } from './Markdown';
 
 export interface TutorialData {
   id: TutorialId;
@@ -64,13 +64,13 @@ export class Tutorial {
   }
 
   public next(): boolean {
-    let increment = this.activeStep.type === "template" ? 2 : 1;
+    let increment = this.activeStep.type === 'template' ? 2 : 1;
     return this.goTo(this._activeStepIndex + increment);
   }
 
   public prev(): boolean {
     let target = this._activeStepIndex - 1;
-    while (target >= 0 && this.steps[target].type === "solution") {
+    while (target >= 0 && this.steps[target].type === 'solution') {
       target--;
     }
     return this.goTo(target);
@@ -85,7 +85,7 @@ export class Tutorial {
       return;
     }
     if (index < 0 || index >= this.steps.length) {
-      throw new Error("Invalid step index");
+      throw new Error('Invalid step index');
     }
     this.steps[index] = this.steps[index].toEnrichedStep(markdown);
     return this;

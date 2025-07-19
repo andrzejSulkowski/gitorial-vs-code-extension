@@ -42,7 +42,9 @@ export class TabTrackingService {
    * @param viewColumn The view column to open the file in (defaults to Two)
    * @returns Promise that resolves when focus is restored, or rejects if failed
    */
-  public async restoreFocusToLastFile(viewColumn: vscode.ViewColumn = vscode.ViewColumn.Two): Promise<void> {
+  public async restoreFocusToLastFile(
+    viewColumn: vscode.ViewColumn = vscode.ViewColumn.Two,
+  ): Promise<void> {
     if (!this._lastActiveTutorialFile) {
       throw new Error('No last active tutorial file to restore focus to');
     }
@@ -56,32 +58,39 @@ export class TabTrackingService {
    * @param viewColumn The view column to search in
    * @returns The tab if found, null otherwise
    */
-  private _findExistingTabForFile(fileUri: vscode.Uri, viewColumn: vscode.ViewColumn): vscode.Tab | null {
+  private _findExistingTabForFile(
+    fileUri: vscode.Uri,
+    viewColumn: vscode.ViewColumn,
+  ): vscode.Tab | null {
     const targetGroup = vscode.window.tabGroups.all.find(group => group.viewColumn === viewColumn);
     if (!targetGroup) {
       return null;
     }
 
-    return targetGroup.tabs.find(tab => {
-      const input = tab.input as any;
-      
-      // Case 1: Regular file tab
-      if (input?.uri?.toString() === fileUri.toString()) {
-        return true;
-      }
-      
-      // Case 2: Diff view tab - check both original and modified URIs
-      /*
+    return (
+      targetGroup.tabs.find(tab => {
+        const input = tab.input as any;
+
+        // Case 1: Regular file tab
+        if (input?.uri?.toString() === fileUri.toString()) {
+          return true;
+        }
+
+        // Case 2: Diff view tab - check both original and modified URIs
+        /*
       if (input.uri.toString().endsWith(fileUri.path)) {
         return true;
       }*/
-      if (input && input.original && input.modified) {
-        return input.original.toString() === fileUri.toString() || 
-               input.modified.toString() === fileUri.toString();
-      }
-      
-      return false;
-    }) || null;
+        if (input && input.original && input.modified) {
+          return (
+            input.original.toString() === fileUri.toString() ||
+            input.modified.toString() === fileUri.toString()
+          );
+        }
+
+        return false;
+      }) || null
+    );
   }
 
   /**
@@ -99,7 +108,7 @@ export class TabTrackingService {
         await vscode.window.showTextDocument(input.uri, {
           viewColumn: group.viewColumn,
           preview: false,
-          preserveFocus: false
+          preserveFocus: false,
         });
       } else if (input && input.original && input.modified) {
         // Diff tab - for focus restoration, open the modified version (current/working version)
@@ -107,37 +116,42 @@ export class TabTrackingService {
         await vscode.window.showTextDocument(input.modified, {
           viewColumn: group.viewColumn,
           preview: false,
-          preserveFocus: false
+          preserveFocus: false,
         });
       }
     }
   }
 
-  public async restoreFocusToFile(file: vscode.Uri, viewColumn: vscode.ViewColumn = vscode.ViewColumn.Two): Promise<void> {
+  public async restoreFocusToFile(
+    file: vscode.Uri,
+    viewColumn: vscode.ViewColumn = vscode.ViewColumn.Two,
+  ): Promise<void> {
     try {
-        // First, check if there's already an open tab for this file
-        const existingTab = this._findExistingTabForFile(file, viewColumn);
-        
-        if (existingTab) {
-          // If we found an existing tab, focus it
-          await this._focusExistingTab(existingTab);
-          console.log(`TabTrackingService: Focused existing tab for ${file.fsPath}`);
-        } else {
-          // No existing tab found, need to open the file
-          // Check if this is a diff tab URI (relative path) that needs to be mapped to actual file
-          const actualFileUri = this._mapToActualFile(file);
-          
-          await vscode.window.showTextDocument(actualFileUri, {
-            viewColumn,
-            preview: false,
-            preserveFocus: false
-          });
-          console.log(`TabTrackingService: Opened new tab and restored focus to ${actualFileUri.fsPath}`);
-        }
-      } catch (error) {
-        console.error(`TabTrackingService: Error restoring focus to ${file.fsPath}:`, error);
-        throw error;
+      // First, check if there's already an open tab for this file
+      const existingTab = this._findExistingTabForFile(file, viewColumn);
+
+      if (existingTab) {
+        // If we found an existing tab, focus it
+        await this._focusExistingTab(existingTab);
+        console.log(`TabTrackingService: Focused existing tab for ${file.fsPath}`);
+      } else {
+        // No existing tab found, need to open the file
+        // Check if this is a diff tab URI (relative path) that needs to be mapped to actual file
+        const actualFileUri = this._mapToActualFile(file);
+
+        await vscode.window.showTextDocument(actualFileUri, {
+          viewColumn,
+          preview: false,
+          preserveFocus: false,
+        });
+        console.log(
+          `TabTrackingService: Opened new tab and restored focus to ${actualFileUri.fsPath}`,
+        );
       }
+    } catch (error) {
+      console.error(`TabTrackingService: Error restoring focus to ${file.fsPath}:`, error);
+      throw error;
+    }
   }
 
   /**
@@ -154,7 +168,7 @@ export class TabTrackingService {
     }
 
     const filePath = fileUri.fsPath;
-    
+
     // Check if this is a relative path (from diff tab)
     if (!path.isAbsolute(filePath)) {
       // This is a relative path like 'src/balances.rs' from a diff tab
@@ -162,7 +176,7 @@ export class TabTrackingService {
       const absolutePath = path.join(this._currentTutorialPath, filePath);
       return vscode.Uri.file(absolutePath);
     }
-    
+
     // Already an absolute path, return as-is
     return fileUri;
   }
@@ -178,11 +192,11 @@ export class TabTrackingService {
   private _setupEventListeners(): void {
     // Track when active editor changes (user clicks on tabs, opens files, etc.)
     this._disposables.push(
-      vscode.window.onDidChangeActiveTextEditor((editor) => {
+      vscode.window.onDidChangeActiveTextEditor(editor => {
         if (editor) {
           this._onEditorActivated(editor);
         }
-      })
+      }),
     );
   }
 
@@ -192,33 +206,35 @@ export class TabTrackingService {
     }
 
     const editorUri = editor.document.uri;
-    
+
     // Only track files that belong to the current tutorial
     if (this._isPartOfTutorial(editorUri)) {
       // Only track if it's in the second editor group (where tutorial files are shown)
       // Handle both regular file tabs and diff view tabs which have different input structures
-      const activeGroup = vscode.window.tabGroups.all.find(group => 
+      const activeGroup = vscode.window.tabGroups.all.find(group =>
         group.tabs.some(tab => {
           const input = tab.input as any;
-          
+
           // Check if this is the active tab first
           if (!tab.isActive) {
             return false;
           }
-          
+
           // Case 1: Regular file tab
           if (input?.uri?.toString() === editorUri.toString()) {
             return true;
           }
-          
+
           // Case 2: Diff view tab - check both original and modified URIs
           if (input && input.original && input.modified) {
-            return input.original.toString() === editorUri.toString() || 
-                   input.modified.toString() === editorUri.toString();
+            return (
+              input.original.toString() === editorUri.toString() ||
+              input.modified.toString() === editorUri.toString()
+            );
           }
-          
+
           return false;
-        })
+        }),
       );
 
       if (activeGroup?.viewColumn === vscode.ViewColumn.Two) {
@@ -235,7 +251,7 @@ export class TabTrackingService {
 
     try {
       const filePath = uri.fsPath;
-      
+
       // Handle both absolute and relative paths
       if (path.isAbsolute(filePath)) {
         const normalizedFilePath = path.normalize(filePath);
@@ -261,4 +277,4 @@ export class TabTrackingService {
     this._lastActiveTutorialFile = null;
     this._currentTutorialPath = null;
   }
-} 
+}

@@ -1,8 +1,8 @@
 <script lang="ts">
-  import Nav from "./Nav.svelte";
-  import StepContent from "./StepContent.svelte";
-  import { tutorialStore } from "../stores/tutorialStore.svelte";
-  import PolkadotTokenPink from "./../PolkadotTokenPink.svelte";
+  import Nav from './Nav.svelte';
+  import StepContent from './StepContent.svelte';
+  import { tutorialStore } from '../stores/tutorialStore.svelte';
+  import PolkadotTokenPink from './../PolkadotTokenPink.svelte';
 
   let currentStep = $derived(tutorialStore.currentStep);
   let isLoading = $derived(tutorialStore.isLoading);
@@ -16,7 +16,7 @@
     while (
       tutorial &&
       target < tutorial.steps.length &&
-      tutorial?.steps[target].type === "solution"
+      tutorial?.steps[target].type === 'solution'
     ) {
       target++;
     }
@@ -25,7 +25,7 @@
 
   let hasPrev = $derived.by(() => {
     let target = currentStepIndex - 1;
-    while (target >= 0 && tutorial?.steps[target].type === "solution") {
+    while (target >= 0 && tutorial?.steps[target].type === 'solution') {
       target--;
     }
     return target >= 0;
@@ -38,20 +38,15 @@
       <PolkadotTokenPink />
     </div>
     <div class="content-area">
-      <StepContent content={currentStep.htmlContent || ""} />
+      <StepContent content={currentStep.htmlContent || ''} />
     </div>
     <div class="nav-area">
-      <Nav
-        stepType={currentStep.type}
-        {isShowingSolution}
-        {hasNext}
-        {hasPrev}
-      />
+      <Nav stepType={currentStep.type} {isShowingSolution} {hasNext} {hasPrev} />
     </div>
   </div>
 {:else}
   <div class="loading">
-    {isLoading ? "Loading tutorial..." : "No tutorial loaded"}
+    {isLoading ? 'Loading tutorial...' : 'No tutorial loaded'}
   </div>
 {/if}
 

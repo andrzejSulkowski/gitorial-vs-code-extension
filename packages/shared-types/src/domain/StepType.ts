@@ -1,2 +1,1 @@
-
-export type StepType = "section" | "template" | "solution" | "action";
+export type StepType = 'section' | 'template' | 'solution' | 'action';

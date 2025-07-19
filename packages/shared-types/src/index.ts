@@ -3,7 +3,6 @@ export * from './domain/TutorialId';
 export * from './domain/StepType';
 export * from './domain/StepData';
 
-
 // # UI
 
 // Message contracts

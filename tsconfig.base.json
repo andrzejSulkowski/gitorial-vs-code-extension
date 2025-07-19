@@ -18,10 +18,5 @@
     "preserveSymlinks": true,
     "types": ["node"]
   },
-  "exclude": [
-    "node_modules",
-    "dist",
-    "out",
-    "**/*.md"
-  ]
-} 
+  "exclude": ["node_modules", "dist", "out", "**/*.md"]
+}

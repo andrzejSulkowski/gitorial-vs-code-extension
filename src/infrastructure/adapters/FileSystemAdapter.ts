@@ -4,7 +4,6 @@
 */
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
-import { IFileSystem } from 'src/domain/ports/IFileSystem';
 
 // It's good practice to define an interface in the Domain layer
 // and implement it here. For example:

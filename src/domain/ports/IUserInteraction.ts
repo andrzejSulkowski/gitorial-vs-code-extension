@@ -11,17 +11,20 @@ export interface PathSelectionOptions {
   defaultUri?: string; // Should be a string representation of a URI
 }
 
-
 export type OpenDialogOptions = {
   canSelectFolders?: boolean;
   canSelectFiles?: boolean;
   openLabel?: string;
   title?: string;
-}
+};
 
 export interface IUserInteraction {
   showOpenDialog(options: OpenDialogOptions): Promise<undefined | string>;
-  showInputBox(options: {prompt: string, placeHolder?: string, defaultValue?: string}): Promise<undefined | string>;
+  showInputBox(options: {
+    prompt: string;
+    placeHolder?: string;
+    defaultValue?: string;
+  }): Promise<undefined | string>;
   showInformationMessage(message: string, options?: { copy?: { data: string } }): Promise<void>;
   showWarningMessage(message: string): Promise<void>;
   showErrorMessage(message: string): Promise<void>;
@@ -40,7 +43,11 @@ export interface IUserInteraction {
    * @param defaultValue Optional pre-filled value.
    * @returns The entered string or undefined if cancelled.
    */
-  getInput(prompt: string, placeHolder?: string, defaultValue?: string): Promise<string | undefined>;
+  getInput(
+    prompt: string,
+    placeHolder?: string,
+    defaultValue?: string
+  ): Promise<string | undefined>;
 
   /**
    * Asks the user for confirmation with a modal message.
@@ -50,7 +57,12 @@ export interface IUserInteraction {
    * @param cancelActionTitle Optional text for the cancel button (e.g., "No", "Cancel").
    * @returns A promise that resolves to true if the user confirmed, false otherwise.
    */
-  askConfirmation(opt: {message: string, detail?: string, confirmActionTitle?: string, cancelActionTitle?: string}): Promise<boolean>;
+  askConfirmation(opt: {
+    message: string;
+    detail?: string;
+    confirmActionTitle?: string;
+    cancelActionTitle?: string;
+  }): Promise<boolean>;
 
   /**
    * Presents the user with a list of options to choose from.
@@ -60,4 +72,4 @@ export interface IUserInteraction {
    * @returns The selected option string, or undefined if the user cancels.
    */
   pickOption(options: string[], prompt?: string, placeHolder?: string): Promise<string | undefined>;
-} 
+}

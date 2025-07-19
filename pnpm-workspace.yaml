@@ -1,4 +1,3 @@
 packages:
-  - "webview-ui"
-  - "packages/*"
-
+  - 'webview-ui'
+  - 'packages/*'

@@ -9,23 +9,23 @@ export interface IStateStorage {
    * @param defaultValue Optional default value if key doesn't exist
    */
   get<T>(key: string, defaultValue?: T): T | undefined;
-  
+
   /**
    * Update a value in storage
    * @param key The key to update
    * @param value The value to store
    */
   update<T>(key: string, value: T): Promise<void>;
-  
+
   /**
    * Clear a value from storage
    * @param key The key to clear
    */
   clear(key: string): Promise<void>;
-  
+
   /**
    * Check if a key exists in storage
    * @param key The key to check
    */
   has(key: string): boolean;
-} 
+}

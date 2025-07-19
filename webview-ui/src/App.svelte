@@ -1,8 +1,8 @@
 <script lang="ts">
-  import Tutorial from "./lib/components/Tutorial.svelte";
-  import { onMount } from "svelte";
-  import { createMessageRouter } from "./lib/stores/messageRouter";
-  import { systemStore } from "./lib/stores/systemStore.svelte";
+  import Tutorial from './lib/components/Tutorial.svelte';
+  import { onMount } from 'svelte';
+  import { createMessageRouter } from './lib/stores/messageRouter';
+  import { systemStore } from './lib/stores/systemStore.svelte';
 
   const messageRouter = createMessageRouter();
 
@@ -10,13 +10,12 @@
     const handleMessage = (event: MessageEvent) => {
       messageRouter.handleMessage(event.data);
     };
-    
+
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
   });
 
   const isLoading = systemStore.isLoading;
-
 </script>
 
 <main>
@@ -34,5 +33,4 @@
     padding: 0;
     position: relative;
   }
-
 </style>

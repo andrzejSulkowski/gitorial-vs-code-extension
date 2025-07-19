@@ -7,7 +7,12 @@ import * as vscode from 'vscode';
 import { Uri } from 'vscode';
 import path from 'node:path';
 import fs from 'fs';
-import { TutorialViewModel, ExtensionToWebviewTutorialMessage, ExtensionToWebviewSystemMessage, ExtensionToWebviewMessage } from '@gitorial/shared-types';
+import {
+  TutorialViewModel,
+  ExtensionToWebviewTutorialMessage,
+  ExtensionToWebviewSystemMessage,
+  ExtensionToWebviewMessage,
+} from '@gitorial/shared-types';
 
 function getNonce() {
   let text = '';
@@ -38,7 +43,7 @@ export class WebViewPanel {
         }
       },
       null,
-      this.disposables
+      this.disposables,
     );
 
     this._showLoadingState();
@@ -53,7 +58,7 @@ export class WebViewPanel {
     const message: ExtensionToWebviewTutorialMessage = {
       category: 'tutorial',
       type: 'data-updated',
-      payload: tutorial
+      payload: tutorial,
     };
     this.panel.webview.postMessage(message);
   }
@@ -88,9 +93,9 @@ export class WebViewPanel {
   }
 
   private async getWebviewHTML(): Promise<string> {
-    const svelteAppBuildPath = Uri.joinPath(this.extensionUri, "webview-ui", "dist");
+    const svelteAppBuildPath = Uri.joinPath(this.extensionUri, 'webview-ui', 'dist');
     const svelteAppDiskPath = svelteAppBuildPath.fsPath;
-    const indexHtmlPath = path.join(svelteAppDiskPath, "index.html");
+    const indexHtmlPath = path.join(svelteAppDiskPath, 'index.html');
 
     let htmlContent: string;
     try {
@@ -110,8 +115,8 @@ export class WebViewPanel {
     const relativeJsPath = jsMatch ? jsMatch[1] : null;
 
     if (!relativeCssPath || !relativeJsPath) {
-      console.error("Could not extract CSS or JS paths from index.html content:", htmlContent);
-      return `<html><body>Error parsing index.html to find asset paths.</body></html>`;
+      console.error('Could not extract CSS or JS paths from index.html content:', htmlContent);
+      return '<html><body>Error parsing index.html to find asset paths.</body></html>';
     }
 
     // Find vite icon path (relative path usually in index.html)
@@ -120,9 +125,13 @@ export class WebViewPanel {
     const relativeViteIconPath = viteIconMatch ? viteIconMatch[1] : '/vite.svg'; // Default if not found
 
     // Create webview URIs for assets
-    const cssUri = this.panel.webview.asWebviewUri(Uri.joinPath(svelteAppBuildPath, relativeCssPath));
+    const cssUri = this.panel.webview.asWebviewUri(
+      Uri.joinPath(svelteAppBuildPath, relativeCssPath),
+    );
     const jsUri = this.panel.webview.asWebviewUri(Uri.joinPath(svelteAppBuildPath, relativeJsPath));
-    const viteIconUri = this.panel.webview.asWebviewUri(Uri.joinPath(svelteAppBuildPath, relativeViteIconPath));
+    const viteIconUri = this.panel.webview.asWebviewUri(
+      Uri.joinPath(svelteAppBuildPath, relativeViteIconPath),
+    );
 
     const nonce = getNonce();
     const csp = `default-src 'none'; style-src ${this.panel.webview.cspSource}; script-src 'nonce-${nonce}'; img-src ${this.panel.webview.cspSource} data:; font-src ${this.panel.webview.cspSource}; connect-src 'self';`;
@@ -136,14 +145,13 @@ export class WebViewPanel {
     htmlContent = htmlContent.replace(
       '</head>',
       `  <meta http-equiv="Content-Security-Policy" content="${csp}">\n` +
-      `  <link rel="icon" type="image/svg+xml" href="${viteIconUri}" />\n` +
-      `  <link rel="stylesheet" type="text/css" href="${cssUri}">\n` +
-      `</head>`
+        `  <link rel="icon" type="image/svg+xml" href="${viteIconUri}" />\n` +
+        `  <link rel="stylesheet" type="text/css" href="${cssUri}">\n` +
+        '</head>',
     );
     htmlContent = htmlContent.replace(
       '</body>',
-      `  <script defer type="module" nonce="${nonce}" src="${jsUri}"></script>\n` +
-      `</body>`
+      `  <script defer type="module" nonce="${nonce}" src="${jsUri}"></script>\n` + '</body>',
     );
 
     return htmlContent;
@@ -170,7 +178,7 @@ export class WebViewPanel {
     const message: ExtensionToWebviewSystemMessage = {
       category: 'system',
       type: 'loading-state',
-      payload: { isLoading: true, message: 'Loading...' }
+      payload: { isLoading: true, message: 'Loading...' },
     };
     this.panel.webview.postMessage(message);
   }
@@ -179,7 +187,7 @@ export class WebViewPanel {
     const message: ExtensionToWebviewSystemMessage = {
       category: 'system',
       type: 'loading-state',
-      payload: { isLoading: false, message: 'Done!' }
+      payload: { isLoading: false, message: 'Done!' },
     };
     this.panel.webview.postMessage(message);
   }

@@ -1,7 +1,7 @@
-import { HTML } from "@gitorial/shared-types";
-import { Markdown } from "../../domain/models/Markdown";
+import { HTML } from '@gitorial/shared-types';
+import { Markdown } from '../../domain/models/Markdown';
 
-/** 
+/**
  * Port for converting Markdown source into HTML for rendering.
  */
 export interface IMarkdownConverter {

@@ -46,8 +46,8 @@ export class MementoAdapter implements IStateStorage {
  */
 export function createMementoAdapter(
   context: vscode.ExtensionContext,
-  useWorkspaceState: boolean = false
+  useWorkspaceState: boolean = false,
 ): MementoAdapter {
   const memento = useWorkspaceState ? context.workspaceState : context.globalState;
   return new MementoAdapter(memento);
-} 
+}

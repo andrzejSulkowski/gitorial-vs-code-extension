@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { mount } from "svelte";
-  import CodeBlock from "./CodeBlock.svelte";
+  import { mount } from 'svelte';
+  import CodeBlock from './CodeBlock.svelte';
 
   interface Props {
     content: string;
@@ -17,18 +17,17 @@
 
   function updateCodeBlocks() {
     if (contentElement) {
-      const preElements = contentElement.querySelectorAll("pre");
+      const preElements = contentElement.querySelectorAll('pre');
 
-      preElements.forEach((pre) => {
-        const code = pre.querySelector("code");
+      preElements.forEach(pre => {
+        const code = pre.querySelector('code');
 
         if (code) {
-          const language =
-            code.className.replace("language-", "") || "javascript";
-          const codeContent = code.textContent || "";
+          const language = code.className.replace('language-', '') || 'javascript';
+          const codeContent = code.textContent || '';
 
-          const wrapper = document.createElement("div");
-          wrapper.className = "code-block-wrapper";
+          const wrapper = document.createElement('div');
+          wrapper.className = 'code-block-wrapper';
 
           mount(CodeBlock, {
             target: wrapper,
@@ -57,13 +56,13 @@
       --vscode-font-family,
       -apple-system,
       BlinkMacSystemFont,
-      "Segoe UI",
+      'Segoe UI',
       Roboto,
       Oxygen,
       Ubuntu,
       Cantarell,
-      "Open Sans",
-      "Helvetica Neue",
+      'Open Sans',
+      'Helvetica Neue',
       sans-serif
     );
     padding: 1em;
@@ -119,12 +118,12 @@
     line-height: 1.6;
   }
 
-  .markdown-content :global(code:not([class*="language-"])) {
+  .markdown-content :global(code:not([class*='language-'])) {
     font-family: var(
       --vscode-editor-font-family,
-      "SFMono-Regular",
+      'SFMono-Regular',
       Consolas,
-      "Liberation Mono",
+      'Liberation Mono',
       Menlo,
       Courier,
       monospace
@@ -186,4 +185,3 @@
     margin: 1.5em 0;
   }
 </style>
-

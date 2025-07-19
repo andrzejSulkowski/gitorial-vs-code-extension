@@ -11,46 +11,46 @@ jobs:
   test:
     name: Tests
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        
+
       - name: Setup pnpm
         uses: pnpm/action-setup@v2
         with:
           version: 10
-          
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: 'pnpm'
-          
+
       - name: Install dependencies
         run: pnpm install
-        
+
       # Shared Types Package
-      - name: "📦 Shared Types: Build"
+      - name: '📦 Shared Types: Build'
         run: pnpm run build:shared
-        
-      # Extension Package  
-      - name: "🔧 Extension: Type Check"
+
+      # Extension Package
+      - name: '🔧 Extension: Type Check'
         run: pnpm run typecheck:extension
-        
-      - name: "🔧 Extension: Lint"
+
+      - name: '🔧 Extension: Lint'
         run: pnpm run lint
-        
-      - name: "🔧 Extension: Build"
+
+      - name: '🔧 Extension: Build'
         run: pnpm run build:extension
 
       # Webview Package
-      - name: "🌐 Webview: Type Check"
+      - name: '🌐 Webview: Type Check'
         run: pnpm run typecheck:webview
-        
-      - name: "🌐 Webview: Build"
+
+      - name: '🌐 Webview: Build'
         run: pnpm run build:webview
 
       # Integration Tests
-      - name: "🧪 VS Code: Extension Tests"
+      - name: '🧪 VS Code: Extension Tests'
         run: xvfb-run -a npx vscode-test

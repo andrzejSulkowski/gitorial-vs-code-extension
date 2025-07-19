@@ -12,10 +12,12 @@ export interface IDB {
   // Add other Memento methods if needed, e.g., keys(), clear() for specific namespaces
 }
 
-
 // Represents a namespaced section of the Memento store
 export class StateDB implements IDB {
-  constructor(private prefix: string, private mementoAdapter: MementoAdapter) {}
+  constructor(
+    private prefix: string,
+    private mementoAdapter: MementoAdapter,
+  ) {}
 
   private getPrefixedKey(key: string): string {
     return `${this.prefix}:${key}`;
@@ -61,4 +63,4 @@ export class GlobalState {
   public async updateRaw(key: string, value: any): Promise<void> {
     await this.mementoAdapter.update(key, value);
   }
-} 
+}

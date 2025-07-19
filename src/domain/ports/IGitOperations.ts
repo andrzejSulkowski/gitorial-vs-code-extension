@@ -1,10 +1,10 @@
 /**
-* Port interface definitions for Git-related operations and data structures.
-* 
-* This module declares the contracts (interfaces, types, enums) that the Domain layer
-* uses for interacting with Git. Implementations of these interfaces live in the
-* Infrastructure layer (e.g., using `simple-git` and VS Code APIs).
-*/
+ * Port interface definitions for Git-related operations and data structures.
+ *
+ * This module declares the contracts (interfaces, types, enums) that the Domain layer
+ * uses for interacting with Git. Implementations of these interfaces live in the
+ * Infrastructure layer (e.g., using `simple-git` and VS Code APIs).
+ */
 
 /**
  * Abstract representation of a Git commit.
@@ -118,15 +118,15 @@ export interface DiffResultNameStatusFile extends DiffResultTextFile {
  * One-letter status codes used by Git diffs under `--name-status`.
  */
 export declare enum DiffNameStatus {
-  ADDED = "A",
-  COPIED = "C",
-  DELETED = "D",
-  MODIFIED = "M",
-  RENAMED = "R",
-  CHANGED = "T",
-  UNMERGED = "U",
-  UNKNOWN = "X",
-  BROKEN = "B"
+  ADDED = 'A',
+  COPIED = 'C',
+  DELETED = 'D',
+  MODIFIED = 'M',
+  RENAMED = 'R',
+  CHANGED = 'T',
+  UNMERGED = 'U',
+  UNKNOWN = 'X',
+  BROKEN = 'B',
 }
 
 /**
@@ -229,7 +229,7 @@ export interface IGitOperations {
    * @param commitHash
    *   The full or abbreviated Git commit hash.
    * @param filePath
-   *   The path to the file **relative to the repository root**.  
+   *   The path to the file **relative to the repository root**.
    *   For example, to read `/project/src/index.ts`, pass `"src/index.ts"`.
    * @throws Error if the file does not exist at that commit or if the Git command fails.
    */
@@ -258,10 +258,9 @@ export interface IGitOperations {
    * @returns An object containing remotes and branch summary.
    */
   getRepoInfo(): Promise<{
-    remotes: RemoteWithRefs[]; 
-    branches: BranchSummary
+    remotes: RemoteWithRefs[];
+    branches: BranchSummary;
   }>;
-
 
   /**
    * Lists all remote heads in the form:
@@ -290,4 +289,3 @@ export interface IGitOperations {
    */
   getChangesInCommit(commitHash: string): Promise<string[]>;
 }
-

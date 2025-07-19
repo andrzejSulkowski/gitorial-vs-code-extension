@@ -23,10 +23,10 @@ export class VSCodeProgressReporter implements IProgressReporter {
           });
         }
         // Keep the progress notification open until reportEnd is called
-        await new Promise<void>((resolve) => {
+        await new Promise<void>(resolve => {
           this.resolveProgress = resolve;
         });
-      }
+      },
     );
   }
 
@@ -44,7 +44,6 @@ export class VSCodeProgressReporter implements IProgressReporter {
     }
   }
 }
-
 
 /**
  * Factory function to create a VS Code progress reporter

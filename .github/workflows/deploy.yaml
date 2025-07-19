@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       dry_run:
-        description: "Run in dry-run mode (build but do not publish)"
+        description: 'Run in dry-run mode (build but do not publish)'
         type: boolean
         required: false
         default: false
@@ -34,7 +34,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: "pnpm"
+          cache: 'pnpm'
 
       - name: Install dependencies
         run: pnpm install
@@ -64,3 +64,8 @@ jobs:
           registryUrl: https://open-vsx.org
           dryRun: ${{ github.event.inputs.dry_run == 'true' }}
           dependencies: false
+
+      - name: GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: '*.vsix'

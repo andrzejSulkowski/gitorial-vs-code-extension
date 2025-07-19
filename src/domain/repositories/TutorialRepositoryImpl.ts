@@ -10,12 +10,10 @@ import { IStateStorage } from '../ports/IStateStorage';
  */
 export type GitAdapterFactory = (repoPath: string) => IGitOperations;
 
-
 /**
  * Implementation of the TutorialRepository
  */
 export class TutorialRepositoryImpl implements ITutorialRepository {
-
   private readonly TUTORIAL_PATH_MAP_KEY_PREFIX = 'gitorial:tutorialPath:';
 
   /**
@@ -37,13 +35,16 @@ export class TutorialRepositoryImpl implements ITutorialRepository {
       const gitAdapter = this.gitAdapterFactory(localPath);
       const gitService = new GitService(gitAdapter);
       const isValid = await gitService.isValidGitorialRepository();
-      if(!isValid){
+      if (!isValid) {
         return null;
       }
       await gitAdapter.ensureGitorialBranch();
       const tutorial = await TutorialBuilder.buildFromLocalPath(localPath, gitService);
       if (tutorial) {
-        await this.stateStorage.update(`${this.TUTORIAL_PATH_MAP_KEY_PREFIX}${tutorial.id}`, localPath);
+        await this.stateStorage.update(
+          `${this.TUTORIAL_PATH_MAP_KEY_PREFIX}${tutorial.id}`,
+          localPath,
+        );
       }
       return tutorial;
     } catch (error) {
@@ -51,7 +52,7 @@ export class TutorialRepositoryImpl implements ITutorialRepository {
       return null;
     }
   }
-  
+
   /**
    * Find a tutorial by its ID
    * @param id The tutorial ID
@@ -60,11 +61,13 @@ export class TutorialRepositoryImpl implements ITutorialRepository {
   public async findById(id: string): Promise<Tutorial | null> {
     const localPath = this.stateStorage.get<string>(`${this.TUTORIAL_PATH_MAP_KEY_PREFIX}${id}`);
     if (localPath) {
-      console.log(`TutorialRepositoryImpl: Found path '${localPath}' for tutorial ID '${id}'. Attempting to load...`);
+      console.log(
+        `TutorialRepositoryImpl: Found path '${localPath}' for tutorial ID '${id}'. Attempting to load...`,
+      );
       return await this.findByPath(localPath);
     } else {
       console.warn(`TutorialRepositoryImpl: No local path found mapped to tutorial ID '${id}'.`);
       return null;
     }
   }
-} 
+}

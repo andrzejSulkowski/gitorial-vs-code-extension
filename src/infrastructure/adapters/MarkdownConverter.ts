@@ -17,4 +17,4 @@ export class MarkdownItConverter implements IMarkdownConverter {
 
 export function createMarkdownConverterAdapter(): IMarkdownConverter {
   return new MarkdownItConverter();
-};
+}

@@ -8,6 +8,6 @@ export interface TutorialViewModel {
   currentStep: {
     id: string;
     index: number;
-  }
+  };
   isShowingSolution: boolean;
 }

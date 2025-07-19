@@ -5,4 +5,4 @@ export type TutorialId = string & { readonly __brand: 'TutorialId' };
 
 export function asTutorialId(id: string): TutorialId {
   return id as TutorialId;
-} 
+}

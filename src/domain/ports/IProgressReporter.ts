@@ -7,7 +7,7 @@ Defines how to report progress of long-running operations (e.g., report({ messag
 export interface ProgressReport {
   message: string;
   increment?: number; // For percentage-based progress
-  total?: number;     // For steps-based progress
+  total?: number; // For steps-based progress
 }
 
 export interface IProgressReporter {

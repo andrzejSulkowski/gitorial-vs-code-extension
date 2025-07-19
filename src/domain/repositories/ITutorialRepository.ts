@@ -7,7 +7,7 @@ import { Tutorial } from '../models/Tutorial';
 
 /**
  * Repository interface for accessing and persisting Tutorial data
- * 
+ *
  * The repository is responsible for:
  * - Finding tutorials by path, ID, or URL
  * - Creating new tutorials from cloned repositories
@@ -20,7 +20,7 @@ export interface ITutorialRepository {
    * @returns The tutorial if found, null otherwise
    */
   findByPath(localPath: string): Promise<Tutorial | null>;
-  
+
   /**
    * Find a tutorial by its ID
    * @param id The tutorial ID

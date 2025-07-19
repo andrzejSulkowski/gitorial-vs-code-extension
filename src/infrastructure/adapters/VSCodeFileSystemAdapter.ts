@@ -7,11 +7,14 @@ export class VSCodeFileSystemAdapter implements IFileSystem {
     if (parentStat.type !== vscode.FileType.Directory) {
       return false;
     }
-    const subdirectoryPath = vscode.Uri.joinPath(vscode.Uri.file(parentDirectoryPath), subdirectoryName);
+    const subdirectoryPath = vscode.Uri.joinPath(
+      vscode.Uri.file(parentDirectoryPath),
+      subdirectoryName,
+    );
     try {
       await vscode.workspace.fs.stat(subdirectoryPath);
       return true;
-    } catch (error) {
+    } catch (_error) {
       return false;
     }
   }

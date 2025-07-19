@@ -1,27 +1,19 @@
 {
-	"extends": "./tsconfig.base.json",
-	"compilerOptions": {
-		"outDir": "out",
-		"rootDir": ".",
-		"lib": ["ES2022", "DOM"],
-		"baseUrl": ".",
-		"types": ["node", "mocha", "chai"],
-		"composite": true,
-		"skipLibCheck": false,
-		"paths": {
-			"@infra/*": ["./src/infrastructure/*"],
-			"@domain/*": ["./src/domain/*"],
-			"@ui/*": ["./src/ui/*"],
-		}
-	},
-	"include": [
-		"src/**/*"
-	],
-	"exclude": [
-		"node_modules",
-		"out", 
-		"example-tutorial",
-		"**/*.md",
-		"webview-ui/node_modules"
-	]
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "out",
+    "rootDir": ".",
+    "lib": ["ES2022", "DOM"],
+    "baseUrl": ".",
+    "types": ["node", "mocha", "chai"],
+    "composite": true,
+    "skipLibCheck": false,
+    "paths": {
+      "@infra/*": ["./src/infrastructure/*"],
+      "@domain/*": ["./src/domain/*"],
+      "@ui/*": ["./src/ui/*"]
+    }
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "out", "example-tutorial", "**/*.md", "webview-ui/node_modules"]
 }

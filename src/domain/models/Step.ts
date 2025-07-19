@@ -1,10 +1,9 @@
 // Represents a single step in a tutorial. Contains metadata like title, commit hash,
 // and type (e.g., section, template, solution, action).
 
-import { StepType, StepData } from "@gitorial/shared-types";
-import { EnrichedStep } from "./EnrichedStep";
-import { Markdown } from "./Markdown";
-
+import { StepType, StepData } from '@gitorial/shared-types';
+import { EnrichedStep } from './EnrichedStep';
+import { Markdown } from './Markdown';
 
 export class Step {
   public readonly id: string;
@@ -21,7 +20,6 @@ export class Step {
     this.index = data.index;
   }
 
-
   public toEnrichedStep(markdown: Markdown): EnrichedStep {
     return new EnrichedStep({
       markdown: markdown,
@@ -29,7 +27,3 @@ export class Step {
     });
   }
 }
-
-
-
-

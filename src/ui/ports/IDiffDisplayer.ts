@@ -6,7 +6,7 @@ Defines how diffs are shown to the user (e.g., displayDiff(files: DiffFilePaylo
 
 /**
  * Port interface definitions for displaying differences (diffs).
- * 
+ *
  * This module declares the contracts (interfaces, types) that the Domain layer
  * uses for requesting diff displays. Implementations of these interfaces live in the
  * Infrastructure layer (e.g., using VS Code APIs).
@@ -29,12 +29,12 @@ export interface DiffFile {
    * Function to get the content of the file for the right side of the diff (e.g., next step/solution).
    */
   rightContentProvider: () => Promise<string>;
-  
+
   /**
    * Relative path within the repository, used for display and URI construction.
    */
   relativePath: string;
-  
+
   /**
    * Identifier (e.g., commit hash) for the left side content, used for unique URI scheme generation.
    */
@@ -50,7 +50,6 @@ export interface DiffFile {
    */
   titleCommitId: string;
 }
-
 
 /**
  * Interface for displaying diffs

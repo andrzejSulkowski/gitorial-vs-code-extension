@@ -7,7 +7,6 @@ import { IMarkdownConverter } from '../../ui/ports/IMarkdownConverter';
  * Converts domain tutorials to view models for the UI layer
  */
 export class TutorialViewModelConverter {
-  
   constructor(private readonly markdownConverter: IMarkdownConverter) {}
 
   /**
@@ -29,7 +28,7 @@ export class TutorialViewModelConverter {
         commitHash: step.commitHash,
         type: step.type,
         isActive: step.id === currentStepId,
-        htmlContent: stepHtmlContent
+        htmlContent: stepHtmlContent,
       };
     });
 
@@ -41,7 +40,7 @@ export class TutorialViewModelConverter {
         id: currentStepId,
         index: currentStepIndex,
       },
-      isShowingSolution: tutorial.isShowingSolution
+      isShowingSolution: tutorial.isShowingSolution,
     };
   }
-} 
+}

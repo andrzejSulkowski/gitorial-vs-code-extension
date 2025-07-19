@@ -1,6 +1,6 @@
 # Gitorial
 
-![Version](https://img.shields.io/badge/version-0.2.0-yellow)
+![Version](https://img.shields.io/badge/version-0.2.1-yellow)
 ![VS Code](https://img.shields.io/badge/VS%20Code-1.87.0+-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
@@ -54,11 +54,13 @@ This project is proudly **funded by Polkadot OpenGov**. We're grateful for the c
 #### 2. Open an Existing Local Tutorial
 
 **Option A: Automatic Detection**
+
 1. Open a folder containing a Gitorial project in VS Code (`File > Open Folder...`)
 2. Run the command **`Gitorial: Open Tutorial (Workspace)`**
 3. The Gitorial extension will activate, detect the tutorial and open the panel
 
 **Option B: Manual Opening**
+
 1. Use the command **`Gitorial: Open Tutorial`**
 2. Choose **"Use Current Workspace"** (if the workspace is the tutorial root) or **"Select Directory..."** to browse to the tutorial folder
 3. If you select a directory, it will open in a new VS Code window and trigger tutorial detection
@@ -72,12 +74,14 @@ For information on creating Gitorial-compatible tutorials, please refer to the o
 ## Installation
 
 ### From VS Code Marketplace
+
 1. Open VS Code
 2. Go to the Extensions view (`Ctrl+Shift+X` or `Cmd+Shift+X`)
 3. Search for "Gitorial"
 4. Click **Install**
 
 ### Manual Installation
+
 1. Download the latest `.vsix` file from the [releases page](https://github.com/andrzejSulkowski/gitorial-vs-code-plugin/releases)
 2. In VS Code, run `Extensions: Install from VSIX...` from the command palette
 3. Select the downloaded `.vsix` file
@@ -87,6 +91,7 @@ For information on creating Gitorial-compatible tutorials, please refer to the o
 For comprehensive information on setting up the development environment, understanding the project architecture, and contributing to the extension, please see the [Development Guide](./DEVELOPMENT.md).
 
 ### Quick Start
+
 ```bash
 # Clone the repository
 git clone https://github.com/andrzejSulkowski/gitorial-vs-code-plugin.git
@@ -112,11 +117,11 @@ See [DEVELOPMENT.md](./DEVELOPMENT.md) for the developer documentation.
 
 ## Commands
 
-| Command | ID | Description |
-|---------|----|-----------| 
-| **Gitorial: Clone New Tutorial** | `gitorial.cloneTutorial` | Clones a new tutorial repository into a selected parent folder and opens it |
-| **Gitorial: Open Tutorial** | `gitorial.openTutorial` | Opens an existing local tutorial from selected directory |
-| **Gitorial: Open Tutorial (Workspace)** | `gitorial.openTutorialWorkspace` | Opens an existing local tutorial from current workspace |
+| Command                                 | ID                               | Description                                                                 |
+| --------------------------------------- | -------------------------------- | --------------------------------------------------------------------------- |
+| **Gitorial: Clone New Tutorial**        | `gitorial.cloneTutorial`         | Clones a new tutorial repository into a selected parent folder and opens it |
+| **Gitorial: Open Tutorial**             | `gitorial.openTutorial`          | Opens an existing local tutorial from selected directory                    |
+| **Gitorial: Open Tutorial (Workspace)** | `gitorial.openTutorialWorkspace` | Opens an existing local tutorial from current workspace                     |
 
 ## Troubleshooting
 
@@ -129,6 +134,7 @@ See [DEVELOPMENT.md](./DEVELOPMENT.md) for the developer documentation.
 ## Contributing
 
 We welcome contributions! Please see our [Development Guide](./DEVELOPMENT.md) for details on:
+
 - Setting up the development environment
 - Understanding the codebase architecture
 - Running tests

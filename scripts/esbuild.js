@@ -26,13 +26,13 @@ function postBuildCleanup() {
       }
 
       const items = fs.readdirSync(src);
-      
+
       items.forEach(item => {
         const srcPath = path.join(src, item);
         const destPath = path.join(dest, item);
-        
+
         const stats = fs.statSync(srcPath);
-        
+
         if (stats.isDirectory()) {
           moveDirContents(srcPath, destPath);
           fs.rmdirSync(srcPath);
@@ -43,7 +43,7 @@ function postBuildCleanup() {
     }
 
     moveDirContents(srcDir, outDir);
-    
+
     fs.rmdirSync(srcDir);
     console.log('✅ Moved files from src to output root');
   }
@@ -62,10 +62,7 @@ async function main() {
     outdir: 'out',
     external: ['vscode'],
     logLevel: 'warning',
-    plugins: [
-      esbuildProblemMatcherPlugin,
-      postBuildPlugin
-    ]
+    plugins: [esbuildProblemMatcherPlugin, postBuildPlugin],
   });
 
   if (watch) {
@@ -95,7 +92,7 @@ const esbuildProblemMatcherPlugin = {
       });
       console.log('[watch] build finished');
     });
-  }
+  },
 };
 
 /**
@@ -111,7 +108,7 @@ const postBuildPlugin = {
         postBuildCleanup();
       }
     });
-  }
+  },
 };
 
 main().catch(e => {

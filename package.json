@@ -2,7 +2,7 @@
   "name": "gitorial",
   "displayName": "Gitorial",
   "description": "Interactive VS Code extension that guides you step-by-step through Git-based tutorials with inline explanations and easy navigation.",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "private": true,
   "publisher": "AndrzejSulkowski",
   "icon": "images/gitorial-icon.png",
@@ -42,7 +42,10 @@
     "publish": "pnpm run build && pnpx vsce publish --no-dependencies",
     "// Utilities": "=== Utility Commands ===",
     "clean": "rm -rf out dist node_modules/.cache packages/*/dist webview-ui/dist",
-    "reset": "pnpm run clean && pnpm install && pnpm run build:shared"
+    "reset": "pnpm run clean && pnpm install && pnpm run build:shared",
+    "// Formatting": "=== Code Formatting ===",
+    "format": "eslint --fix .",
+    "format:check": "eslint ."
   },
   "categories": [
     "Education",
@@ -125,7 +128,6 @@
     "sinon": "^20.0.0",
     "ts-node": "^10.9.2",
     "typescript": "^5.8.2",
-
     "undici-types": "^7.10.0"
   }
 }

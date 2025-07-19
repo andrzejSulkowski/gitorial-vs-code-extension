@@ -3,7 +3,11 @@
 - Maps UI actions to domain services
 */
 
-import { WebviewToExtensionMessage, WebviewToExtensionSystemMessage, WebviewToExtensionTutorialMessage } from '@gitorial/shared-types';
+import {
+  WebviewToExtensionMessage,
+  WebviewToExtensionSystemMessage,
+  WebviewToExtensionTutorialMessage,
+} from '@gitorial/shared-types';
 
 /**
  * UI-level interface for handling webview commands.
@@ -32,18 +36,18 @@ export class WebviewMessageHandler {
    */
   public handleMessage(message: WebviewToExtensionMessage): void {
     switch (message.category) {
-      case 'tutorial': {
-        this.tutorialMessageHandler.handleWebviewMessage(message);
-        break;
-      }
-      case 'system': {
-        this.systemMessageHandler.handleWebviewMessage(message);
-        break;
-      }
-      default: {
-        console.warn('Received unknown command from webview:', message);
-        break;
-      }
+    case 'tutorial': {
+      this.tutorialMessageHandler.handleWebviewMessage(message);
+      break;
+    }
+    case 'system': {
+      this.systemMessageHandler.handleWebviewMessage(message);
+      break;
+    }
+    default: {
+      console.warn('Received unknown command from webview:', message);
+      break;
+    }
     }
   }
 }

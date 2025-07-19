@@ -18,7 +18,7 @@ import { StepType, StepData } from '@gitorial/shared-types';
 export class TutorialBuilder {
   /**
    * Creates a tutorial from a local repository path
-   * 
+   *
    * @param repoPath Path to the local git repository
    * @param stateStorage Storage for tutorial state
    * @param gitAdapter Git adapter for the repository
@@ -31,12 +31,14 @@ export class TutorialBuilder {
     try {
       const repoUrl = await gitService.getRepoUrl();
       if (!repoUrl) {
-        throw new Error("For now a gitorial needs to be linked to a remote origin\nOtherwise we can not derive the Gitorials Identifier");
+        throw new Error(
+          'For now a gitorial needs to be linked to a remote origin\nOtherwise we can not derive the Gitorials Identifier',
+        );
       }
       const details = this.extractRepoDetails(repoUrl);
 
       if (!details) {
-        throw new Error("Could not get repo details out of remote url: " + repoUrl);
+        throw new Error('Could not get repo details out of remote url: ' + repoUrl);
       }
 
       const id = this.generateTutorialId(details.owner, details.repo);
@@ -54,7 +56,7 @@ export class TutorialBuilder {
         repoUrl: repoUrl || undefined,
         localPath: repoPath,
         steps,
-        activeStepIndex: 0
+        activeStepIndex: 0,
       };
 
       return new Tutorial(tutorialData);
@@ -88,7 +90,7 @@ export class TutorialBuilder {
         return {
           platform: 'github',
           owner: githubMatch[1],
-          repo: githubMatch[2]
+          repo: githubMatch[2],
         };
       }
 
@@ -99,7 +101,7 @@ export class TutorialBuilder {
         return {
           platform: 'gitlab',
           owner: gitlabMatch[1],
-          repo: gitlabMatch[2]
+          repo: gitlabMatch[2],
         };
       }
 
@@ -139,16 +141,19 @@ export class TutorialBuilder {
   public static extractStepsFromCommits(commits: DomainCommit[], tutorialId: TutorialId): Step[] {
     const chronologicalCommits = [...commits].reverse();
     const steps: Step[] = [];
-    const validTypes: ReadonlyArray<StepType> = ["section", "template", "solution", "action"];
+    const validTypes: ReadonlyArray<StepType> = ['section', 'template', 'solution', 'action'];
 
     let relevantCommits = chronologicalCommits;
-    if (relevantCommits.length > 0 && relevantCommits[0].message.toLowerCase().startsWith("readme:")) {
+    if (
+      relevantCommits.length > 0 &&
+      relevantCommits[0].message.toLowerCase().startsWith('readme:')
+    ) {
       relevantCommits = relevantCommits.slice(1);
     }
 
     relevantCommits.forEach((commit, index) => {
       const message = commit.message.trim();
-      const colonIndex = message.indexOf(":");
+      const colonIndex = message.indexOf(':');
       let stepType: StepType;
       let stepTitle = message;
 
@@ -158,7 +163,9 @@ export class TutorialBuilder {
           stepType = parsedType as StepType;
           stepTitle = message.substring(colonIndex + 1).trim();
         } else {
-          throw new Error(`TutorialBuilder: Invalid step type "${parsedType}" in commit message: "${message}".`);
+          throw new Error(
+            `TutorialBuilder: Invalid step type "${parsedType}" in commit message: "${message}".`,
+          );
         }
       } else {
         throw new Error(`TutorialBuilder: Commit message "${message}" missing type prefix.`);

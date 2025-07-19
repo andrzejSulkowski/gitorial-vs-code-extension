@@ -1,8 +1,6 @@
-import type { 
-  ExtensionToWebviewMessage
-} from '@gitorial/shared-types';
-import { tutorialStore } from './tutorialStore';
-import { systemStore } from './systemStore';
+import type { ExtensionToWebviewMessage } from '@gitorial/shared-types';
+import { tutorialStore } from './tutorialStore.svelte';
+import { systemStore } from './systemStore.svelte';
 
 export { sendMessage } from '../utils/messaging';
 
@@ -14,6 +12,6 @@ export function createMessageRouter() {
       } else if (message.category === 'system') {
         systemStore.handleMessage(message);
       }
-    }
+    },
   };
 }

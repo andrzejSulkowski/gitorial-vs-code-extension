@@ -3,7 +3,12 @@
 - Uses GitAdapter but focuses on tutorial-related logic
 */
 
-import { IGitOperations, DomainCommit, DefaultLogFields, ListLogLine } from '../ports/IGitOperations';
+import {
+  IGitOperations,
+  DomainCommit,
+  DefaultLogFields,
+  ListLogLine,
+} from '../ports/IGitOperations';
 
 // Provides domain-specific Git operations relevant to tutorials. It uses the
 // IGitOperations port to interact with an actual Git implementation and the
@@ -21,9 +26,7 @@ export class GitService {
    * @param gitAdapter The Git adapter to use
    * @param repoPath The path to the repository
    */
-  constructor(
-    gitAdapter: IGitOperations,
-  ) {
+  constructor(gitAdapter: IGitOperations) {
     this.gitAdapter = gitAdapter;
   }
 
@@ -48,7 +51,6 @@ export class GitService {
     }
   }
 
-
   /**
    * Get the content of a file at a specific commit
    * @param commitHash The commit hash
@@ -70,7 +72,7 @@ export class GitService {
     try {
       return await this.gitAdapter.getCurrentCommitHash();
     } catch (error) {
-      console.error(`Error getting current commit:`, error);
+      console.error('Error getting current commit:', error);
       throw error;
     }
   }
@@ -80,8 +82,9 @@ export class GitService {
    */
   public async getCommitHistory(): Promise<DomainCommit[]> {
     try {
-      const rawCommits: Array<DefaultLogFields & ListLogLine> = await this.gitAdapter.getCommits("gitorial");
-      
+      const rawCommits: Array<DefaultLogFields & ListLogLine> =
+        await this.gitAdapter.getCommits('gitorial');
+
       const domainCommits: DomainCommit[] = rawCommits.map(commit => {
         return {
           hash: commit.hash,
@@ -92,13 +95,11 @@ export class GitService {
         };
       });
       return domainCommits;
-
     } catch (error) {
-      console.error(`Error getting commit history:`, error);
+      console.error('Error getting commit history:', error);
       throw error;
     }
   }
-
 
   /**
    * Determines whether the given repository contains a "gitorial" branch
@@ -130,7 +131,8 @@ export class GitService {
           // or refs/heads/branch -> branch (though remote.refs.fetch should be remote-tracking)
           if (branchName.startsWith('refs/remotes/')) {
             branchName = branchName.substring('refs/remotes/'.length);
-          } else if (branchName.startsWith('refs/heads/')) { // Less likely for remote.refs.fetch but good to be safe
+          } else if (branchName.startsWith('refs/heads/')) {
+            // Less likely for remote.refs.fetch but good to be safe
             branchName = branchName.substring('refs/heads/'.length);
           }
           // Now branchName could be 'origin/gitorial/step1' or just 'gitorial/step1' if remote name was part of ref
@@ -142,10 +144,9 @@ export class GitService {
       }
 
       return false; // No gitorial branch found in local or remotes
-
     } catch (error) {
       // Log and publish an error event, then return false
-      console.error(`Error checking if repository is valid Gitorial repository:`, error);
+      console.error('Error checking if repository is valid Gitorial repository:', error);
       return false;
     }
   }
@@ -165,14 +166,13 @@ export class GitService {
     return segments.includes('gitorial');
   }
 
-
   async getRepoName(): Promise<string> {
     return this.gitAdapter.getRepoName();
   }
   /**
    * Fetches the remote URL
-  * @throws Error - when not found
-  */
+   * @throws Error - when not found
+   */
   async getRepoUrl(): Promise<string | null> {
     return await this.gitAdapter.getRepoUrl();
   }

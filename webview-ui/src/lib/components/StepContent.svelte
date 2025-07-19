@@ -1,5 +1,5 @@
 <script lang="ts">
-  import HtmlContent from "./HtmlContent.svelte";
+  import HtmlContent from './HtmlContent.svelte';
 
   interface Props {
     content: string;

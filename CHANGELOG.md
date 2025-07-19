@@ -39,7 +39,14 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 - Feature diff view scans changed files for 'educational content' keywords and filters out noise files
 - Fix focus of the last active tutorial file when toggling the solution
 
-## 0.2.0 - 2025-07-12
+## [0.2.0] - 2025-07-12
 
 - Cloning defaults to first commit
 - Fix navigation while showing solution, hides the solution
+
+## [0.2.1] - 2025-07-19
+
+- Fix opening projects with incorrect stored tutorial ID and fallback to step 1
+- Introduce eslint formatting
+- refactor webview svelte to use purly rune syntax
+- CI workflow to release to GitHub releases

@@ -136,32 +136,54 @@ export class TutorialService {
   }
 
   /**
-   * Activate a tutorial
+   * Activates a tutorial, restoring state from options or persisted state.
    */
-  private async _activateTutorial(tutorial: Tutorial, options: LoadTutorialOptions = {}): Promise<void> {
+  private async _activateTutorial(
+    tutorial: Tutorial,
+    options: LoadTutorialOptions = {}
+  ): Promise<void> {
     this._tutorial = tutorial;
     const persistedState: StoredTutorialState | undefined = await this.activeTutorialStateRepository.getActiveTutorial();
+    this._tutorial.isShowingSolution = !!options.showSolution;
 
-    this._tutorial.isShowingSolution = options.showSolution || false;
+    const fallbackToFirstStep = async (context: string, error: unknown) => {
+      console.error(`TutorialService: Error during _activateTutorial for ${context}`, error);
+      this.activeTutorialStateRepository.clearActiveTutorial();
+      await this.forceStepIndex(0);
+    };
+
     if (options.initialStepCommitHash) {
-      await this.forceStepCommitHash(options.initialStepCommitHash);
+      try {
+        await this.forceStepCommitHash(options.initialStepCommitHash);
+      } catch (e) {
+        await fallbackToFirstStep(
+          `initial step commit hash: ${options.initialStepCommitHash}`,
+          e
+        );
+      }
     } else if (persistedState?.currentStepId) {
-      await this.forceStepId(persistedState.currentStepId);
+      try {
+        await this.forceStepId(persistedState.currentStepId);
+      } catch (e) {
+        await fallbackToFirstStep(
+          `persisted step id: ${persistedState.currentStepId}`,
+          e
+        );
+      }
     } else {
-      // The default gitorial commit is the first commit in the "gitorial" branch
+      // Default: checkout the first commit in the "gitorial" branch
       await this.gitOperations?.checkout(tutorial.activeStep.commitHash);
-      // No step to force, so we just enrich the active step (happens automatically in force methods)
       await this._enrichActiveStep();
     }
 
-    let effectiveInitialTabs: string[] = [];
-    if (options.initialOpenTabFsPaths) {
-      effectiveInitialTabs = options.initialOpenTabFsPaths;
-    } else if (persistedState?.openFileUris) {
-      effectiveInitialTabs = persistedState.openFileUris;
-    }
+    const effectiveInitialTabs: string[] =
+      options.initialOpenTabFsPaths ??
+      persistedState?.openFileUris ??
+      [];
 
     this._tutorial.lastPersistedOpenTabFsPaths = effectiveInitialTabs;
+
+    // Persist the active tutorial state
     await this._saveActiveTutorialState();
   }
   //    _____      _   _                
@@ -208,13 +230,9 @@ export class TutorialService {
     if (!targetStep) {
       throw new Error(`TutorialService: Invalid step index: ${stepIndex}`);
     }
-    if (this._tutorial.activeStep.id === targetStep.id) {
-      throw new Error(`TutorialService: already on step: ${targetStep.id}`);
-    } else {
-      const oldStepIndex = this._tutorial.activeStepIndex;
-      this._tutorial.goTo(stepIndex);
-      await this._afterStepChange(oldStepIndex);
-    }
+    const oldStepIndex = this._tutorial.activeStepIndex;
+    this._tutorial.goTo(stepIndex);
+    await this._afterStepChange(oldStepIndex);
   }
 
   /**
@@ -248,8 +266,10 @@ export class TutorialService {
     if (!targetStep) {
       throw new Error(`TutorialService: Invalid step id: ${stepId}`);
     }
-    this._tutorial.goTo(targetStep.index);
-    await this._afterStepChange(oldStepIndex);
+    if(targetStep.id !== this._tutorial.activeStep.id) {
+      this._tutorial.goTo(targetStep.index);
+      await this._afterStepChange(oldStepIndex);
+    }
   }
 
   /**
@@ -297,7 +317,7 @@ export class TutorialService {
 
 
   //TODO: We could just check if there is a Gitorial branch and this would mean there is a tutorial instead of loading the whole thing like done preivously
-  public async isTutorial(){}
+  public async isTutorial() { }
 
   //    _____ _        _         __  __                                                   _   
   //   / ____| |      | |       |  \/  |                                                 | |  

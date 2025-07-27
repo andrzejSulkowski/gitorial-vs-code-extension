@@ -40,7 +40,12 @@ import { WebviewPanelManager } from '@ui/webview/WebviewPanelManager';
  * Main extension activation point.
  * This function is called when the extension is activated.
  */
-export async function activate(context: vscode.ExtensionContext): Promise<vscode.ExtensionContext> {
+export interface GitorialExtensionAPI {
+  tutorialController: TutorialController;
+  autoOpenState: AutoOpenState;
+}
+
+export async function activate(context: vscode.ExtensionContext): Promise<GitorialExtensionAPI> {
   console.log('📖 Gitorial extension active');
 
   const { tutorialController, autoOpenState } =
@@ -56,7 +61,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<vscode
   await checkAndHandleAutoOpenState(tutorialController, autoOpenState);
 
   console.log('📖 Gitorial activation complete.');
-  return context;
+  return { tutorialController, autoOpenState };
 }
 
 /**
@@ -159,15 +164,12 @@ async function bootstrapApplication(context: vscode.ExtensionContext) {
     gitChangesFactory,
     markdownConverter,
     webviewPanelManager,
+    context,
   );
 
   return {
     tutorialController,
     autoOpenState,
-    userInteractionAdapter,
-    activeTutorialStateRepository,
-    tutorialRepository,
-    workspaceId,
   };
 }
 

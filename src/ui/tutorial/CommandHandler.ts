@@ -38,6 +38,47 @@ export class CommandHandler {
   }
 
   /**
+   * Cleans up the temporary e2e-execution folder and its contents.
+   */
+  public async handleCleanupTemporaryFolders(): Promise<void> {
+    console.log('CommandHandler: handleCleanupTemporaryFolders called');
+    await this.tutorialController.cleanupTemporaryFolders();
+  }
+
+  /**
+   * Resets user preferences for clone destination choices.
+   */
+  public async handleResetClonePreferences(): Promise<void> {
+    console.log('CommandHandler: handleResetClonePreferences called');
+    await this.tutorialController.resetClonePreferences();
+  }
+
+  // === NAVIGATION COMMAND HANDLERS FOR E2E TESTING ===
+
+  /**
+   * Navigates to the next step in the current tutorial.
+   */
+  public async handleNavigateToNextStep(): Promise<void> {
+    console.log('CommandHandler: handleNavigateToNextStep called');
+    const success = await this.tutorialController.navigateToNextStep();
+    if (!success) {
+      console.log('CommandHandler: Navigation to next step failed or already at last step');
+    }
+  }
+
+  /**
+   * Navigates to the previous step in the current tutorial.
+   */
+  public async handleNavigateToPreviousStep(): Promise<void> {
+    console.log('CommandHandler: handleNavigateToPreviousStep called');
+    const success = await this.tutorialController.navigateToPreviousStep();
+    if (!success) {
+      console.log('CommandHandler: Navigation to previous step failed or already at first step');
+    }
+  }
+
+
+  /**
    * Registers all Gitorial commands with VS Code.
    * This method should be called during extension activation.
    * @param context The extension context to push disposables to.
@@ -56,6 +97,32 @@ export class CommandHandler {
         this.handleOpenWorkspaceTutorial(),
       ),
     );
+
+    context.subscriptions.push(
+      vscode.commands.registerCommand('gitorial.cleanupTemporaryFolders', () =>
+        this.handleCleanupTemporaryFolders(),
+      ),
+    );
+
+    context.subscriptions.push(
+      vscode.commands.registerCommand('gitorial.resetClonePreferences', () =>
+        this.handleResetClonePreferences(),
+      ),
+    );
+
+    // Navigation commands for E2E testing
+    context.subscriptions.push(
+      vscode.commands.registerCommand('gitorial.navigateToNextStep', () =>
+        this.handleNavigateToNextStep(),
+      ),
+    );
+
+    context.subscriptions.push(
+      vscode.commands.registerCommand('gitorial.navigateToPreviousStep', () =>
+        this.handleNavigateToPreviousStep(),
+      ),
+    );
+
 
     console.log('Gitorial commands registered.');
   }

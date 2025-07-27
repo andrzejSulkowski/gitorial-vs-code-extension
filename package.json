@@ -36,6 +36,8 @@
     "// Testing": "=== Testing Commands ===",
     "test": "pnpm run build && pnpm run lint && vscode-test",
     "test:unit": "mocha --require ts-node/register \"src/**/*.test.ts\" --exclude \"src/test/**/*.test.ts\"",
+    "test:e2e": "pnpm run build && vscode-test --config=.vscode-test.e2e.mjs",
+    "test:all": "pnpm run test:unit && pnpm run test:e2e",
     "// Publishing": "=== VS Code Extension ===",
     "vscode:prepublish": "pnpm run build:extension:production",
     "package": "pnpm run build && pnpx vsce package --no-dependencies",
@@ -84,6 +86,14 @@
       {
         "command": "gitorial.openTutorial",
         "title": "Gitorial: Open Tutorial"
+      },
+      {
+        "command": "gitorial.cleanupTemporaryFolders",
+        "title": "Gitorial: Cleanup Temporary Folders"
+      },
+      {
+        "command": "gitorial.resetClonePreferences",
+        "title": "Gitorial: Reset Clone Preferences"
       }
     ],
     "uriHandler": [

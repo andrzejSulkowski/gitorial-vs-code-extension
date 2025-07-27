@@ -55,7 +55,11 @@ export class SystemController implements IWebviewSystemMessageHandler {
     // Send error to webview if available
     this._notifyWebviewError(errorMessage);
 
-    // TODO: Add telemetry/logging service integration here
+    // Enhanced error tracking and telemetry
+    this._trackError(error, context);
+
+    // Store error for diagnostics
+    this._storeErrorForDiagnostics(errorMessage, context);
   }
 
   /**
@@ -174,7 +178,15 @@ export class SystemController implements IWebviewSystemMessageHandler {
    */
   public async onDeactivate(): Promise<void> {
     console.log(`SystemController: Extension deactivated. Total errors: ${this.errorCount}`);
-    // TODO: Cleanup, save state, etc.
+
+    // Cleanup operations
+    await this._performCleanup();
+
+    // Save final state and diagnostics
+    await this._saveFinalState();
+
+    // Log deactivation summary
+    this._logDeactivationSummary();
   }
 
   // ============ PRIVATE HELPERS ============
@@ -188,6 +200,79 @@ export class SystemController implements IWebviewSystemMessageHandler {
       };
       await this.webviewPanelManager.sendMessage(systemMessage);
     }
+  }
+
+  private _trackError(error: Error | string, context?: string): void {
+    const errorInfo = {
+      message: error instanceof Error ? error.message : error,
+      stack: error instanceof Error ? error.stack : undefined,
+      context: context || 'unknown',
+      timestamp: new Date().toISOString(),
+      sessionId: this.extensionContext.globalState.get('sessionId', 'unknown'),
+    };
+
+    // Log structured error for potential telemetry integration
+    console.error('SystemController: Structured error info:', JSON.stringify(errorInfo, null, 2));
+
+    // Could integrate with telemetry services here (e.g., Azure Application Insights, etc.)
+    // this.telemetryService?.trackError(errorInfo);
+  }
+
+  private _storeErrorForDiagnostics(errorMessage: string, context?: string): void {
+    const errorEntry = {
+      timestamp: new Date().toISOString(),
+      context: context || 'unknown',
+      message: errorMessage,
+      errorCount: this.errorCount,
+    };
+
+    // Store in extension global state for diagnostic purposes
+    const existingErrors = this.extensionContext.globalState.get<any[]>('recentErrors', []);
+    const updatedErrors = [errorEntry, ...existingErrors.slice(0, 9)]; // Keep last 10 errors
+
+    this.extensionContext.globalState.update('recentErrors', updatedErrors);
+  }
+
+  private async _performCleanup(): Promise<void> {
+    try {
+      // Close any open webview panels
+      if (this.webviewPanelManager) {
+        await this.webviewPanelManager.dispose();
+      }
+
+      // Clear temporary state
+      // Add other cleanup operations as needed
+
+      console.log('SystemController: Cleanup completed successfully');
+    } catch (error) {
+      console.error('SystemController: Error during cleanup:', error);
+    }
+  }
+
+  private async _saveFinalState(): Promise<void> {
+    try {
+      const finalState = {
+        totalErrors: this.errorCount,
+        deactivationTime: new Date().toISOString(),
+        uptime: Date.now() - this.extensionContext.globalState.get('startupTime', Date.now()),
+      };
+
+      await this.extensionContext.globalState.update('lastSessionInfo', finalState);
+      console.log('SystemController: Final state saved');
+    } catch (error) {
+      console.error('SystemController: Error saving final state:', error);
+    }
+  }
+
+  private _logDeactivationSummary(): void {
+    const uptime = Date.now() - this.extensionContext.globalState.get('startupTime', Date.now());
+    const uptimeMinutes = Math.round(uptime / 60000);
+
+    console.log(`SystemController: Session Summary:
+      - Total Errors: ${this.errorCount}
+      - Uptime: ${uptimeMinutes} minutes
+      - Webview Active: ${!!this.webviewPanelManager?.isVisible()}
+    `);
   }
 }
 

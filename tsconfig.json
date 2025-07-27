@@ -11,7 +11,8 @@
     "paths": {
       "@infra/*": ["./src/infrastructure/*"],
       "@domain/*": ["./src/domain/*"],
-      "@ui/*": ["./src/ui/*"]
+      "@ui/*": ["./src/ui/*"],
+      "@utils/*": ["./src/utils/*"]
     }
   },
   "include": ["src/**/*"],

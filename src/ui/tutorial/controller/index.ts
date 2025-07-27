@@ -2,11 +2,13 @@ import { IProgressReporter } from '@domain/ports/IProgressReporter';
 import { IUserInteraction } from '@domain/ports/IUserInteraction';
 import { WebviewPanelManager } from '@ui/webview/WebviewPanelManager';
 import { IFileSystem } from '@domain/ports/IFileSystem';
+import * as vscode from 'vscode';
 import { TutorialService } from '@domain/services/TutorialService';
 import { AutoOpenState } from '@infra/state/AutoOpenState';
 import { WebviewToExtensionTutorialMessage } from '@gitorial/shared-types';
 import { IWebviewTutorialMessageHandler } from '@ui/webview/WebviewMessageHandler';
-import * as Lifecycle from './lifecycle';
+import { LifecycleController, LifecycleResult } from './LifecycleController';
+import type { CloneOptions, OpenOptions } from './LifecycleController';
 import * as Navigation from './navigation';
 import * as External from './external';
 import * as Editor from './editor';
@@ -24,7 +26,7 @@ import { IMarkdownConverter } from '@ui/ports/IMarkdownConverter';
  * It bridges user actions (from commands, UI panels) with the domain logic (TutorialService)
  */
 export class TutorialController implements IWebviewTutorialMessageHandler {
-  private readonly lifecycleController: Lifecycle.Controller;
+  private readonly lifecycleController: LifecycleController;
   private readonly navigationController: Navigation.Controller;
   private readonly externalController: External.Controller;
   private readonly editorController: Editor.Controller;
@@ -53,14 +55,16 @@ export class TutorialController implements IWebviewTutorialMessageHandler {
     gitChangesFactory: IGitChangesFactory,
     markdownConverter: IMarkdownConverter,
     webviewPanelManager: WebviewPanelManager,
+    extensionContext?: vscode.ExtensionContext,
   ) {
-    this.lifecycleController = new Lifecycle.Controller(
+    this.lifecycleController = new LifecycleController(
       progressReporter,
       fs,
       this.tutorialService,
       this.autoOpenState,
       this.userInteraction,
       gitChangesFactory,
+      extensionContext,
     );
     this.navigationController = new Navigation.Controller(
       this.tutorialService,
@@ -94,7 +98,7 @@ export class TutorialController implements IWebviewTutorialMessageHandler {
    * After successful cloning, it may trigger opening the tutorial in a new VS Code window.
    * @param options Optional parameters including repoUrl and commitHash
    */
-  public async cloneAndOpen(options?: Lifecycle.CloneOptions): Promise<void> {
+  public async cloneAndOpen(options?: CloneOptions): Promise<void> {
     await this._handleLifecycleResult(this.lifecycleController.cloneAndOpen(options));
   }
 
@@ -104,15 +108,69 @@ export class TutorialController implements IWebviewTutorialMessageHandler {
    * and prompt the user to open it
    * @param options Optional parameters including commitHash and force flags
    */
-  public async openFromWorkspace(options?: Lifecycle.OpenOptions): Promise<void> {
+  public async openFromWorkspace(options?: OpenOptions): Promise<void> {
     await this._handleLifecycleResult(this.lifecycleController.openFromWorkspace(options));
   }
 
-  public async openFromPath(options?: Lifecycle.OpenOptions): Promise<void> {
+  public async openFromPath(options?: OpenOptions): Promise<void> {
     await this._handleLifecycleResult(this.lifecycleController.openFromPath(options));
   }
 
-  private async _handleLifecycleResult(promise: Promise<Lifecycle.LifecylceResult>): Promise<void> {
+  /**
+   * Cleans up temporary folders used for tutorial cloning (e2e-execution directory).
+   * This helps users manage disk space by removing temporary tutorial files.
+   */
+  public async cleanupTemporaryFolders(): Promise<void> {
+    await this.lifecycleController.cleanupTemporaryFolders();
+  }
+
+  /**
+   * Resets user preferences for clone destination choices.
+   */
+  public async resetClonePreferences(): Promise<void> {
+    await this.lifecycleController.resetClonePreferences();
+  }
+
+  // === NAVIGATION METHODS FOR E2E TESTING ===
+
+  /**
+   * Navigates to the next step in the current tutorial.
+   * Returns true if navigation was successful, false otherwise.
+   */
+  public async navigateToNextStep(): Promise<boolean> {
+    const result = await this.navigationController.navigateToNextStep();
+    if (result.success && this._gitChanges) {
+      await this.editorController.display(result.tutorial, this._gitChanges);
+      await this.webviewController.display(result.tutorial);
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Navigates to the previous step in the current tutorial.
+   * Returns true if navigation was successful, false otherwise.
+   */
+  public async navigateToPreviousStep(): Promise<boolean> {
+    const result = await this.navigationController.navigateToPreviousStep();
+    if (result.success && this._gitChanges) {
+      await this.editorController.display(result.tutorial, this._gitChanges);
+      await this.webviewController.display(result.tutorial);
+      return true;
+    }
+    return false;
+  }
+
+
+  /**
+   * Gets the current tutorial state for testing.
+   * Returns null if no tutorial is active.
+   */
+  public getCurrentTutorial(): any {
+    return this.tutorialService.tutorial;
+  }
+
+  private async _handleLifecycleResult(promise: Promise<LifecycleResult>): Promise<void> {
     const result = await promise;
     if (result.success) {
       const { tutorial, gitChanges } = result;
@@ -186,7 +244,7 @@ export class TutorialController implements IWebviewTutorialMessageHandler {
     }
   }
 
-  private async _openLocalTutorial(options?: Lifecycle.OpenOptions): Promise<void> {
+  private async _openLocalTutorial(options?: OpenOptions): Promise<void> {
     const path = await this._pickFolder({
       title: 'Open Local Gitorial Tutorial',
       openLabel: 'Select Tutorial Folder',

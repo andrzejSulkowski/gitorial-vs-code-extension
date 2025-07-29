@@ -36,6 +36,7 @@
     "// Testing": "=== Testing Commands ===",
     "test": "pnpm run build && pnpm run lint && vscode-test",
     "test:unit": "mocha --require ts-node/register \"src/**/*.test.ts\" --exclude \"src/test/**/*.test.ts\"",
+    "test:integration": "pnpm run build && vscode-test --config .vscode-test.integration.mjs",
     "// Publishing": "=== VS Code Extension ===",
     "vscode:prepublish": "pnpm run build:extension:production",
     "package": "pnpm run build && pnpx vsce package --no-dependencies",

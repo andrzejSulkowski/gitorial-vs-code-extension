@@ -1,5 +1,4 @@
 import { IUserInteraction } from '@domain/ports/IUserInteraction';
-import { UrlValidator } from '@utils/security/UrlValidator';
 import { PathManager } from './PathManager';
 import * as vscode from 'vscode';
 

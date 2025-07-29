@@ -1,29 +1,29 @@
 import * as assert from 'assert';
 import * as vscode from 'vscode';
-import { E2ETestUtils } from './test-utils';
-import { E2E_TEST_CONFIG } from './test-config';
+import { IntegrationTestUtils } from './test-utils';
+import { INTEGRATION_TEST_CONFIG } from './test-config';
 
 /**
- * Simple E2E Framework Demonstration
+ * Simple Integration Framework Demonstration
  * Tests basic framework functionality to verify everything is working
  */
 
-suite('E2E: Framework Demo', () => {
+suite('Integration: Framework Demo', () => {
   suiteSetup(async function() {
-    this.timeout(E2E_TEST_CONFIG.TIMEOUTS.TEST_EXECUTION);
-    console.log('Setting up E2E framework demo...');
-    await E2ETestUtils.initialize();
-    await E2ETestUtils.waitForExtensionActivation();
+    this.timeout(INTEGRATION_TEST_CONFIG.TIMEOUTS.TEST_EXECUTION);
+    console.log('Setting up Integration framework demo...');
+    await IntegrationTestUtils.initialize();
+    await IntegrationTestUtils.waitForExtensionActivation();
     console.log('Framework demo setup complete');
   });
 
   suiteTeardown(async function() {
-    this.timeout(E2E_TEST_CONFIG.TIMEOUTS.CLEANUP);
+    this.timeout(INTEGRATION_TEST_CONFIG.TIMEOUTS.CLEANUP);
     console.log('Cleaning up framework demo...');
-    await E2ETestUtils.cleanup();
+    await IntegrationTestUtils.cleanup();
 
-    // Also cleanup the e2e-execution directory created by our extension
-    await E2ETestUtils.cleanupE2EExecutionDirectory();
+    // Also cleanup the integration-execution directory created by our extension
+    await IntegrationTestUtils.cleanupIntegrationExecutionDirectory();
     console.log('Framework demo cleanup complete');
   });
 
@@ -33,13 +33,13 @@ suite('E2E: Framework Demo', () => {
     console.log('Testing: Test environment initialization');
 
     // Test that we can create a test repository
-    const testRepo = await E2ETestUtils.createTestRepository('demo-repo');
+    const testRepo = await IntegrationTestUtils.createTestRepository('demo-repo');
 
     assert.ok(testRepo.path, 'Test repository path should be created');
     assert.ok(testRepo.git, 'Git instance should be available');
 
     // Test that repository has proper structure
-    const currentBranch = await E2ETestUtils.getCurrentBranch(testRepo.path);
+    const currentBranch = await IntegrationTestUtils.getCurrentBranch(testRepo.path);
     console.log(`Repository branch: ${currentBranch}`);
 
     assert.ok(currentBranch, 'Repository should have a current branch');
@@ -91,21 +91,21 @@ suite('E2E: Framework Demo', () => {
     console.log('Testing: Test utilities functionality');
 
     // Test mock remote repository creation (real GitHub repo)
-    const mockRemote = await E2ETestUtils.createMockRemoteRepository();
+    const mockRemote = await IntegrationTestUtils.createMockRemoteRepository();
     assert.ok(mockRemote.url, 'Mock remote URL should be available');
     assert.ok(mockRemote.url.includes('github.com'), 'Should use real GitHub repository');
     console.log(`Mock remote URL: ${mockRemote.url}`);
 
     // Test workspace creation
-    const testRepo = await E2ETestUtils.createTestRepository('utils-test');
-    const workspace = await E2ETestUtils.createTestWorkspace(testRepo.path);
+    const testRepo = await IntegrationTestUtils.createTestRepository('utils-test');
+    const workspace = await IntegrationTestUtils.createTestWorkspace(testRepo.path);
 
     assert.ok(workspace.uri, 'Workspace URI should be created');
     assert.ok(workspace.path, 'Workspace path should be available');
 
     // Test file content assertion
     const testFilePath = require('path').join(testRepo.path, 'src', 'main.ts');
-    await E2ETestUtils.assertFileContent(testFilePath, 'TODO');
+    await IntegrationTestUtils.assertFileContent(testFilePath, 'TODO');
 
     console.log('Test utilities functionality verified');
   });
@@ -117,9 +117,9 @@ suite('E2E: Framework Demo', () => {
 
     // Test file assertion with non-existent content
     try {
-      const testRepo = await E2ETestUtils.createTestRepository('error-test');
+      const testRepo = await IntegrationTestUtils.createTestRepository('error-test');
       const testFilePath = require('path').join(testRepo.path, 'src', 'main.ts');
-      await E2ETestUtils.assertFileContent(testFilePath, 'NON_EXISTENT_CONTENT');
+      await IntegrationTestUtils.assertFileContent(testFilePath, 'NON_EXISTENT_CONTENT');
       assert.fail('Should have thrown an error for non-existent content');
     } catch (_error) {
       console.log('File assertion error handled correctly');
@@ -127,7 +127,7 @@ suite('E2E: Framework Demo', () => {
 
     // Test condition timeout
     try {
-      await E2ETestUtils.waitForCondition(() => false, 1000); // Will timeout
+      await IntegrationTestUtils.waitForCondition(() => false, 1000); // Will timeout
       assert.fail('Should have thrown timeout error');
     } catch (_error) {
       console.log('Condition timeout handled correctly');

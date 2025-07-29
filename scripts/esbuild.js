@@ -54,12 +54,12 @@ async function main() {
     entryPoints: [
       'src/extension.ts', 
       'src/test/extension.test.ts',
-      'src/test/e2e/test-config.ts',
-      'src/test/e2e/test-utils.ts',
-      'src/test/e2e/framework-demo.e2e.test.ts',
-      'src/test/e2e/core-workflows.e2e.test.ts',
-      'src/test/e2e/clone-workflow.e2e.test.ts',
-      'src/test/e2e/lesson-navigation.e2e.test.ts'
+      'src/test/integration/test-config.ts',
+      'src/test/integration/test-utils.ts',
+      'src/test/integration/framework-demo.integration.test.ts',
+      'src/test/integration/core-workflows.integration.test.ts',
+      'src/test/integration/clone-workflow.integration.test.ts',
+      'src/test/integration/lesson-navigation.integration.test.ts'
     ],
     bundle: true,
     format: 'cjs',

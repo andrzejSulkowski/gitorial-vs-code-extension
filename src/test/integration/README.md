@@ -1,14 +1,14 @@
-# Gitorial E2E Tests
+# Gitorial Integration Tests
 
-This directory contains end-to-end tests for the Gitorial VS Code extension. These tests verify complete user workflows and integration between all system components.
+This directory contains integration tests for the Gitorial VS Code extension. These tests verify complete user workflows and integration between all system components.
 
 ## Test Structure
 
 ### Core Test Files
 
-- **`test-utils.ts`** - Shared utilities and fixtures for E2E testing
-- **`core-workflows.e2e.test.ts`** - Tests for core tutorial workflows (open, navigate, state management)
-- **`clone-workflow.e2e.test.ts`** - Tests for tutorial cloning and remote repository handling
+- **`test-utils.ts`** - Shared utilities and fixtures for Integration testing
+- **`core-workflows.integration.test.ts`** - Tests for core tutorial workflows (open, navigate, state management)
+- **`clone-workflow.integration.test.ts`** - Tests for tutorial cloning and remote repository handling
 
 ### Test Categories
 
@@ -43,7 +43,7 @@ This directory contains end-to-end tests for the Gitorial VS Code extension. The
 - Workspace state handling
 - Session recovery
 
-## Running E2E Tests
+## Running Integration Tests
 
 ### Prerequisites
 
@@ -55,27 +55,27 @@ This directory contains end-to-end tests for the Gitorial VS Code extension. The
 ### Commands
 
 ```bash
-# Run all E2E tests
-pnpm run test:e2e
+# Run all Integration tests
+pnpm run test:integration
 
-# Run all tests (unit + e2e)
+# Run all tests (unit + integration)
 pnpm run test:all
 
-# Run specific E2E test suite
-pnpm run test:e2e -- --grep "Core Workflows"
+# Run specific Integration test suite
+pnpm run test:integration -- --grep "Core Workflows"
 
-# Run E2E tests in watch mode (development)
-pnpm run build:watch & pnpm run test:e2e -- --watch
+# Run Integration tests in watch mode (development)
+pnpm run build:watch & pnpm run test:integration -- --watch
 ```
 
 ### CI/CD Integration
 
-E2E tests are integrated with the build pipeline:
+Integration tests are integrated with the build pipeline:
 
 1. **Build Phase**: Compiles extension and webview
 2. **Lint Phase**: Code quality checks
 3. **Unit Tests**: Fast unit tests
-4. **E2E Tests**: Full integration tests
+4. **Integration Tests**: Full integration tests
 
 ## Test Environment
 
@@ -107,38 +107,38 @@ All test artifacts are automatically cleaned up:
 
 ### Adding New Tests
 
-1. **Create Test File**: Follow naming pattern `*.e2e.test.ts`
-2. **Use Test Utils**: Import and use `E2ETestUtils` for consistency
+1. **Create Test File**: Follow naming pattern `*.integration.test.ts`
+2. **Use Test Utils**: Import and use `IntegrationTestUtils` for consistency
 3. **Follow Patterns**: Use existing test structure and patterns
 4. **Add Cleanup**: Ensure proper cleanup in teardown methods
 
 ### Test Patterns
 
 ```typescript
-import { E2ETestUtils } from './test-utils';
+import { IntegrationTestUtils } from './test-utils';
 
-suite('My E2E Test Suite', () => {
+suite('My Integration Test Suite', () => {
   suiteSetup(async function() {
     this.timeout(30000);
-    await E2ETestUtils.initialize();
-    await E2ETestUtils.waitForExtensionActivation();
+    await IntegrationTestUtils.initialize();
+    await IntegrationTestUtils.waitForExtensionActivation();
   });
 
   suiteTeardown(async function() {
-    await E2ETestUtils.cleanup();
+    await IntegrationTestUtils.cleanup();
   });
 
   test('should test specific workflow', async function() {
     this.timeout(15000);
     
     // Setup
-    const testRepo = await E2ETestUtils.createTestRepository();
+    const testRepo = await IntegrationTestUtils.createTestRepository();
     
     // Execute
-    await E2ETestUtils.executeCommand('gitorial.someCommand');
+    await IntegrationTestUtils.executeCommand('gitorial.someCommand');
     
     // Verify
-    const result = await E2ETestUtils.waitForCondition(() => {
+    const result = await IntegrationTestUtils.waitForCondition(() => {
       // Check condition
       return true;
     });
@@ -152,31 +152,31 @@ suite('My E2E Test Suite', () => {
 
 ```typescript
 // Mock user input
-E2ETestUtils.mockInputBox('user-input-value');
+IntegrationTestUtils.mockInputBox('user-input-value');
 
 // Mock file selection
-E2ETestUtils.mockOpenDialog([vscode.Uri.file('/path/to/directory')]);
+IntegrationTestUtils.mockOpenDialog([vscode.Uri.file('/path/to/directory')]);
 
 // Mock quick pick selection
-E2ETestUtils.mockQuickPick({ label: 'Option 1', value: 'option1' });
+IntegrationTestUtils.mockQuickPick({ label: 'Option 1', value: 'option1' });
 ```
 
 ### Assertion Helpers
 
 ```typescript
 // File content assertions
-await E2ETestUtils.assertFileContent('/path/to/file', 'expected content');
+await IntegrationTestUtils.assertFileContent('/path/to/file', 'expected content');
 
 // Git state assertions
-const branch = await E2ETestUtils.getCurrentBranch('/repo/path');
+const branch = await IntegrationTestUtils.getCurrentBranch('/repo/path');
 assert.strictEqual(branch, 'gitorial');
 
 // Repository state assertions
-const isClean = await E2ETestUtils.isRepositoryClean('/repo/path');
+const isClean = await IntegrationTestUtils.isRepositoryClean('/repo/path');
 assert.ok(isClean, 'Repository should be clean');
 ```
 
-## Debugging E2E Tests
+## Debugging Integration Tests
 
 ### Development Mode
 
@@ -187,7 +187,7 @@ Run tests in development mode for debugging:
 pnpm run build:watch
 
 # Run specific test with debugging
-pnpm run test:e2e -- --grep "specific test name" --timeout 0
+pnpm run test:integration -- --grep "specific test name" --timeout 0
 ```
 
 ### VS Code Extension Host
@@ -240,12 +240,12 @@ Tests include comprehensive logging:
 
 ### GitHub Actions
 
-E2E tests integrate with GitHub Actions workflow:
+Integration tests integrate with GitHub Actions workflow:
 
 ```yaml
-- name: Run E2E Tests
+- name: Run Integration Tests
   run: |
-    xvfb-run -a pnpm run test:e2e
+    xvfb-run -a pnpm run test:integration
   env:
     DISPLAY: :99
 ```
@@ -268,4 +268,4 @@ On test failures:
 
 ---
 
-These E2E tests ensure the Gitorial extension works reliably across all supported user workflows and provides confidence for releases and refactoring efforts.
+These Integration tests ensure the Gitorial extension works reliably across all supported user workflows and provides confidence for releases and refactoring efforts.

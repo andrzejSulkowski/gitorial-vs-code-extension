@@ -1,49 +1,49 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
-import { E2ETestUtils, TestRepository } from './test-utils';
-import { E2E_TEST_CONFIG } from './test-config';
+import { IntegrationTestUtils, TestRepository } from './test-utils';
+import { INTEGRATION_TEST_CONFIG } from './test-config';
 
 /**
- * E2E Tests for Core Gitorial Workflows
+ * Integration Tests for Core Gitorial Workflows
  * Tests error handling and edge cases for tutorial operations
  */
 
-suite('E2E: Core Workflows', () => {
+suite('Integration: Core Workflows', () => {
   let testRepo: TestRepository;
   let _extensionContext: vscode.Extension<any>;
 
   suiteSetup(async function() {
-    this.timeout(E2E_TEST_CONFIG.TIMEOUTS.SUITE_SETUP);
+    this.timeout(INTEGRATION_TEST_CONFIG.TIMEOUTS.SUITE_SETUP);
 
-    console.log('Setting up Core Workflows E2E test environment...');
+    console.log('Setting up Core Workflows Integration test environment...');
 
     // Initialize test utilities
-    await E2ETestUtils.initialize();
+    await IntegrationTestUtils.initialize();
 
     // Wait for extension activation
-    _extensionContext = await E2ETestUtils.waitForExtensionActivation();
+    _extensionContext = await IntegrationTestUtils.waitForExtensionActivation();
 
-    console.log('Core Workflows E2E test environment ready');
+    console.log('Core Workflows Integration test environment ready');
   });
 
   suiteTeardown(async function() {
-    this.timeout(E2E_TEST_CONFIG.TIMEOUTS.CLEANUP);
-    console.log('Cleaning up Core Workflows E2E test environment...');
-    await E2ETestUtils.cleanup();
+    this.timeout(INTEGRATION_TEST_CONFIG.TIMEOUTS.CLEANUP);
+    console.log('Cleaning up Core Workflows Integration test environment...');
+    await IntegrationTestUtils.cleanup();
 
-    // Also cleanup the e2e-execution directory created by our extension
-    await E2ETestUtils.cleanupE2EExecutionDirectory();
-    console.log('Core Workflows E2E test environment cleaned up');
+    // Also cleanup the integration-execution directory created by our extension
+    await IntegrationTestUtils.cleanupIntegrationExecutionDirectory();
+    console.log('Core Workflows Integration test environment cleaned up');
   });
 
   setup(async function() {
-    this.timeout(E2E_TEST_CONFIG.TIMEOUTS.CLEANUP);
+    this.timeout(INTEGRATION_TEST_CONFIG.TIMEOUTS.CLEANUP);
     // Create fresh test repository for each test
-    testRepo = await E2ETestUtils.createTestRepository(`test-repo-${Date.now()}`);
+    testRepo = await IntegrationTestUtils.createTestRepository(`test-repo-${Date.now()}`);
   });
 
   teardown(async function() {
-    this.timeout(E2E_TEST_CONFIG.TIMEOUTS.QUICK_OPERATION);
+    this.timeout(INTEGRATION_TEST_CONFIG.TIMEOUTS.QUICK_OPERATION);
     // Individual test cleanup is handled by the utilities
   });
 
@@ -55,10 +55,10 @@ suite('E2E: Core Workflows', () => {
 
       // Test 1: Invalid directory with openTutorial
       const nonExistentPath = path.join(testRepo.path, 'non-existent');
-      E2ETestUtils.mockOpenDialog([vscode.Uri.file(nonExistentPath)]);
+      IntegrationTestUtils.mockOpenDialog([vscode.Uri.file(nonExistentPath)]);
 
       try {
-        await E2ETestUtils.executeCommand('gitorial.openTutorial');
+        await IntegrationTestUtils.executeCommand('gitorial.openTutorial');
         console.log('Invalid directory handled gracefully (openTutorial)');
       } catch (_error) {
         console.log('Command failed as expected for invalid directory (openTutorial)');
@@ -66,7 +66,7 @@ suite('E2E: Core Workflows', () => {
 
       // Test 2: No workspace with openWorkspaceTutorial (same error path in test environment)
       try {
-        await E2ETestUtils.executeCommand('gitorial.openWorkspaceTutorial');
+        await IntegrationTestUtils.executeCommand('gitorial.openWorkspaceTutorial');
         console.log('No workspace handled gracefully (openWorkspaceTutorial)');
       } catch (_error) {
         console.log('Command failed as expected for no workspace (openWorkspaceTutorial)');
@@ -87,10 +87,10 @@ suite('E2E: Core Workflows', () => {
       await require('fs/promises').mkdir(nonGitPath, { recursive: true });
 
       // Mock file picker to select non-git directory
-      E2ETestUtils.mockOpenDialog([vscode.Uri.file(nonGitPath)]);
+      IntegrationTestUtils.mockOpenDialog([vscode.Uri.file(nonGitPath)]);
 
       try {
-        await E2ETestUtils.executeCommand('gitorial.openTutorial');
+        await IntegrationTestUtils.executeCommand('gitorial.openTutorial');
         console.log('Command completed (may have shown error message)');
       } catch (_error) {
         console.log('Error handled gracefully:', (_error as Error).message);

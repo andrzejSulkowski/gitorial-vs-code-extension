@@ -1,5 +1,4 @@
 import { IFileSystem } from '@domain/ports/IFileSystem';
-import { PathSanitizer } from '@utils/security/PathSanitizer';
 import * as os from 'os';
 import * as path from 'path';
 

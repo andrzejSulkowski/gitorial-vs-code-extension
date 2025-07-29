@@ -1,14 +1,14 @@
 import * as assert from 'assert';
 import * as vscode from 'vscode';
-import { E2ETestUtils } from './test-utils';
-import { E2E_TEST_CONFIG } from './test-config';
+import { IntegrationTestUtils } from './test-utils';
+import { INTEGRATION_TEST_CONFIG } from './test-config';
 
 /**
- * E2E Tests for Lesson Navigation
+ * Integration Tests for Lesson Navigation
  * Tests the complete lesson navigation workflow including step progression and content changes
  */
 
-suite('E2E: Lesson Navigation', () => {
+suite('Integration: Lesson Navigation', () => {
   let mockRemoteRepo: { path: string; url: string };
   let _extensionContext: vscode.Extension<any>;
   let sharedClonedRepoPath: string;
@@ -16,24 +16,24 @@ suite('E2E: Lesson Navigation', () => {
   suiteSetup(async function() {
     this.timeout(30000); // Increased timeout for clone + setup
 
-    console.log('Setting up Lesson Navigation E2E test environment...');
+    console.log('Setting up Lesson Navigation Integration test environment...');
 
-    await E2ETestUtils.initialize();
-    _extensionContext = await E2ETestUtils.waitForExtensionActivation();
+    await IntegrationTestUtils.initialize();
+    _extensionContext = await IntegrationTestUtils.waitForExtensionActivation();
 
     // Create mock remote repository for navigation tests (real GitHub repo)
-    mockRemoteRepo = await E2ETestUtils.createMockRemoteRepository();
+    mockRemoteRepo = await IntegrationTestUtils.createMockRemoteRepository();
     console.log(`Mock remote repository created at: ${mockRemoteRepo.url}`);
 
     // Clone once for all navigation tests in this suite
     console.log('Cloning tutorial once for all navigation tests...');
-    E2ETestUtils.mockInputBox(mockRemoteRepo.url);
-    await E2ETestUtils.executeCommand('gitorial.cloneTutorial');
+    IntegrationTestUtils.mockInputBox(mockRemoteRepo.url);
+    await IntegrationTestUtils.executeCommand('gitorial.cloneTutorial');
 
     // Wait for clone to complete and find the actual repository path
     console.log('Searching for cloned repository...');
-    await E2ETestUtils.waitForCondition(async () => {
-      const foundPath = await E2ETestUtils.findClonedRepositoryPath('rust-state-machine');
+    await IntegrationTestUtils.waitForCondition(async () => {
+      const foundPath = await IntegrationTestUtils.findClonedRepositoryPath('rust-state-machine');
       if (foundPath) {
         sharedClonedRepoPath = foundPath;
         return true;
@@ -49,7 +49,7 @@ suite('E2E: Lesson Navigation', () => {
 
     // Explicitly open the tutorial from the cloned path to ensure it's loaded into the active session
     console.log('Loading tutorial from cloned path using extension API...');
-    const didLoad = await E2ETestUtils.loadTutorialFromPath(sharedClonedRepoPath);
+    const didLoad = await IntegrationTestUtils.loadTutorialFromPath(sharedClonedRepoPath);
 
     if (!didLoad) {
       throw new Error('Failed to load tutorial into active session - navigation tests will fail');
@@ -57,17 +57,17 @@ suite('E2E: Lesson Navigation', () => {
 
     console.log('Tutorial successfully loaded into active session');
 
-    console.log('Lesson Navigation E2E test environment ready');
+    console.log('Lesson Navigation Integration test environment ready');
   });
 
   suiteTeardown(async function() {
-    this.timeout(E2E_TEST_CONFIG.TIMEOUTS.CLEANUP);
-    console.log('Cleaning up Lesson Navigation E2E test environment...');
-    await E2ETestUtils.cleanup();
+    this.timeout(INTEGRATION_TEST_CONFIG.TIMEOUTS.CLEANUP);
+    console.log('Cleaning up Lesson Navigation Integration test environment...');
+    await IntegrationTestUtils.cleanup();
 
-    // Also cleanup the e2e-execution directory created by our extension
-    await E2ETestUtils.cleanupE2EExecutionDirectory();
-    console.log('Lesson Navigation E2E test environment cleaned up');
+    // Also cleanup the integration-execution directory created by our extension
+    await IntegrationTestUtils.cleanupIntegrationExecutionDirectory();
+    console.log('Lesson Navigation Integration test environment cleaned up');
   });
 
   suite('Step Navigation Workflow', () => {
@@ -77,36 +77,36 @@ suite('E2E: Lesson Navigation', () => {
       console.log('Testing: Sequential step navigation (using shared repo)');
 
       // Verify shared repository exists and get initial state
-      const currentBranch = await E2ETestUtils.getCurrentBranch(sharedClonedRepoPath);
+      const currentBranch = await IntegrationTestUtils.getCurrentBranch(sharedClonedRepoPath);
       console.log(`Current branch: ${currentBranch}`);
 
       // Navigate to next step
       console.log('Navigating to next step...');
-      await E2ETestUtils.executeCommand('gitorial.navigateToNextStep');
+      await IntegrationTestUtils.executeCommand('gitorial.navigateToNextStep');
       await new Promise(resolve => setTimeout(resolve, 2000));
       console.log('Next step navigation completed');
 
       // Navigate to another next step
       console.log('Navigating to step 3...');
-      await E2ETestUtils.executeCommand('gitorial.navigateToNextStep');
+      await IntegrationTestUtils.executeCommand('gitorial.navigateToNextStep');
       await new Promise(resolve => setTimeout(resolve, 2000));
       console.log('Second next step navigation completed');
 
       // Navigate backwards
       console.log('Navigating back to previous step...');
-      await E2ETestUtils.executeCommand('gitorial.navigateToPreviousStep');
+      await IntegrationTestUtils.executeCommand('gitorial.navigateToPreviousStep');
       await new Promise(resolve => setTimeout(resolve, 2000));
       console.log('Previous step navigation completed');
 
       // Navigate back to step 1
       console.log('Navigating back to step 1...');
-      await E2ETestUtils.executeCommand('gitorial.navigateToPreviousStep');
+      await IntegrationTestUtils.executeCommand('gitorial.navigateToPreviousStep');
       await new Promise(resolve => setTimeout(resolve, 2000));
       console.log('Back to step 1 navigation completed');
 
       // Test boundary - try to go before first step
       console.log('Testing boundary: navigate before first step...');
-      await E2ETestUtils.executeCommand('gitorial.navigateToPreviousStep');
+      await IntegrationTestUtils.executeCommand('gitorial.navigateToPreviousStep');
       await new Promise(resolve => setTimeout(resolve, 1000));
       console.log('Boundary test completed (should stay on first step)');
 
@@ -120,33 +120,33 @@ suite('E2E: Lesson Navigation', () => {
 
       // Test: Try to navigate backward from first step (should fail gracefully)
       console.log('Testing backward navigation from first step...');
-      await E2ETestUtils.executeCommand('gitorial.navigateToPreviousStep');
+      await IntegrationTestUtils.executeCommand('gitorial.navigateToPreviousStep');
       await new Promise(resolve => setTimeout(resolve, 500));
 
       // Navigate forward a few steps to test end boundary
       console.log('Navigating to middle steps...');
-      await E2ETestUtils.executeCommand('gitorial.navigateToNextStep');
+      await IntegrationTestUtils.executeCommand('gitorial.navigateToNextStep');
       await new Promise(resolve => setTimeout(resolve, 500));
-      await E2ETestUtils.executeCommand('gitorial.navigateToNextStep');
+      await IntegrationTestUtils.executeCommand('gitorial.navigateToNextStep');
       await new Promise(resolve => setTimeout(resolve, 500));
 
       // Navigate forward multiple times to reach/exceed last step
       console.log('Testing forward navigation to/beyond last step...');
       for (let i = 0; i < 5; i++) {
-        await E2ETestUtils.executeCommand('gitorial.navigateToNextStep');
+        await IntegrationTestUtils.executeCommand('gitorial.navigateToNextStep');
         await new Promise(resolve => setTimeout(resolve, 500));
       }
 
       // Navigate back to first step
       console.log('Testing backward navigation to first step...');
       for (let i = 0; i < 5; i++) {
-        await E2ETestUtils.executeCommand('gitorial.navigateToPreviousStep');
+        await IntegrationTestUtils.executeCommand('gitorial.navigateToPreviousStep');
         await new Promise(resolve => setTimeout(resolve, 500));
       }
 
       // Try to navigate before first step (should fail gracefully)
       console.log('Testing backward navigation before first step...');
-      await E2ETestUtils.executeCommand('gitorial.navigateToPreviousStep');
+      await IntegrationTestUtils.executeCommand('gitorial.navigateToPreviousStep');
       await new Promise(resolve => setTimeout(resolve, 500));
 
       console.log('Navigation boundaries test completed');
@@ -160,25 +160,25 @@ suite('E2E: Lesson Navigation', () => {
       console.log('Testing: Repository state during navigation (using shared repo)');
 
       // Verify repository is clean after opening
-      const isCleanAfterOpen = await E2ETestUtils.isRepositoryClean(sharedClonedRepoPath);
+      const isCleanAfterOpen = await IntegrationTestUtils.isRepositoryClean(sharedClonedRepoPath);
       assert.ok(isCleanAfterOpen, 'Repository should be clean after opening tutorial');
       console.log('Repository clean after tutorial opening');
 
       // Navigate to next step
-      await E2ETestUtils.executeCommand('gitorial.navigateToNextStep');
+      await IntegrationTestUtils.executeCommand('gitorial.navigateToNextStep');
       await new Promise(resolve => setTimeout(resolve, 2000));
 
       // Verify repository is still clean after navigation
-      const isCleanAfterNav = await E2ETestUtils.isRepositoryClean(sharedClonedRepoPath);
+      const isCleanAfterNav = await IntegrationTestUtils.isRepositoryClean(sharedClonedRepoPath);
       assert.ok(isCleanAfterNav, 'Repository should remain clean after step navigation');
       console.log('Repository remains clean after navigation');
 
       // Navigate back
-      await E2ETestUtils.executeCommand('gitorial.navigateToPreviousStep');
+      await IntegrationTestUtils.executeCommand('gitorial.navigateToPreviousStep');
       await new Promise(resolve => setTimeout(resolve, 2000));
 
       // Verify repository is still clean after backward navigation
-      const isCleanAfterBackNav = await E2ETestUtils.isRepositoryClean(sharedClonedRepoPath);
+      const isCleanAfterBackNav = await IntegrationTestUtils.isRepositoryClean(sharedClonedRepoPath);
       assert.ok(isCleanAfterBackNav, 'Repository should remain clean after backward navigation');
       console.log('Repository remains clean after backward navigation');
 
@@ -193,7 +193,7 @@ suite('E2E: Lesson Navigation', () => {
       // Wait for tutorial to initialize (detached HEAD on specific commit is expected)
       await new Promise(resolve => setTimeout(resolve, 1000));
 
-      const initialBranch = await E2ETestUtils.getCurrentBranch(sharedClonedRepoPath);
+      const initialBranch = await IntegrationTestUtils.getCurrentBranch(sharedClonedRepoPath);
       console.log(`Initial branch/commit: ${initialBranch}`);
 
       // Gitorial extension uses detached HEAD on specific step commits, not branch names
@@ -204,10 +204,10 @@ suite('E2E: Lesson Navigation', () => {
 
       // Navigate through steps and check that we're always on a valid gitorial state
       console.log('Testing navigation state consistency during next step...');
-      await E2ETestUtils.executeCommand('gitorial.navigateToNextStep');
+      await IntegrationTestUtils.executeCommand('gitorial.navigateToNextStep');
       await new Promise(resolve => setTimeout(resolve, 2000));
 
-      const stateAfterNext = await E2ETestUtils.getCurrentBranch(sharedClonedRepoPath);
+      const stateAfterNext = await IntegrationTestUtils.getCurrentBranch(sharedClonedRepoPath);
       console.log(`State after next: ${stateAfterNext}`);
 
       // Should be either on gitorial branch or a step commit (detached HEAD)
@@ -216,10 +216,10 @@ suite('E2E: Lesson Navigation', () => {
       assert.ok(isValidNextState, `Should be on gitorial branch or step commit after next, got: ${stateAfterNext}`);
 
       console.log('Testing navigation state consistency during previous step...');
-      await E2ETestUtils.executeCommand('gitorial.navigateToPreviousStep');
+      await IntegrationTestUtils.executeCommand('gitorial.navigateToPreviousStep');
       await new Promise(resolve => setTimeout(resolve, 2000));
 
-      const stateAfterPrev = await E2ETestUtils.getCurrentBranch(sharedClonedRepoPath);
+      const stateAfterPrev = await IntegrationTestUtils.getCurrentBranch(sharedClonedRepoPath);
       console.log(`State after previous: ${stateAfterPrev}`);
 
       // Should be either on gitorial branch or a step commit (detached HEAD)
@@ -239,14 +239,14 @@ suite('E2E: Lesson Navigation', () => {
 
       // Try to navigate without opening a tutorial first
       try {
-        await E2ETestUtils.executeCommand('gitorial.navigateToNextStep');
+        await IntegrationTestUtils.executeCommand('gitorial.navigateToNextStep');
         console.log('Navigation command completed (should handle gracefully)');
       } catch (_error) {
         console.log('Navigation command failed gracefully as expected');
       }
 
       try {
-        await E2ETestUtils.executeCommand('gitorial.navigateToPreviousStep');
+        await IntegrationTestUtils.executeCommand('gitorial.navigateToPreviousStep');
         console.log('Previous navigation command completed (should handle gracefully)');
       } catch (_error) {
         console.log('Previous navigation command failed gracefully as expected');

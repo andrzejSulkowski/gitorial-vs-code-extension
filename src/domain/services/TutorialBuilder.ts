@@ -10,7 +10,6 @@ import { TutorialId } from '@gitorial/shared-types';
 import { DomainCommit } from '../ports/IGitOperations';
 import { Step } from '../models/Step';
 import { StepType, StepData } from '@gitorial/shared-types';
-import { UrlValidator } from '@utils/security/UrlValidator';
 
 /**
  * Constructs Tutorial domain objects from raw data (e.g., repository information,
@@ -84,14 +83,30 @@ export class TutorialBuilder {
     repo: string;
   } | null {
     try {
-      // Use secure URL validator to extract repository information
-      const repoInfo = UrlValidator.extractRepositoryInfo(repoUrl);
-      if (!repoInfo) {
-        console.error(`Failed to extract repo details from URL ${repoUrl}: Invalid or unsupported URL format`);
-        return null;
+      // Handle GitHub URLs
+      const githubRegex = /github\.com[\/:]([^\/]+)\/([^\/\.]+)(\.git)?$/i;
+      const githubMatch = repoUrl.match(githubRegex);
+      if (githubMatch) {
+        return {
+          platform: 'github',
+          owner: githubMatch[1],
+          repo: githubMatch[2],
+        };
       }
 
-      return repoInfo;
+      // Handle GitLab URLs
+      const gitlabRegex = /gitlab\.com[\/:]([^\/]+)\/([^\/\.]+)(\.git)?$/i;
+      const gitlabMatch = repoUrl.match(gitlabRegex);
+      if (gitlabMatch) {
+        return {
+          platform: 'gitlab',
+          owner: gitlabMatch[1],
+          repo: gitlabMatch[2],
+        };
+      }
+
+      // Unknown platform
+      return null;
     } catch (error) {
       console.error(`Error extracting repo details from URL ${repoUrl}:`, error);
       return null;

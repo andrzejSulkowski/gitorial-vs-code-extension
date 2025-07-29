@@ -14,9 +14,6 @@ import * as path from 'path'; //TODO: Remove this import and use IFileSystem ins
 import * as os from 'os';
 import { IGitOperations, DefaultLogFields, ListLogLine } from '../../domain/ports/IGitOperations';
 import { IGitChanges, DiffFilePayload } from 'src/ui/ports/IGitChanges';
-import { CommandValidator } from '@utils/security/CommandValidator';
-import { UrlValidator } from '@utils/security/UrlValidator';
-import { PathSanitizer } from '@utils/security/PathSanitizer';
 
 /**
  * Adapter for Git operations using simple-git
@@ -42,45 +39,10 @@ export class GitAdapter implements IGitOperations, IGitChanges {
     targetPath: string,
     progressCallback?: (message: string) => void,
   ): Promise<void> {
-    // Validate repository URL for security
-    const urlValidation = UrlValidator.validateRepositoryUrl(repoUrl);
-    if (!urlValidation.isValid) {
-      throw new Error(`Invalid repository URL: ${urlValidation.error}`);
-    }
-
-    // Validate target path for security
-    // Check if target path is in a temp directory to allow system temp paths
-    const tempDir = os.tmpdir();
-    const isInTempDir = targetPath.startsWith(tempDir) ||
-                       targetPath.includes('/e2e-execution') ||
-                       targetPath.startsWith('/var/folders'); // macOS temp
-
-    const pathValidation = PathSanitizer.sanitizePath(targetPath, {
-      allowAbsolute: true,
-      allowRelative: false,
-      restrictToUserHome: !isInTempDir, // Allow temp directories outside user home
-    });
-    if (!pathValidation.isValid) {
-      throw new Error(`Invalid target path: ${pathValidation.error}`);
-    }
-
-    // Validate git clone command
-    if (!urlValidation.normalizedUrl || !pathValidation.sanitizedPath) {
-      throw new Error('URL normalization or path sanitization failed');
-    }
-    
-    const commandValidation = CommandValidator.createSafeGitCloneCommand(
-      urlValidation.normalizedUrl,
-      pathValidation.sanitizedPath,
-    );
-    if (!commandValidation.isValid) {
-      throw new Error(`Invalid git command: ${commandValidation.error}`);
-    }
-
     if (progressCallback) {
-      progressCallback(`Cloning ${urlValidation.normalizedUrl} into ${pathValidation.sanitizedPath}...`);
+      progressCallback(`Cloning ${repoUrl} into ${targetPath}...`);
     }
-    await simpleGit().clone(urlValidation.normalizedUrl, pathValidation.sanitizedPath);
+    await simpleGit().clone(repoUrl, targetPath);
     if (progressCallback) {
       progressCallback('Cloned successfully.');
     }
@@ -89,8 +51,8 @@ export class GitAdapter implements IGitOperations, IGitChanges {
    * Factory method to create a GitAdapter after cloning a repo
    */
   public static async createFromClone(repoUrl: string, targetDir: string): Promise<GitAdapter> {
-    // Use the secure cloneRepo method instead of direct simple-git
-    await GitAdapter.cloneRepo(repoUrl, targetDir);
+    const git = simpleGit();
+    await git.clone(repoUrl, targetDir);
     return new GitAdapter(targetDir);
   }
 
@@ -300,12 +262,6 @@ export class GitAdapter implements IGitOperations, IGitChanges {
     await this.git.clone(this.repoPath);
   }
   public async checkout(commitHash: string): Promise<void> {
-    // Validate git checkout command for security
-    const commandValidation = CommandValidator.createSafeGitCheckoutCommand(commitHash);
-    if (!commandValidation.isValid) {
-      throw new Error(`Invalid git checkout command: ${commandValidation.error}`);
-    }
-
     await this.git.checkout(commitHash);
   }
   public async listRemote(args: TaskOptions): Promise<string> {
@@ -316,21 +272,10 @@ export class GitAdapter implements IGitOperations, IGitChanges {
    * Checkout a specific commit and clean the working directory
    */
   public async checkoutAndClean(commitHash: string): Promise<void> {
-    // Validate git checkout command for security
-    const commandValidation = CommandValidator.createSafeGitCheckoutCommand(commitHash);
-    if (!commandValidation.isValid) {
-      throw new Error(`Invalid git checkout command: ${commandValidation.error}`);
-    }
-
     try {
       await this.git.checkout(commitHash);
     } catch (error: any) {
       if (error.message?.includes('Your local changes')) {
-        // Validate forced checkout command
-        const forceValidation = CommandValidator.validateCommand('git', ['checkout', '-f', commitHash]);
-        if (!forceValidation.isValid) {
-          throw new Error(`Invalid git force checkout command: ${forceValidation.error}`);
-        }
         await this.git.checkout(['-f', commitHash]);
       } else {
         throw error;

@@ -10,8 +10,6 @@ import { AutoOpenState } from '@infra/state/AutoOpenState';
 import { asTutorialId } from '@gitorial/shared-types';
 import { IGitChanges } from '@ui/ports/IGitChanges';
 import { IGitChangesFactory } from '@ui/ports/IGitChangesFactory';
-import { UrlValidator } from '@utils/security/UrlValidator';
-import { PathSanitizer } from '@utils/security/PathSanitizer';
 
 /**
  * SIMPLIFIED TUTORIAL LIFECYCLE CONTROLLER
@@ -404,16 +402,7 @@ export class Controller {
       return undefined;
     }
 
-    // Validate URL for security
-    const validation = UrlValidator.validateRepositoryUrl(url);
-    if (!validation.isValid) {
-      await this.userInteraction.showErrorMessage(
-        `Invalid repository URL: ${validation.error}`,
-      );
-      return undefined;
-    }
-
-    return validation.normalizedUrl;
+    return url;
   }
 
   private async _promptForCloneDestination(): Promise<string | undefined> {
@@ -469,13 +458,8 @@ export class Controller {
    * Creates a temporary directory for cloning tutorials that can be easily cleaned up
    */
   private async _createTemporaryCloneDirectory(): Promise<string> {
-    // Use secure path sanitization for temporary directory creation
-    const tempPathResult = PathSanitizer.createSafeTempPath('e2e-execution');
-    if (!tempPathResult.isValid || !tempPathResult.sanitizedPath) {
-      throw new Error(`Failed to create safe temporary directory: ${tempPathResult.error}`);
-    }
-
-    const e2eExecutionDir = tempPathResult.sanitizedPath;
+    const tempDir = os.tmpdir();
+    const e2eExecutionDir = path.join(tempDir, 'e2e-execution');
 
     try {
       // Ensure the e2e-execution directory exists
@@ -650,13 +634,7 @@ export class Controller {
   }
 
   private _buildClonePath(parentDir: string, repoName: string): string {
-    // Use path sanitizer to create safe clone path
-    const pathResult = PathSanitizer.createSafeClonePath(parentDir, repoName);
-    if (!pathResult.isValid || !pathResult.sanitizedPath) {
-      throw new Error(`Failed to create safe clone path: ${pathResult.error}`);
-    }
-
-    return pathResult.sanitizedPath;
+    return this.fs.join(parentDir, repoName);
   }
 
   private async _reportProgress<T>(message: string, operation: () => Promise<T>): Promise<T> {

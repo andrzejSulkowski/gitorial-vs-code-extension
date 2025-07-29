@@ -3,10 +3,10 @@ import * as path from 'path';
 import * as fs from 'fs/promises';
 import { simpleGit, SimpleGit } from 'simple-git';
 import * as os from 'os';
-import { E2E_TEST_CONFIG } from './test-config';
+import { INTEGRATION_TEST_CONFIG } from './test-config';
 
 /**
- * E2E Testing utilities for Gitorial VS Code extension
+ * Integration Testing utilities for Gitorial VS Code extension
  * Provides test fixtures, workspace setup, and cleanup functionality
  */
 
@@ -37,7 +37,7 @@ class GitHubRepositoryProvider implements RepositoryProvider {
 }
 
 class LocalRepositoryProvider implements RepositoryProvider {
-  constructor(private testUtils: typeof E2ETestUtils) {}
+  constructor(private testUtils: typeof IntegrationTestUtils) {}
 
   async getTestRepository(): Promise<{ path: string; url: string }> {
     const localRepo = await this.testUtils.createLocalMockRepository();
@@ -45,7 +45,7 @@ class LocalRepositoryProvider implements RepositoryProvider {
   }
 }
 
-export class E2ETestUtils {
+export class IntegrationTestUtils {
   private static testDir: string;
   private static createdPaths: string[] = [];
   private static repositoryProvider: RepositoryProvider;
@@ -55,13 +55,13 @@ export class E2ETestUtils {
    */
   static async initialize(useLocalRepo: boolean = false): Promise<void> {
     // Create unique test directory using configuration
-    this.testDir = path.join(os.tmpdir(), `${E2E_TEST_CONFIG.DIRECTORIES.TEMP_PREFIX}-${Date.now()}`);
+    this.testDir = path.join(os.tmpdir(), `${INTEGRATION_TEST_CONFIG.DIRECTORIES.TEMP_PREFIX}-${Date.now()}`);
     await fs.mkdir(this.testDir, { recursive: true });
     this.createdPaths.push(this.testDir);
 
     // Configure repository provider based on environment
     if (useLocalRepo || process.env.GITORIAL_USE_LOCAL_REPO === 'true') {
-      this.repositoryProvider = new LocalRepositoryProvider(E2ETestUtils);
+      this.repositoryProvider = new LocalRepositoryProvider(IntegrationTestUtils);
     } else {
       // Default to GitHub provider with rust-state-machine repo
       this.repositoryProvider = new GitHubRepositoryProvider('https://github.com/shawntabrizi/rust-state-machine');
@@ -87,24 +87,24 @@ export class E2ETestUtils {
   }
 
   /**
-   * Clean up the e2e-execution directory created by the extension
+   * Clean up the integration-execution directory created by the extension
    */
-  static async cleanupE2EExecutionDirectory(): Promise<void> {
-    const e2eExecutionPath = path.join(os.tmpdir(), 'e2e-execution');
+  static async cleanupIntegrationExecutionDirectory(): Promise<void> {
+    const e2eExecutionPath = path.join(os.tmpdir(), 'integration-execution');
 
     try {
       await fs.access(e2eExecutionPath);
       await fs.rm(e2eExecutionPath, { recursive: true, force: true });
-      console.log('🗑️  Cleaned up e2e-execution directory');
+      console.log('🗑️  Cleaned up integration-execution directory');
     } catch (_error) {
       // Directory doesn't exist, which is fine
-      console.log('📂 No e2e-execution directory to clean up');
+      console.log('📂 No integration-execution directory to clean up');
     }
   }
 
   /**
    * Find the actual cloned repository path for navigation tests
-   * Searches for e2e-execution directories in all common temp directory locations
+   * Searches for integration-execution directories in all common temp directory locations
    */
   static async findClonedRepositoryPath(repoName: string = 'rust-state-machine'): Promise<string | null> {
     // Common temp directory locations to check
@@ -123,7 +123,7 @@ export class E2ETestUtils {
 
     for (const tempLocation of tempLocations) {
       try {
-        const e2eExecutionPath = path.join(tempLocation, 'e2e-execution');
+        const e2eExecutionPath = path.join(tempLocation, 'integration-execution');
         const repoPath = path.join(e2eExecutionPath, repoName);
 
         // Check if the repository directory exists
@@ -329,7 +329,7 @@ export class E2ETestUtils {
   /**
    * Wait for webview panel to be created
    */
-  static async waitForWebviewPanel(timeout: number = E2E_TEST_CONFIG.TIMEOUTS.QUICK_OPERATION): Promise<vscode.WebviewPanel | null> {
+  static async waitForWebviewPanel(timeout: number = INTEGRATION_TEST_CONFIG.TIMEOUTS.QUICK_OPERATION): Promise<vscode.WebviewPanel | null> {
     return new Promise((resolve) => {
       const startTime = Date.now();
 
@@ -342,7 +342,7 @@ export class E2ETestUtils {
         }
 
         // Continue checking
-        setTimeout(checkForPanel, E2E_TEST_CONFIG.POLLING.WEBVIEW_CHECK_INTERVAL);
+        setTimeout(checkForPanel, INTEGRATION_TEST_CONFIG.POLLING.WEBVIEW_CHECK_INTERVAL);
       };
 
       checkForPanel();
@@ -389,7 +389,7 @@ export class E2ETestUtils {
     // Restore after short delay to avoid affecting other tests
     setTimeout(() => {
       vscode.window.showInputBox = originalShowInputBox;
-    }, E2E_TEST_CONFIG.MOCKS.INPUT_BOX_RESTORE);
+    }, INTEGRATION_TEST_CONFIG.MOCKS.INPUT_BOX_RESTORE);
   }
 
   /**
@@ -401,7 +401,7 @@ export class E2ETestUtils {
 
     setTimeout(() => {
       vscode.window.showQuickPick = originalShowQuickPick;
-    }, E2E_TEST_CONFIG.MOCKS.QUICK_PICK_RESTORE);
+    }, INTEGRATION_TEST_CONFIG.MOCKS.QUICK_PICK_RESTORE);
   }
 
   /**
@@ -416,7 +416,7 @@ export class E2ETestUtils {
 
     setTimeout(() => {
       vscode.window.showInformationMessage = originalShowInformationMessage;
-    }, E2E_TEST_CONFIG.MOCKS.DIALOG_RESTORE);
+    }, INTEGRATION_TEST_CONFIG.MOCKS.DIALOG_RESTORE);
   }
 
   /**
@@ -431,7 +431,7 @@ export class E2ETestUtils {
 
     setTimeout(() => {
       vscode.window.showWarningMessage = originalShowWarningMessage;
-    }, E2E_TEST_CONFIG.MOCKS.DIALOG_RESTORE);
+    }, INTEGRATION_TEST_CONFIG.MOCKS.DIALOG_RESTORE);
   }
 
   /**
@@ -454,13 +454,13 @@ export class E2ETestUtils {
 
     setTimeout(() => {
       vscode.window.showOpenDialog = originalShowOpenDialog;
-    }, E2E_TEST_CONFIG.MOCKS.INPUT_BOX_RESTORE);
+    }, INTEGRATION_TEST_CONFIG.MOCKS.INPUT_BOX_RESTORE);
   }
 
   /**
    * Wait for specific file to be opened in editor
    */
-  static async waitForFileToOpen(fileName: string, timeout: number = E2E_TEST_CONFIG.TIMEOUTS.FILE_OPERATION): Promise<vscode.TextEditor | null> {
+  static async waitForFileToOpen(fileName: string, timeout: number = INTEGRATION_TEST_CONFIG.TIMEOUTS.FILE_OPERATION): Promise<vscode.TextEditor | null> {
     return new Promise((resolve) => {
       const startTime = Date.now();
 
@@ -476,7 +476,7 @@ export class E2ETestUtils {
           return;
         }
 
-        setTimeout(checkForFile, E2E_TEST_CONFIG.POLLING.DEFAULT_INTERVAL);
+        setTimeout(checkForFile, INTEGRATION_TEST_CONFIG.POLLING.DEFAULT_INTERVAL);
       };
 
       checkForFile();
@@ -536,8 +536,8 @@ export class E2ETestUtils {
    */
   static async waitForCondition(
     condition: () => boolean | Promise<boolean>,
-    timeout: number = E2E_TEST_CONFIG.TIMEOUTS.QUICK_OPERATION,
-    interval: number = E2E_TEST_CONFIG.POLLING.DEFAULT_INTERVAL,
+    timeout: number = INTEGRATION_TEST_CONFIG.TIMEOUTS.QUICK_OPERATION,
+    interval: number = INTEGRATION_TEST_CONFIG.POLLING.DEFAULT_INTERVAL,
   ): Promise<void> {
     const startTime = Date.now();
 

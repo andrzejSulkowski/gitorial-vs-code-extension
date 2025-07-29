@@ -2,8 +2,6 @@ import { Tutorial } from '@domain/models/Tutorial';
 import { IFileSystem } from '@domain/ports/IFileSystem';
 import { IProgressReporter } from '@domain/ports/IProgressReporter';
 import { TutorialService } from '@domain/services/TutorialService';
-import { UrlValidator } from '@utils/security/UrlValidator';
-import { PathSanitizer } from '@utils/security/PathSanitizer';
 import * as os from 'os';
 
 export interface CloneOptions {

@@ -1,4 +1,4 @@
-name: E2E Tests
+name: Integration Tests
 
 on:
   push:
@@ -51,14 +51,14 @@ jobs:
     - name: Run unit tests
       run: pnpm run test:unit
       
-    - name: Setup virtual display for E2E tests
+    - name: Setup virtual display for integration tests
       run: |
         sudo apt-get update
         sudo apt-get install -y xvfb
         
-    - name: Run E2E tests
+    - name: Run integration tests
       run: |
-        xvfb-run -a pnpm run test:e2e
+        xvfb-run -a pnpm run test:integration
       env:
         DISPLAY: :99
         
@@ -79,5 +79,5 @@ jobs:
         name: extension-logs-${{ matrix.node-version }}
         path: |
           .vscode-test/
-          /tmp/gitorial-e2e-tests-*
+          /tmp/gitorial-integration-tests-*
         retention-days: 3

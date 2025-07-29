@@ -1,9 +1,9 @@
 /**
- * E2E Test Configuration Constants
+ * Integration Test Configuration Constants
  * Centralizes all timeout values, directory names, and test settings
  */
 
-export const E2E_TEST_CONFIG = {
+export const INTEGRATION_TEST_CONFIG = {
   /** Timeout configurations for different test operations */
   TIMEOUTS: {
     /** Suite setup timeout - allows for extension activation and environment setup */
@@ -25,7 +25,7 @@ export const E2E_TEST_CONFIG = {
   /** Directory and file naming conventions */
   DIRECTORIES: {
     /** Prefix for temporary test directories */
-    TEMP_PREFIX: 'gitorial-e2e-tests',
+    TEMP_PREFIX: 'gitorial-integration-tests',
     /** Target directory name for clone operations */
     CLONE_TARGET: 'test-clones',
     /** Repository name used in tests */

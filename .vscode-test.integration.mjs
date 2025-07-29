@@ -1,10 +1,10 @@
 import { defineConfig } from '@vscode/test-cli';
 
 export default defineConfig({
-  files: 'out/test/e2e/**/*.e2e.test.js',
+  files: 'out/test/integration/**/*.integration.test.js',
   mocha: {
     ui: 'tdd',
-    timeout: 30000, // Keep consistent with E2E_TEST_CONFIG.TIMEOUTS.VSCODE_TEST
+    timeout: 30000, // Keep consistent with INTEGRATION_TEST_CONFIG.TIMEOUTS.VSCODE_TEST
     color: true,
     reporter: 'spec'
   },

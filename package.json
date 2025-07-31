@@ -92,7 +92,23 @@
         "id": "gitorial-uri-handler",
         "label": "Gitorial URI Handler"
       }
-    ]
+    ],
+    "configuration": {
+      "title": "Gitorial",
+      "properties": {
+        "gitorial.cloneLocation": {
+          "type": "string",
+          "enum": ["subdirectory", "separate-workspace", "ask"],
+          "default": "ask",
+          "description": "Where to clone tutorials: as subdirectories in current workspace, separate workspace, or ask each time"
+        },
+        "gitorial.defaultCloneDirectory": {
+          "type": "string",
+          "default": "tutorials",
+          "description": "Default subdirectory name for tutorials when using subdirectory mode"
+        }
+      }
+    }
   },
   "dependencies": {
     "@gitorial/shared-types": "workspace:*",

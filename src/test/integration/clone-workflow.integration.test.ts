@@ -1,6 +1,7 @@
 import * as assert from 'assert';
 import * as vscode from 'vscode';
 import * as path from 'path';
+import * as fs from 'node:fs/promises';
 import { IntegrationTestUtils } from './test-utils';
 import { INTEGRATION_TEST_CONFIG } from './test-config';
 
@@ -35,6 +36,10 @@ suite('Integration: Clone Tutorial Workflow', () => {
 
     // Also cleanup the integration-execution directory created by our extension
     await IntegrationTestUtils.cleanupIntegrationExecutionDirectory();
+
+    // Clean up the tutorials directory created by subdirectory mode testing
+    await IntegrationTestUtils.cleanupTutorialsDirectory();
+
     console.log('Clone Integration test environment cleaned up');
   });
 
@@ -44,40 +49,41 @@ suite('Integration: Clone Tutorial Workflow', () => {
 
       console.log('Testing: Successful tutorial clone workflow');
 
+      // Configure extension for subdirectory mode
+      const config = vscode.workspace.getConfiguration('gitorial');
+      await config.update('cloneLocation', 'subdirectory', vscode.ConfigurationTarget.Workspace);
+
       // Mock user inputs for clone command with real repository
       IntegrationTestUtils.mockInputBox(mockRemoteRepo.url); // Repository URL input
 
-      const targetDir = path.join(process.cwd(), INTEGRATION_TEST_CONFIG.DIRECTORIES.CLONE_TARGET);
-      IntegrationTestUtils.mockOpenDialog([vscode.Uri.file(targetDir)]); // Target directory selection
-
-      // Mock confirmation dialogs for overwrite and tutorial opening
+      // Mock confirmation dialogs for subdirectory mode and overwrite
+      IntegrationTestUtils.mockConfirmationDialog('Use Subdirectory'); // Choose subdirectory mode if asked
       IntegrationTestUtils.mockWarningDialog('Overwrite'); // Handle "Folder already exists" dialog
-      IntegrationTestUtils.mockConfirmationDialog('Yes'); // Handle "Do you want to open tutorial" dialog
 
       try {
         // Execute clone command
         await IntegrationTestUtils.executeCommand('gitorial.cloneTutorial');
 
-        // Wait for clone operation to complete (real network operation takes longer)
+        // Wait for clone operation to complete - check subdirectory location
+        const expectedClonePath = path.join(process.cwd(), 'tutorials', INTEGRATION_TEST_CONFIG.DIRECTORIES.TEST_REPO_NAME);
+
         await IntegrationTestUtils.waitForCondition(async () => {
-          // Check if cloned directory exists (repository name from URL)
-          const expectedClonePath = path.join(targetDir, INTEGRATION_TEST_CONFIG.DIRECTORIES.TEST_REPO_NAME);
           try {
-            await require('fs/promises').access(expectedClonePath);
+            await fs.access(expectedClonePath);
             return true;
           } catch {
             return false;
           }
         }, INTEGRATION_TEST_CONFIG.TIMEOUTS.NETWORK_OPERATION);
 
-        console.log('Repository cloned successfully');
+        console.log('Repository cloned successfully to subdirectory');
 
         // Verify cloned repository structure
-        const clonedRepoPath = path.join(targetDir, INTEGRATION_TEST_CONFIG.DIRECTORIES.TEST_REPO_NAME);
+        const clonedRepoPath = expectedClonePath;
 
         // Check if it's a git repository
         const gitDirPath = path.join(clonedRepoPath, '.git');
-        await require('fs/promises').access(gitDirPath);
+        await fs.access(gitDirPath);
 
         // Verify gitorial branch exists
         const currentBranch = await IntegrationTestUtils.getCurrentBranch(clonedRepoPath);
@@ -100,16 +106,20 @@ suite('Integration: Clone Tutorial Workflow', () => {
 
       console.log('Testing: Clone to existing directory (reusing previous clone)');
 
-      // Mock user inputs - this will trigger the overwrite confirmation since rust-state-machine already exists
-      IntegrationTestUtils.mockInputBox(mockRemoteRepo.url);
+      // Configure extension for subdirectory mode
+      const config = vscode.workspace.getConfiguration('gitorial');
+      await config.update('cloneLocation', 'subdirectory', vscode.ConfigurationTarget.Workspace);
+
+      // Mock user inputs for clone command with existing directory
+      IntegrationTestUtils.mockInputBox(mockRemoteRepo.url); // Repository URL input
+
+      // Mock confirmation dialogs for subdirectory mode and overwrite
+      IntegrationTestUtils.mockConfirmationDialog('Use Subdirectory'); // Choose subdirectory mode if asked
+      IntegrationTestUtils.mockWarningDialog('Overwrite'); // Handle "Folder already exists" dialog
 
       try {
         await IntegrationTestUtils.executeCommand('gitorial.cloneTutorial');
-
-        // This test verifies the overwrite confirmation dialog works correctly
-        // The auto-confirm in test environment should handle the overwrite dialog
         console.log('Existing directory handling test completed');
-
       } catch (_error) {
         // Expected behavior - might fail due to existing directory
         console.log('Existing directory handled appropriately');

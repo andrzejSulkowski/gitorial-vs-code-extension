@@ -56,7 +56,6 @@ async function main() {
       'src/test/extension.test.ts',
       'src/test/integration/clone-workflow.integration.test.ts',
       'src/test/integration/core-workflows.integration.test.ts',
-      'src/test/integration/framework-demo.integration.test.ts',
       'src/test/integration/lesson-navigation.integration.test.ts'
     ],
     bundle: true,

@@ -14,4 +14,6 @@ export default defineConfig({
   ],
   // Enable extension development mode
   extensionDevelopmentPath: process.cwd(),
+  // Set test workspace to enable subdirectory mode
+  workspaceFolder: process.cwd(),
 });

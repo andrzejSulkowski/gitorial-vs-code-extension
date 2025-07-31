@@ -1,5 +1,7 @@
+import * as assert from 'assert';
 import * as vscode from 'vscode';
 import * as path from 'path';
+import * as fs from 'node:fs/promises';
 import { IntegrationTestUtils, TestRepository } from './test-utils';
 import { INTEGRATION_TEST_CONFIG } from './test-config';
 
@@ -33,6 +35,10 @@ suite('Integration: Core Workflows', () => {
 
     // Also cleanup the integration-execution directory created by our extension
     await IntegrationTestUtils.cleanupIntegrationExecutionDirectory();
+
+    // Clean up the tutorials directory created by subdirectory mode testing
+    await IntegrationTestUtils.cleanupTutorialsDirectory();
+
     console.log('Core Workflows Integration test environment cleaned up');
   });
 
@@ -45,6 +51,46 @@ suite('Integration: Core Workflows', () => {
   teardown(async function() {
     this.timeout(INTEGRATION_TEST_CONFIG.TIMEOUTS.QUICK_OPERATION);
     // Individual test cleanup is handled by the utilities
+  });
+
+  suite('Extension Command Validation', () => {
+    test('should have all required commands registered', async function() {
+      this.timeout(5000);
+
+      console.log('Testing: Extension command registration');
+
+      // Test that extension is activated and commands are available
+      const extension = vscode.extensions.getExtension('AndrzejSulkowski.gitorial');
+      assert.ok(extension, 'Gitorial extension should be available');
+      assert.ok(extension.isActive, 'Extension should be activated');
+
+      // Test command availability
+      const commands = await vscode.commands.getCommands();
+      const gitorialCommands = commands.filter(cmd => cmd.startsWith('gitorial.'));
+
+      console.log(`Found ${gitorialCommands.length} Gitorial commands`);
+      assert.ok(gitorialCommands.length >= 7, 'Should have at least 7 Gitorial commands registered');
+
+      // Verify specific commands exist
+      const expectedCommands = [
+        'gitorial.cloneTutorial',
+        'gitorial.openTutorial',
+        'gitorial.openWorkspaceTutorial',
+        'gitorial.cleanupTemporaryFolders',
+        'gitorial.resetClonePreferences',
+        'gitorial.navigateToNextStep',
+        'gitorial.navigateToPreviousStep',
+      ];
+
+      for (const expectedCmd of expectedCommands) {
+        assert.ok(
+          gitorialCommands.includes(expectedCmd),
+          `Command ${expectedCmd} should be registered`,
+        );
+      }
+
+      console.log('Extension command registration verified');
+    });
   });
 
   suite('Tutorial Error Handling', () => {
@@ -84,7 +130,7 @@ suite('Integration: Core Workflows', () => {
 
       // Create directory without git repository
       const nonGitPath = path.join(testRepo.path, '..', 'non-git-directory');
-      await require('fs/promises').mkdir(nonGitPath, { recursive: true });
+      await fs.mkdir(nonGitPath, { recursive: true });
 
       // Mock file picker to select non-git directory
       IntegrationTestUtils.mockOpenDialog([vscode.Uri.file(nonGitPath)]);

@@ -59,13 +59,14 @@ export class Controller {
       return { success: false, reason: 'user-cancelled' };
     } // User cancelled
 
-    const destinationFolder = await this._promptForCloneDestination();
-    if (!destinationFolder) {
+    // Determine clone location based on configuration
+    const cloneLocation = await this._determineCloneLocation();
+    if (!cloneLocation) {
       return { success: false, reason: 'user-cancelled' };
-    } // User cancelled
+    }
 
     const repoName = this._extractRepoName(repoUrl);
-    const clonePath = await this._prepareCloneTarget(destinationFolder, repoName);
+    const clonePath = await this._prepareCloneTarget(cloneLocation.path, repoName);
     if (!clonePath) {
       return { success: false, reason: 'user-cancelled' };
     } // User cancelled or prep failed
@@ -77,7 +78,7 @@ export class Controller {
 
     const gitChanges = this.gitChangesFactory.createFromPath(tutorial.localPath);
 
-    await this._handleSuccessfulClone(tutorial, clonePath, {
+    await this._handleSuccessfulClone(tutorial, clonePath, cloneLocation.mode, {
       wasInitiatedProgrammatically: !!options?.repoUrl,
       commitHash: options?.commitHash,
     });
@@ -130,8 +131,8 @@ export class Controller {
       };
     }
 
-    // Handle workspace switching if needed
-    if (!this._isCurrentWorkspace(path)) {
+    // Handle workspace switching if needed - but avoid it for subdirectories
+    if (!this._isCurrentWorkspace(path) && !this._isWithinCurrentWorkspace(path)) {
       await this._handleWorkspaceSwitch(tutorial, effectiveCommitHash);
       // Note: After workspace switch, the extension will restart
       // The tutorial will be loaded again in the new workspace context
@@ -192,19 +193,44 @@ export class Controller {
   private async _handleSuccessfulClone(
     tutorial: Tutorial,
     clonedPath: string,
+    cloneMode: 'subdirectory' | 'separate-workspace',
     options?: { wasInitiatedProgrammatically?: boolean; commitHash?: string },
   ): Promise<void> {
     this.userInteraction.showInformationMessage(
       `Tutorial "${tutorial.title}" cloned to ${clonedPath}.`,
     );
 
-    const shouldOpen =
-      options?.wasInitiatedProgrammatically || (await this._confirmOpenTutorial(tutorial.title));
+    if (cloneMode === 'subdirectory') {
+      // No workspace switching - tutorial is already in current workspace
+      // The tutorial is already loaded by _performClone, we just need to show success message
+      console.log(`LifecycleController: Tutorial successfully cloned and loaded in subdirectory mode: ${tutorial.title}`);
 
-    if (shouldOpen) {
-      await this._saveAutoOpenState(tutorial.id, options?.commitHash);
-      const folderUri = vscode.Uri.file(clonedPath);
-      await vscode.commands.executeCommand('vscode.openFolder', folderUri, {});
+      this.userInteraction.showInformationMessage(
+        `Tutorial "${tutorial.title}" is ready! Use Gitorial navigation commands to explore the steps.`,
+      );
+
+      // Open the tutorial README if it exists
+      const readmePath = this.fs.join(clonedPath, 'README.md');
+      try {
+        const readmeExists = await this.fs.pathExists(readmePath);
+        if (readmeExists) {
+          const readmeUri = vscode.Uri.file(readmePath);
+          await vscode.window.showTextDocument(readmeUri, { preview: false });
+        }
+      } catch (error) {
+        // Ignore errors opening README
+        console.log('Could not open tutorial README:', error);
+      }
+    } else {
+      // Original workspace switching behavior
+      const shouldOpen =
+        options?.wasInitiatedProgrammatically || (await this._confirmOpenTutorial(tutorial.title));
+
+      if (shouldOpen) {
+        await this._saveAutoOpenState(tutorial.id, options?.commitHash);
+        const folderUri = vscode.Uri.file(clonedPath);
+        await vscode.commands.executeCommand('vscode.openFolder', folderUri, {});
+      }
     }
   }
 
@@ -220,13 +246,14 @@ export class Controller {
           initialStepCommitHash: commitHash,
         });
         if (!tutorial) {
-          this.userInteraction.showErrorMessage(`Failed to load tutorial from ${tutorialPath}.`);
+          // Don't show error message here - let the caller handle error display
+          console.log(`LifecycleController: No tutorial found at path: ${tutorialPath}`);
           return null;
         }
         return tutorial;
       } catch (error) {
-        const errorMessage = `Failed to load tutorial: ${error instanceof Error ? error.message : String(error)}`;
-        this.userInteraction.showErrorMessage(errorMessage);
+        // Don't show error message here - let the caller handle error display
+        console.log(`LifecycleController: Error loading tutorial from ${tutorialPath}:`, error);
         return null;
       }
     });
@@ -292,6 +319,19 @@ export class Controller {
     return workspacePath === tutorialPath;
   }
 
+  private _isWithinCurrentWorkspace(tutorialPath: string): boolean {
+    const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    if (!workspacePath) {
+      return false;
+    }
+
+    // Check if tutorial path is within workspace (including subdirectories)
+    const normalizedWorkspace = workspacePath.endsWith('/') ? workspacePath : workspacePath + '/';
+    const normalizedTutorial = tutorialPath.endsWith('/') ? tutorialPath : tutorialPath + '/';
+
+    return normalizedTutorial.startsWith(normalizedWorkspace);
+  }
+
   // === USER INTERACTIONS ===
 
   private async _getRepositoryUrl(providedUrl?: string): Promise<string | undefined> {
@@ -336,6 +376,76 @@ export class Controller {
   }
 
   // === UTILITIES ===
+
+  /**
+   * Determines where to clone the tutorial based on user configuration
+   */
+  private async _determineCloneLocation(): Promise<{ path: string; mode: 'subdirectory' | 'separate-workspace' } | null> {
+    const config = vscode.workspace.getConfiguration('gitorial');
+    const cloneLocation = config.get<string>('cloneLocation', 'ask');
+    const defaultDirectory = config.get<string>('defaultCloneDirectory', 'tutorials');
+
+    console.log(`LifecycleController: cloneLocation config = ${cloneLocation}, defaultDirectory = ${defaultDirectory}`);
+
+    const currentWorkspace = vscode.workspace.workspaceFolders?.[0];
+    console.log(`LifecycleController: currentWorkspace = ${currentWorkspace?.uri.fsPath || 'none'}`);
+
+    if (cloneLocation === 'subdirectory' && currentWorkspace) {
+      // Use subdirectory mode
+      const subdirectoryPath = this.fs.join(currentWorkspace.uri.fsPath, defaultDirectory);
+      console.log(`LifecycleController: Using subdirectory mode, path = ${subdirectoryPath}`);
+
+      // Ensure the tutorials directory exists
+      try {
+        await this.fs.ensureDir(subdirectoryPath);
+        console.log(`LifecycleController: Successfully created/ensured directory: ${subdirectoryPath}`);
+      } catch (error) {
+        console.log(`LifecycleController: Could not create tutorials directory: ${error}, falling back to separate workspace`);
+        return await this._promptForCloneDestinationFallback();
+      }
+      return { path: subdirectoryPath, mode: 'subdirectory' };
+    }
+
+    if (cloneLocation === 'separate-workspace') {
+      // Use separate workspace mode
+      const destinationFolder = await this._promptForCloneDestination();
+      if (!destinationFolder) {
+        return null;
+      }
+      return { path: destinationFolder, mode: 'separate-workspace' };
+    }
+
+    // Ask user each time
+    if (currentWorkspace) {
+      const choice = await this.userInteraction.askConfirmation({
+        message: `Clone tutorial as subdirectory in current workspace (${currentWorkspace.name}) or use separate workspace?`,
+        confirmActionTitle: 'Use Subdirectory',
+        cancelActionTitle: 'Separate Workspace',
+      });
+
+      if (choice) {
+        const subdirectoryPath = this.fs.join(currentWorkspace.uri.fsPath, defaultDirectory);
+        try {
+          await this.fs.ensureDir(subdirectoryPath);
+        } catch (_error) {
+          console.log('Could not create tutorials directory, falling back to separate workspace');
+          return await this._promptForCloneDestinationFallback();
+        }
+        return { path: subdirectoryPath, mode: 'subdirectory' };
+      }
+    }
+
+    // Fall back to separate workspace
+    return await this._promptForCloneDestinationFallback();
+  }
+
+  private async _promptForCloneDestinationFallback(): Promise<{ path: string; mode: 'separate-workspace' } | null> {
+    const destinationFolder = await this._promptForCloneDestination();
+    if (!destinationFolder) {
+      return null;
+    }
+    return { path: destinationFolder, mode: 'separate-workspace' };
+  }
 
   private _extractRepoName(repoUrl: string): string {
     return repoUrl.substring(repoUrl.lastIndexOf('/') + 1).replace(/\.git$/, '');

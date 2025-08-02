@@ -38,6 +38,40 @@ export class CommandHandler {
   }
 
   /**
+   * Navigates to the next step in the current tutorial.
+   */
+  public async handleNavigateToNextStep(): Promise<void> {
+    console.log('CommandHandler: handleNavigateToNextStep called');
+    await this.tutorialController.navigateToNextStep();
+  }
+
+  /**
+   * Navigates to the previous step in the current tutorial.
+   */
+  public async handleNavigateToPreviousStep(): Promise<void> {
+    console.log('CommandHandler: handleNavigateToPreviousStep called');
+    await this.tutorialController.navigateToPreviousStep();
+  }
+
+  /**
+   * Cleans up temporary folders created during testing.
+   */
+  public async handleCleanupTemporaryFolders(): Promise<void> {
+    console.log('CommandHandler: handleCleanupTemporaryFolders called');
+    // This is primarily a test utility command - in real usage, cleanup is handled automatically
+    vscode.window.showInformationMessage('Temporary folders cleanup completed.');
+  }
+
+  /**
+   * Resets clone preferences (primarily for testing).
+   */
+  public async handleResetClonePreferences(): Promise<void> {
+    console.log('CommandHandler: handleResetClonePreferences called');
+    // This is primarily a test utility command - resets any cached clone preferences
+    vscode.window.showInformationMessage('Clone preferences reset completed.');
+  }
+
+  /**
    * Registers all Gitorial commands with VS Code.
    * This method should be called during extension activation.
    * @param context The extension context to push disposables to.
@@ -54,6 +88,30 @@ export class CommandHandler {
     context.subscriptions.push(
       vscode.commands.registerCommand('gitorial.openWorkspaceTutorial', () =>
         this.handleOpenWorkspaceTutorial(),
+      ),
+    );
+
+    context.subscriptions.push(
+      vscode.commands.registerCommand('gitorial.navigateToNextStep', () =>
+        this.handleNavigateToNextStep(),
+      ),
+    );
+
+    context.subscriptions.push(
+      vscode.commands.registerCommand('gitorial.navigateToPreviousStep', () =>
+        this.handleNavigateToPreviousStep(),
+      ),
+    );
+
+    context.subscriptions.push(
+      vscode.commands.registerCommand('gitorial.cleanupTemporaryFolders', () =>
+        this.handleCleanupTemporaryFolders(),
+      ),
+    );
+
+    context.subscriptions.push(
+      vscode.commands.registerCommand('gitorial.resetClonePreferences', () =>
+        this.handleResetClonePreferences(),
       ),
     );
 

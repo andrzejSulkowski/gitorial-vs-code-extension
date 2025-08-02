@@ -947,9 +947,9 @@ export class IntegrationTestUtils {
     // Always try global settings first in CI/test environments to avoid workspace issues
     const isTestEnv = this.isTestEnvironment();
     const hasWorkspace = vscode.workspace.workspaceFolders && vscode.workspace.workspaceFolders.length > 0;
-    
+
     // In test environments, prefer global settings to avoid workspace configuration errors
-    const configTarget = isTestEnv ? vscode.ConfigurationTarget.Global : 
+    const configTarget = isTestEnv ? vscode.ConfigurationTarget.Global :
       (hasWorkspace ? vscode.ConfigurationTarget.Workspace : vscode.ConfigurationTarget.Global);
 
     try {
@@ -965,11 +965,11 @@ export class IntegrationTestUtils {
         } catch (fallbackError) {
           console.error(`❌ Failed to configure ${section}.${key} even with global fallback:`, fallbackError);
           // Don't throw - allow tests to continue even if configuration fails
-          console.warn(`⚠️ Continuing test execution despite configuration failure`);
+          console.warn('⚠️ Continuing test execution despite configuration failure');
         }
       } else {
         console.error(`❌ Global configuration failed for ${section}.${key}:`, error);
-        console.warn(`⚠️ Continuing test execution despite configuration failure`);
+        console.warn('⚠️ Continuing test execution despite configuration failure');
       }
     }
   }

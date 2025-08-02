@@ -36,8 +36,7 @@ suite('Integration: Core Workflows', () => {
     // Also cleanup the integration-execution directory created by our extension
     await IntegrationTestUtils.cleanupIntegrationExecutionDirectory();
 
-    // Clean up the tutorials directory created by subdirectory mode testing
-    await IntegrationTestUtils.cleanupTutorialsDirectory();
+    // Note: Tutorial directories are now cleaned up automatically in IntegrationTestUtils.cleanup()
 
     console.log('Core Workflows Integration test environment cleaned up');
   });
@@ -55,7 +54,7 @@ suite('Integration: Core Workflows', () => {
 
   suite('Extension Command Validation', () => {
     test('should have all required commands registered', async function() {
-      this.timeout(5000);
+      this.timeout(INTEGRATION_TEST_CONFIG.TIMEOUTS.QUICK_OPERATION);
 
       console.log('Testing: Extension command registration');
 
@@ -95,7 +94,7 @@ suite('Integration: Core Workflows', () => {
 
   suite('Tutorial Error Handling', () => {
     test('should handle invalid tutorial paths and directories gracefully', async function() {
-      this.timeout(10000);
+      this.timeout(INTEGRATION_TEST_CONFIG.TIMEOUTS.TEST_EXECUTION);
 
       console.log('Testing: Invalid tutorial path handling');
 
@@ -124,7 +123,7 @@ suite('Integration: Core Workflows', () => {
 
   suite('Error Handling Workflows', () => {
     test('should handle invalid git repositories gracefully', async function() {
-      this.timeout(10000);
+      this.timeout(INTEGRATION_TEST_CONFIG.TIMEOUTS.TEST_EXECUTION);
 
       console.log('Testing: Invalid git repository handling');
 

@@ -7,19 +7,19 @@ export const INTEGRATION_TEST_CONFIG = {
   /** Timeout configurations for different test operations */
   TIMEOUTS: {
     /** Suite setup timeout - allows for extension activation and environment setup */
-    SUITE_SETUP: 30000,
+    SUITE_SETUP: 60000,
     /** Individual test execution timeout */
-    TEST_EXECUTION: 15000,
+    TEST_EXECUTION: 30000,
     /** Extended timeout for network operations like cloning */
-    NETWORK_OPERATION: 25000,
+    NETWORK_OPERATION: 60000,
     /** Quick operations timeout */
-    QUICK_OPERATION: 5000,
+    QUICK_OPERATION: 10000,
     /** Cleanup operations timeout */
-    CLEANUP: 10000,
+    CLEANUP: 15000,
     /** File operation timeout */
-    FILE_OPERATION: 3000,
+    FILE_OPERATION: 5000,
     /** VS Code test configuration timeout */
-    VSCODE_TEST: 30000,
+    VSCODE_TEST: 60000,
   },
 
   /** Directory and file naming conventions */

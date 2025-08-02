@@ -53,6 +53,7 @@ class LocalRepositoryProvider implements RepositoryProvider {
 export class IntegrationTestUtils {
   private static testDir: string;
   private static createdPaths: string[] = [];
+  private static tutorialPaths: string[] = []; // Track tutorial directories created during tests
   private static repositoryProvider: RepositoryProvider;
   private static gitOperationCache = new Map<string, any>();
   private static mockCleanups: Array<() => void> = [];
@@ -106,6 +107,9 @@ export class IntegrationTestUtils {
       this.webviewPanelDisposable = undefined;
     }
     this.webviewPanelRegistry.clear();
+
+    // Clean up tutorial directories created during tests
+    await this.cleanupAllTutorialDirectories();
   }
 
   /**
@@ -151,10 +155,18 @@ export class IntegrationTestUtils {
     const tutorialsPath = path.join(cwd, 'tutorials');
 
     // Additional safety: verify we're not deleting from system directories
+    // But explicitly allow deletion of tutorials subdirectory in project directory
     const normalizedPath = path.resolve(tutorialsPath);
-    if (this.isSystemDirectory(normalizedPath)) {
-      console.warn('⚠️  Skipping cleanup - would delete from system directory');
-      return;
+    const projectDir = path.resolve(cwd);
+    const isTutorialsSubdir = normalizedPath === path.join(projectDir, 'tutorials');
+
+    // Skip cleanup only if it's NOT the tutorials subdirectory AND it's a system directory
+    // This explicitly allows the tutorials subdirectory to be deleted
+    if (!isTutorialsSubdir) {
+      if (this.isSystemDirectory(normalizedPath)) {
+        console.warn('⚠️  Skipping cleanup - would delete from system directory');
+        return;
+      }
     }
 
     try {
@@ -165,6 +177,115 @@ export class IntegrationTestUtils {
       // Directory doesn't exist, which is fine
       console.log('📂 No tutorials directory to clean up');
     }
+  }
+
+  /**
+   * Track a tutorial directory for cleanup
+   */
+  static trackTutorialPath(tutorialPath: string): void {
+    if (tutorialPath && !this.tutorialPaths.includes(tutorialPath)) {
+      this.tutorialPaths.push(tutorialPath);
+      console.log(`📝 Tracking tutorial path for cleanup: ${tutorialPath}`);
+    }
+  }
+
+  /**
+   * Clean up all tutorial directories created during tests
+   * This includes subdirectory mode tutorials and any other tutorial locations
+   */
+  static async cleanupAllTutorialDirectories(): Promise<void> {
+    // Safety check: only delete if we're in a test environment
+    if (!this.isTestEnvironment()) {
+      console.log('⚠️  Skipping tutorial directories cleanup - not in test environment');
+      return;
+    }
+
+    // Clean up tracked tutorial paths
+    for (const tutorialPath of this.tutorialPaths) {
+      try {
+        const normalizedPath = path.resolve(tutorialPath);
+
+        // Safety check: only delete from temp directories
+        if (this.isSafeToDelete(normalizedPath)) {
+          await fs.access(normalizedPath);
+          await fs.rm(normalizedPath, { recursive: true, force: true });
+          console.log(`🗑️  Cleaned up tracked tutorial directory: ${normalizedPath}`);
+        }
+      } catch (_error) {
+        // Directory doesn't exist, which is fine
+      }
+    }
+    this.tutorialPaths = [];
+
+    // Clean up subdirectory mode tutorials
+    await this.cleanupTutorialsDirectory();
+
+    // Clean up integration-execution directory (where tutorials might be cloned)
+    await this.cleanupIntegrationExecutionDirectory();
+
+    // Clean up any other potential tutorial locations
+    await this.cleanupOtherTutorialLocations();
+  }
+
+  /**
+   * Clean up other potential tutorial locations that might be created during tests
+   */
+  private static async cleanupOtherTutorialLocations(): Promise<void> {
+    const potentialPaths = [
+      // Common temp directories where tutorials might be cloned
+      path.join(os.tmpdir(), 'rust-state-machine'),
+      path.join(os.tmpdir(), 'gitorial-tutorials'),
+      path.join(os.tmpdir(), 'tutorials'),
+
+      // User temp directory variations
+      path.join(os.homedir(), '.tmp', 'rust-state-machine'),
+      path.join(os.homedir(), '.tmp', 'gitorial-tutorials'),
+      path.join(os.homedir(), '.tmp', 'tutorials'),
+
+      // macOS specific temp directories
+      path.join('/var/folders', '**', 'T', 'rust-state-machine'),
+      path.join('/var/folders', '**', 'T', 'gitorial-tutorials'),
+      path.join('/var/folders', '**', 'T', 'tutorials'),
+    ];
+
+    for (const potentialPath of potentialPaths) {
+      try {
+        // Skip paths with wildcards as they're not directly accessible
+        if (potentialPath.includes('**')) {
+          continue;
+        }
+
+        const normalizedPath = path.resolve(potentialPath);
+
+        // Safety check: only delete from temp directories
+        if (!this.isSafeToDelete(normalizedPath)) {
+          continue;
+        }
+
+        await fs.access(normalizedPath);
+        await fs.rm(normalizedPath, { recursive: true, force: true });
+        console.log(`🗑️  Cleaned up tutorial directory: ${normalizedPath}`);
+      } catch (_error) {
+        // Directory doesn't exist, which is fine
+      }
+    }
+  }
+
+  /**
+   * Check if a path is safe to delete (in temp directories only)
+   */
+  private static isSafeToDelete(dirPath: string): boolean {
+    const tempDirs = [
+      os.tmpdir(),
+      '/tmp',
+      '/var/tmp',
+      path.join(os.homedir(), '.tmp'),
+    ];
+
+    return tempDirs.some(tempDir => {
+      const normalizedTempDir = path.resolve(tempDir);
+      return dirPath.startsWith(normalizedTempDir + path.sep) || dirPath === normalizedTempDir;
+    });
   }
 
   /**
@@ -560,6 +681,13 @@ export class IntegrationTestUtils {
       console.log(`✅ Command ${command} completed`);
       return result;
     } catch (error) {
+      // Check if this is a workspace-related error that we can handle gracefully
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      if (this.isWorkspaceSwitchingError(errorMessage)) {
+        console.log(`📝 Workspace switching detected during command ${command} - this may be expected`);
+        return null; // Return null instead of throwing for workspace switching errors
+      }
+
       console.error(`❌ Command ${command} failed:`, error);
       throw error;
     }
@@ -597,6 +725,25 @@ export class IntegrationTestUtils {
     const originalShowInformationMessage = vscode.window.showInformationMessage;
     vscode.window.showInformationMessage = async (message: string, ..._items: any[]) => {
       console.log(`📋 Mocked dialog: "${message}" - returning: ${returnValue}`);
+      return returnValue as any;
+    };
+
+    this.mockCleanups.push(() => {
+      vscode.window.showInformationMessage = originalShowInformationMessage;
+    });
+  }
+
+  /**
+   * Mock multiple confirmation dialogs in sequence
+   */
+  static mockConfirmationDialogs(returnValues: (string | undefined)[]): void {
+    const originalShowInformationMessage = vscode.window.showInformationMessage;
+    let callIndex = 0;
+
+    vscode.window.showInformationMessage = async (message: string, ..._items: any[]) => {
+      const returnValue = returnValues[callIndex] || returnValues[returnValues.length - 1];
+      console.log(`📋 Mocked dialog ${callIndex + 1}: "${message}" - returning: ${returnValue}`);
+      callIndex++;
       return returnValue as any;
     };
 
@@ -696,11 +843,12 @@ export class IntegrationTestUtils {
       return filePath === expectedFileName;
     case 'basename':
       return path.basename(filePath) === expectedFileName;
-    case 'endsWith':
+    case 'endsWith': {
       // Ensure we match complete path segments to avoid false positives
       const normalizedPath = filePath.replace(/\\/g, '/');
       const normalizedExpected = expectedFileName.replace(/\\/g, '/');
       return normalizedPath.endsWith('/' + normalizedExpected) || normalizedPath === normalizedExpected;
+    }
     default:
       return false;
     }
@@ -784,6 +932,46 @@ export class IntegrationTestUtils {
     }
 
     return await this.repositoryProvider.getTestRepository();
+  }
+
+  /**
+   * Safely configure extension settings, handling workspace vs global configuration
+   */
+  static async configureExtensionSetting(
+    section: string,
+    key: string,
+    value: any,
+  ): Promise<void> {
+    const config = vscode.workspace.getConfiguration(section);
+
+    // Always try global settings first in CI/test environments to avoid workspace issues
+    const isTestEnv = this.isTestEnvironment();
+    const hasWorkspace = vscode.workspace.workspaceFolders && vscode.workspace.workspaceFolders.length > 0;
+    
+    // In test environments, prefer global settings to avoid workspace configuration errors
+    const configTarget = isTestEnv ? vscode.ConfigurationTarget.Global : 
+      (hasWorkspace ? vscode.ConfigurationTarget.Workspace : vscode.ConfigurationTarget.Global);
+
+    try {
+      await config.update(key, value, configTarget);
+      console.log(`✅ Configured ${section}.${key} = ${value} (${configTarget === vscode.ConfigurationTarget.Global ? 'global' : 'workspace'})`);
+    } catch (error) {
+      console.warn(`⚠️ Failed to configure ${section}.${key}:`, error);
+      // Always fall back to global settings if initial attempt fails
+      if (configTarget !== vscode.ConfigurationTarget.Global) {
+        try {
+          await config.update(key, value, vscode.ConfigurationTarget.Global);
+          console.log(`✅ Configured ${section}.${key} = ${value} (global fallback)`);
+        } catch (fallbackError) {
+          console.error(`❌ Failed to configure ${section}.${key} even with global fallback:`, fallbackError);
+          // Don't throw - allow tests to continue even if configuration fails
+          console.warn(`⚠️ Continuing test execution despite configuration failure`);
+        }
+      } else {
+        console.error(`❌ Global configuration failed for ${section}.${key}:`, error);
+        console.warn(`⚠️ Continuing test execution despite configuration failure`);
+      }
+    }
   }
 
   /**

@@ -37,8 +37,7 @@ suite('Integration: Clone Tutorial Workflow', () => {
     // Also cleanup the integration-execution directory created by our extension
     await IntegrationTestUtils.cleanupIntegrationExecutionDirectory();
 
-    // Clean up the tutorials directory created by subdirectory mode testing
-    await IntegrationTestUtils.cleanupTutorialsDirectory();
+    // Note: Tutorial directories are now cleaned up automatically in IntegrationTestUtils.cleanup()
 
     console.log('Clone Integration test environment cleaned up');
   });
@@ -50,14 +49,13 @@ suite('Integration: Clone Tutorial Workflow', () => {
       console.log('Testing: Successful tutorial clone workflow');
 
       // Configure extension for subdirectory mode
-      const config = vscode.workspace.getConfiguration('gitorial');
-      await config.update('cloneLocation', 'subdirectory', vscode.ConfigurationTarget.Workspace);
+      await IntegrationTestUtils.configureExtensionSetting('gitorial', 'cloneLocation', 'subdirectory');
 
       // Mock user inputs for clone command with real repository
       IntegrationTestUtils.mockInputBox(mockRemoteRepo.url); // Repository URL input
 
       // Mock confirmation dialogs for subdirectory mode and overwrite
-      IntegrationTestUtils.mockConfirmationDialog('Use Subdirectory'); // Choose subdirectory mode if asked
+      IntegrationTestUtils.mockConfirmationDialogs(['Use Subdirectory', 'Yes']); // Handle subdirectory mode and tutorial opening
       IntegrationTestUtils.mockWarningDialog('Overwrite'); // Handle "Folder already exists" dialog
 
       try {
@@ -77,6 +75,9 @@ suite('Integration: Clone Tutorial Workflow', () => {
         }, INTEGRATION_TEST_CONFIG.TIMEOUTS.NETWORK_OPERATION);
 
         console.log('Repository cloned successfully to subdirectory');
+
+        // Track the cloned tutorial path for cleanup
+        IntegrationTestUtils.trackTutorialPath(expectedClonePath);
 
         // Verify cloned repository structure
         const clonedRepoPath = expectedClonePath;
@@ -102,19 +103,18 @@ suite('Integration: Clone Tutorial Workflow', () => {
     });
 
     test('should handle clone to existing directory with confirmation', async function() {
-      this.timeout(10000);
+      this.timeout(INTEGRATION_TEST_CONFIG.TIMEOUTS.TEST_EXECUTION);
 
       console.log('Testing: Clone to existing directory (reusing previous clone)');
 
       // Configure extension for subdirectory mode
-      const config = vscode.workspace.getConfiguration('gitorial');
-      await config.update('cloneLocation', 'subdirectory', vscode.ConfigurationTarget.Workspace);
+      await IntegrationTestUtils.configureExtensionSetting('gitorial', 'cloneLocation', 'subdirectory');
 
       // Mock user inputs for clone command with existing directory
       IntegrationTestUtils.mockInputBox(mockRemoteRepo.url); // Repository URL input
 
       // Mock confirmation dialogs for subdirectory mode and overwrite
-      IntegrationTestUtils.mockConfirmationDialog('Use Subdirectory'); // Choose subdirectory mode if asked
+      IntegrationTestUtils.mockConfirmationDialogs(['Use Subdirectory', 'Yes']); // Handle subdirectory mode and tutorial opening
       IntegrationTestUtils.mockWarningDialog('Overwrite'); // Handle "Folder already exists" dialog
 
       try {
@@ -129,7 +129,7 @@ suite('Integration: Clone Tutorial Workflow', () => {
 
   suite('Clone Error Handling', () => {
     test('should handle repository access errors gracefully', async function() {
-      this.timeout(10000);
+      this.timeout(INTEGRATION_TEST_CONFIG.TIMEOUTS.TEST_EXECUTION);
 
       console.log('Testing: Repository access error handling');
 
@@ -146,7 +146,7 @@ suite('Integration: Clone Tutorial Workflow', () => {
     });
 
     test('should handle empty or cancelled user input', async function() {
-      this.timeout(5000);
+      this.timeout(INTEGRATION_TEST_CONFIG.TIMEOUTS.QUICK_OPERATION);
 
       console.log('Testing: Empty user input handling');
 

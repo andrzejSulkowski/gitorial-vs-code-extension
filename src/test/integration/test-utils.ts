@@ -16,55 +16,20 @@ export interface TestRepository {
   url?: string;
 }
 
-export interface TestWorkspace {
-  uri: vscode.Uri;
-  path: string;
-}
-
-export interface RepositoryProvider {
-  getTestRepository(): Promise<{ path: string; url: string }>;
-}
-
-class GitHubRepositoryProvider implements RepositoryProvider {
-  constructor(private repoUrl: string) {}
-
-  async getTestRepository(): Promise<{ path: string; url: string }> {
-    // This provider only provides the URL for external cloning
-    // The actual cloning is handled by the VS Code extension's clone command
-    // Return a placeholder path since the extension will determine the actual clone location
-    const tempPath = path.join(os.tmpdir(), 'gitorial-clone-placeholder');
-
-    return {
-      path: tempPath, // Placeholder - actual path determined by extension
-      url: this.repoUrl, // Real GitHub URL for cloning
-    };
-  }
-}
-
 export class IntegrationTestUtils {
   private static testDir: string;
   private static createdPaths: string[] = [];
   private static tutorialPaths: string[] = []; // Track tutorial directories created during tests
-  private static repositoryProvider: RepositoryProvider;
-  private static gitOperationCache = new Map<string, any>();
   private static mockCleanups: Array<() => void> = [];
 
   /**
-   * Initialize test environment with configurable repository provider
+   * Initialize test environment
    */
-  static async initialize(useLocalRepo: boolean = false): Promise<void> {
+  static async initialize(): Promise<void> {
     // Create unique test directory using configuration
     this.testDir = path.join(os.tmpdir(), `${INTEGRATION_TEST_CONFIG.DIRECTORIES.TEMP_PREFIX}-${Date.now()}`);
     await fs.mkdir(this.testDir, { recursive: true });
     this.createdPaths.push(this.testDir);
-
-    // Configure repository provider based on environment
-    if (useLocalRepo || process.env.GITORIAL_USE_LOCAL_REPO === 'true') {
-      throw new Error('Local repository provider not implemented - use GitHub provider');
-    } else {
-      // Default to GitHub provider with rust-state-machine repo
-      this.repositoryProvider = new GitHubRepositoryProvider('https://github.com/shawntabrizi/rust-state-machine');
-    }
   }
 
   /**
@@ -85,7 +50,7 @@ export class IntegrationTestUtils {
     this.createdPaths = [];
 
     // Clear git operation cache
-    this.gitOperationCache.clear();
+    // this.gitOperationCache.clear(); // This line was removed
 
     // Clean up tutorial directories created during tests
     await this.cleanupAllTutorialDirectories();
@@ -202,7 +167,7 @@ export class IntegrationTestUtils {
     } catch (error) {
       // Check if this is a workspace-related error that we can handle gracefully
       const errorMessage = error instanceof Error ? error.message : String(error);
-      if (this.isWorkspaceSwitchingError(errorMessage)) {
+      if (errorMessage.includes('workspace.*switching') || errorMessage.includes('extension host.*restart') || errorMessage.includes('workspace.*folder.*changed') || errorMessage.includes('workspace.*update') || errorMessage.includes('extension.*host.*terminated') || errorMessage.includes('workspaceFolders.*changed')) {
         return null; // Return null instead of throwing for workspace switching errors
       }
 
@@ -313,239 +278,40 @@ export class IntegrationTestUtils {
   }
 
   /**
-   * Clean up the integration-execution directory created by the extension
+   * Clean up integration execution directory created by extension
    */
   static async cleanupIntegrationExecutionDirectory(): Promise<void> {
-    // Safety check: ensure we're in a test environment
-    if (!this.isTestEnvironment()) {
-      console.log('⚠️  Skipping integration-execution cleanup - not in test environment');
-      return;
-    }
-
-    const e2eExecutionPath = path.join(os.tmpdir(), 'integration-execution');
-
-    // Additional safety: verify path is in temp directory
-    const tempDir = os.tmpdir();
-    if (!e2eExecutionPath.startsWith(tempDir)) {
-      console.warn('⚠️  Skipping cleanup - path not in temp directory');
-      return;
-    }
-
+    const integrationDir = path.join(process.cwd(), 'integration-execution');
     try {
-      await fs.access(e2eExecutionPath);
-      await fs.rm(e2eExecutionPath, { recursive: true, force: true });
-      console.log('🗑️  Cleaned up integration-execution directory');
-    } catch (_error) {
-      // Directory doesn't exist, which is fine
-      console.log('📂 No integration-execution directory to clean up');
+      await fs.access(integrationDir);
+      await fs.rm(integrationDir, { recursive: true, force: true });
+    } catch {
+      // Directory doesn't exist or can't be accessed - that's fine
     }
   }
 
   /**
-   * Clean up the tutorials directory created by subdirectory mode testing
-   */
-  static async cleanupTutorialsDirectory(): Promise<void> {
-    // Safety check: only delete if we're in a test environment
-    if (!this.isTestEnvironment()) {
-      console.log('⚠️  Skipping tutorials cleanup - not in test environment');
-      return;
-    }
-
-    const cwd = process.cwd();
-    const tutorialsPath = path.join(cwd, 'tutorials');
-
-    // Additional safety: verify we're not deleting from system directories
-    // But explicitly allow deletion of tutorials subdirectory in project directory
-    const normalizedPath = path.resolve(tutorialsPath);
-    const projectDir = path.resolve(cwd);
-    const isTutorialsSubdir = normalizedPath === path.join(projectDir, 'tutorials');
-
-    // Skip cleanup only if it's NOT the tutorials subdirectory AND it's a system directory
-    // This explicitly allows the tutorials subdirectory to be deleted
-    if (!isTutorialsSubdir) {
-      if (this.isSystemDirectory(normalizedPath)) {
-        console.warn('⚠️  Skipping cleanup - would delete from system directory');
-        return;
-      }
-    }
-
-    try {
-      await fs.access(tutorialsPath);
-      await fs.rm(tutorialsPath, { recursive: true, force: true });
-      console.log('🗑️  Cleaned up tutorials directory');
-    } catch (_error) {
-      // Directory doesn't exist, which is fine
-      console.log('📂 No tutorials directory to clean up');
-    }
-  }
-
-  /**
-   * Track a tutorial directory for cleanup
+   * Track a tutorial path for cleanup
    */
   static trackTutorialPath(tutorialPath: string): void {
     if (tutorialPath && !this.tutorialPaths.includes(tutorialPath)) {
       this.tutorialPaths.push(tutorialPath);
-      console.log(`📝 Tracking tutorial path for cleanup: ${tutorialPath}`);
     }
   }
 
   /**
    * Clean up all tutorial directories created during tests
-   * This includes subdirectory mode tutorials and any other tutorial locations
    */
   static async cleanupAllTutorialDirectories(): Promise<void> {
-    // Safety check: only delete if we're in a test environment
-    if (!this.isTestEnvironment()) {
-      console.log('⚠️  Skipping tutorial directories cleanup - not in test environment');
-      return;
-    }
-
     // Clean up tracked tutorial paths
     for (const tutorialPath of this.tutorialPaths) {
       try {
-        const normalizedPath = path.resolve(tutorialPath);
-
-        // Safety check: only delete from temp directories
-        if (this.isSafeToDelete(normalizedPath)) {
-          await fs.access(normalizedPath);
-          await fs.rm(normalizedPath, { recursive: true, force: true });
-          console.log(`🗑️  Cleaned up tracked tutorial directory: ${normalizedPath}`);
-        }
-      } catch (_error) {
-        // Directory doesn't exist, which is fine
+        await fs.rm(tutorialPath, { recursive: true, force: true });
+      } catch (error) {
+        console.warn(`Failed to cleanup tutorial path ${tutorialPath}:`, error);
       }
     }
     this.tutorialPaths = [];
-
-    // Clean up subdirectory mode tutorials
-    await this.cleanupTutorialsDirectory();
-
-    // Clean up integration-execution directory (where tutorials might be cloned)
-    await this.cleanupIntegrationExecutionDirectory();
-
-    // Clean up any other potential tutorial locations
-    await this.cleanupOtherTutorialLocations();
-  }
-
-  /**
-   * Clean up other potential tutorial locations that might be created during tests
-   */
-  private static async cleanupOtherTutorialLocations(): Promise<void> {
-    const potentialPaths = [
-      // Common temp directories where tutorials might be cloned
-      path.join(os.tmpdir(), 'rust-state-machine'),
-      path.join(os.tmpdir(), 'gitorial-tutorials'),
-      path.join(os.tmpdir(), 'tutorials'),
-
-      // User temp directory variations
-      path.join(os.homedir(), '.tmp', 'rust-state-machine'),
-      path.join(os.homedir(), '.tmp', 'gitorial-tutorials'),
-      path.join(os.homedir(), '.tmp', 'tutorials'),
-
-      // macOS specific temp directories
-      path.join('/var/folders', '**', 'T', 'rust-state-machine'),
-      path.join('/var/folders', '**', 'T', 'gitorial-tutorials'),
-      path.join('/var/folders', '**', 'T', 'tutorials'),
-    ];
-
-    for (const potentialPath of potentialPaths) {
-      try {
-        // Skip paths with wildcards as they're not directly accessible
-        if (potentialPath.includes('**')) {
-          continue;
-        }
-
-        const normalizedPath = path.resolve(potentialPath);
-
-        // Safety check: only delete from temp directories
-        if (!this.isSafeToDelete(normalizedPath)) {
-          continue;
-        }
-
-        await fs.access(normalizedPath);
-        await fs.rm(normalizedPath, { recursive: true, force: true });
-        console.log(`🗑️  Cleaned up tutorial directory: ${normalizedPath}`);
-      } catch (_error) {
-        // Directory doesn't exist, which is fine
-      }
-    }
-  }
-
-  /**
-   * Check if a path is safe to delete (in temp directories only)
-   */
-  private static isSafeToDelete(dirPath: string): boolean {
-    const tempDirs = [
-      os.tmpdir(),
-      '/tmp',
-      '/var/tmp',
-      path.join(os.homedir(), '.tmp'),
-    ];
-
-    return tempDirs.some(tempDir => {
-      const normalizedTempDir = path.resolve(tempDir);
-      return dirPath.startsWith(normalizedTempDir + path.sep) || dirPath === normalizedTempDir;
-    });
-  }
-
-  /**
-   * Check if we're running in a test environment
-   */
-  private static isTestEnvironment(): boolean {
-    const cwd = process.cwd();
-    return (
-      // Check environment variables
-      process.env.NODE_ENV === 'test' ||
-      process.env.INTEGRATION_TEST === 'true' ||
-      process.env.VSCODE_TEST === 'true' ||
-      // Check if CWD contains test indicators
-      cwd.includes('test') ||
-      cwd.includes('gitorial') || // Our project directory
-      // Check if we're running under mocha/jest
-      process.argv.some(arg => arg.includes('mocha') || arg.includes('jest') || arg.includes('vscode-test'))
-    );
-  }
-
-  /**
-   * Check if a path is a system directory that shouldn't be deleted
-   */
-  private static isSystemDirectory(dirPath: string): boolean {
-    const systemPaths = [
-      '/',
-      os.homedir(),
-      '/usr',
-      '/System',
-      '/Library',
-      '/Applications',
-      '/bin',
-      '/sbin',
-      '/etc',
-      '/var',
-      '/opt',
-      process.cwd(), // Don't delete the entire project directory
-    ];
-
-    return systemPaths.some(systemPath => {
-      const normalizedSystemPath = path.resolve(systemPath);
-      return dirPath === normalizedSystemPath || dirPath.startsWith(normalizedSystemPath + path.sep);
-    });
-  }
-
-  /**
-   * Check if an error message indicates workspace switching behavior
-   */
-  private static isWorkspaceSwitchingError(errorMessage: string): boolean {
-    // Check for specific workspace-related error patterns
-    const workspaceErrorPatterns = [
-      /workspace.*switching/i,
-      /extension host.*restart/i,
-      /workspace.*folder.*changed/i,
-      /workspace.*update/i,
-      /extension.*host.*terminated/i,
-      /workspaceFolders.*changed/i,
-    ];
-
-    return workspaceErrorPatterns.some(pattern => pattern.test(errorMessage));
   }
 
   /**
@@ -591,16 +357,28 @@ export class IntegrationTestUtils {
   }
 
   /**
-   * Get current git branch in repository
+   * Get current branch of repository
    */
   static async getCurrentBranch(repositoryPath: string): Promise<string> {
     const git = simpleGit(repositoryPath);
-    const branches = await git.branch();
-    return branches.current;
+    try {
+      // Try to get the branch name first
+      const branch = await git.revparse(['--abbrev-ref', 'HEAD']);
+      // If we get "HEAD", we're in detached HEAD state, try to get the actual branch
+      if (branch === 'HEAD') {
+        const branches = await git.branch();
+        return branches.current;
+      }
+      return branch;
+    } catch {
+      // Fallback to branch() method
+      const branches = await git.branch();
+      return branches.current;
+    }
   }
 
   /**
-   * Check if repository is in clean state
+   * Check if repository is clean (no uncommitted changes)
    */
   static async isRepositoryClean(repositoryPath: string): Promise<boolean> {
     const git = simpleGit(repositoryPath);
@@ -629,15 +407,16 @@ export class IntegrationTestUtils {
   }
 
   /**
-   * Create a mock remote repository using configured provider
-   * Supports both GitHub and local repositories for testing
+   * Create a mock remote repository for testing
    */
   static async createMockRemoteRepository(): Promise<{ path: string; url: string }> {
-    if (!this.repositoryProvider) {
-      throw new Error('Repository provider not initialized. Call initialize() first.');
-    }
+    // Return a simple mock repository URL for testing
+    const tempPath = path.join(os.tmpdir(), 'gitorial-clone-placeholder');
 
-    return await this.repositoryProvider.getTestRepository();
+    return {
+      path: tempPath, // Placeholder - actual path determined by extension
+      url: 'https://github.com/shawntabrizi/rust-state-machine', // Real GitHub URL for cloning
+    };
   }
 
   /**
@@ -651,12 +430,10 @@ export class IntegrationTestUtils {
     const config = vscode.workspace.getConfiguration(section);
 
     // Always try global settings first in CI/test environments to avoid workspace issues
-    const isTestEnv = this.isTestEnvironment();
     const hasWorkspace = vscode.workspace.workspaceFolders && vscode.workspace.workspaceFolders.length > 0;
 
     // In test environments, prefer global settings to avoid workspace configuration errors
-    const configTarget = isTestEnv ? vscode.ConfigurationTarget.Global :
-      (hasWorkspace ? vscode.ConfigurationTarget.Workspace : vscode.ConfigurationTarget.Global);
+    const configTarget = hasWorkspace ? vscode.ConfigurationTarget.Workspace : vscode.ConfigurationTarget.Global;
 
     try {
       await config.update(key, value, configTarget);

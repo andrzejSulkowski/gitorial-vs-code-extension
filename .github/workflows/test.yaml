@@ -51,8 +51,18 @@ jobs:
       - name: '🌐 Webview: Build'
         run: pnpm run build:webview
 
+      # Configure Git for GitHub Actions (needed for integration tests that clone repositories)
+      - name: '⚙️ Configure Git'
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+          # Configure Git to use HTTPS with token for GitHub
+          git config --global url."https://x-access-token:${{ github.token }}@github.com/".insteadOf "https://github.com/"
+
       # Extension Validation Tests (Unit + Core Integration)
       - name: '🧪 VS Code: Extension Validation'
         run: xvfb-run -a npx vscode-test
         env:
           CI: 'true'
+          # Provide GitHub token for git operations in tests
+          GITHUB_TOKEN: ${{ github.token }}

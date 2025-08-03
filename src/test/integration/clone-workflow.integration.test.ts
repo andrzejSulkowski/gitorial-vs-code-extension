@@ -54,6 +54,10 @@ suite('Integration: Clone Tutorial Workflow', () => {
       // Mock user inputs for clone command with real repository
       IntegrationTestUtils.mockInputBox(mockRemoteRepo.url); // Repository URL input
 
+      // Mock directory picker to select workspace root for subdirectory mode
+      const workspaceRoot = vscode.Uri.file(process.cwd());
+      IntegrationTestUtils.mockOpenDialog([workspaceRoot]);
+
       // Mock confirmation dialogs for subdirectory mode and overwrite
       IntegrationTestUtils.mockConfirmationDialogs(['Use Subdirectory', 'Yes']); // Handle subdirectory mode and tutorial opening
       IntegrationTestUtils.mockWarningDialog('Overwrite'); // Handle "Folder already exists" dialog

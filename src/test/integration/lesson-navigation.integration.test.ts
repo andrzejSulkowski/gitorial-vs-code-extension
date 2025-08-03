@@ -221,7 +221,7 @@ suite('Integration: Lesson Navigation', () => {
         if (extensionAPI?.tutorialController) {
           console.log('✅ Tutorial controller is available and ready');
           console.log('✅ Tutorial loading infrastructure verified');
-          
+
           // In a real environment, the tutorial would load and switch workspaces
           // In test environment, we verify the components are available
           console.log('ℹ️ Skipping actual tutorial loading to avoid workspace switch in test environment');

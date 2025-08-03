@@ -19,6 +19,10 @@ suite('Integration: Clone Tutorial Workflow', () => {
 
     console.log('Setting up Clone Integration test environment...');
 
+    // First, ensure we have a workspace folder to work in
+    const workspaceFolder = vscode.Uri.file(process.cwd());
+    console.log(`Setting up workspace at: ${workspaceFolder.fsPath}`);
+
     await IntegrationTestUtils.initialize();
     _extensionContext = await IntegrationTestUtils.waitForExtensionActivation();
 
@@ -59,15 +63,15 @@ suite('Integration: Clone Tutorial Workflow', () => {
       IntegrationTestUtils.mockOpenDialog([workspaceRoot]);
 
       // Mock confirmation dialogs for subdirectory mode and overwrite
-      IntegrationTestUtils.mockConfirmationDialogs(['Use Subdirectory', 'Yes']); // Handle subdirectory mode and tutorial opening
-      IntegrationTestUtils.mockWarningDialog('Overwrite'); // Handle "Folder already exists" dialog
+      IntegrationTestUtils.mockAskConfirmations([true, true]); // Handle subdirectory mode and tutorial opening
+      IntegrationTestUtils.mockAskConfirmation(true); // Handle "Folder already exists" dialog
 
       try {
         // Execute clone command
         await IntegrationTestUtils.executeCommand('gitorial.cloneTutorial');
 
         // Wait for clone operation to complete - check tutorials subdirectory location
-        const expectedClonePath = path.join(process.cwd(), 'tutorials', INTEGRATION_TEST_CONFIG.DIRECTORIES.TEST_REPO_NAME);
+        const expectedClonePath = path.join(process.cwd(), INTEGRATION_TEST_CONFIG.DIRECTORIES.TEST_REPO_NAME);
 
         await IntegrationTestUtils.waitForCondition(async () => {
           try {
@@ -118,8 +122,8 @@ suite('Integration: Clone Tutorial Workflow', () => {
       IntegrationTestUtils.mockInputBox(mockRemoteRepo.url); // Repository URL input
 
       // Mock confirmation dialogs for subdirectory mode and overwrite
-      IntegrationTestUtils.mockConfirmationDialogs(['Use Subdirectory', 'Yes']); // Handle subdirectory mode and tutorial opening
-      IntegrationTestUtils.mockWarningDialog('Overwrite'); // Handle "Folder already exists" dialog
+      IntegrationTestUtils.mockAskConfirmations([true, true]); // Handle subdirectory mode and tutorial opening
+      IntegrationTestUtils.mockAskConfirmation(true); // Handle "Folder already exists" dialog
 
       try {
         await IntegrationTestUtils.executeCommand('gitorial.cloneTutorial');

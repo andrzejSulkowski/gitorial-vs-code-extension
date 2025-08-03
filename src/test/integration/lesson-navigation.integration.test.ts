@@ -43,8 +43,8 @@ suite('Integration: Lesson Navigation', () => {
     IntegrationTestUtils.mockOpenDialog([workspaceRoot]);
 
     // Mock all possible dialogs that might appear during clone
-    IntegrationTestUtils.mockConfirmationDialogs(['Use Subdirectory', 'Yes']); // Handle subdirectory mode and tutorial opening
-    IntegrationTestUtils.mockWarningDialog('Overwrite'); // Handle "Folder already exists" dialog if needed
+    IntegrationTestUtils.mockAskConfirmations([true, true]); // Handle subdirectory mode and tutorial opening
+    IntegrationTestUtils.mockAskConfirmation(true); // Handle "Folder already exists" dialog if needed
 
     try {
       await IntegrationTestUtils.executeCommand('gitorial.cloneTutorial');
@@ -58,7 +58,7 @@ suite('Integration: Lesson Navigation', () => {
     console.log('Looking for cloned repository in subdirectory...');
 
     // Since we configured subdirectory mode, look in the workspace tutorials subdirectory
-    const expectedSubdirectoryPath = path.join(process.cwd(), 'tutorials', 'rust-state-machine');
+    const expectedSubdirectoryPath = path.join(process.cwd(), 'rust-state-machine');
 
     try {
       await fs.access(expectedSubdirectoryPath);

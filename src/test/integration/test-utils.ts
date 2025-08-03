@@ -804,6 +804,61 @@ export class IntegrationTestUtils {
   }
 
   /**
+   * Simulate warning dialog with boolean return value for askConfirmation
+   */
+  static mockAskConfirmation(returnValue: boolean): void {
+    const originalShowWarningMessage = vscode.window.showWarningMessage;
+    vscode.window.showWarningMessage = async (message: string, ...items: any[]) => {
+      console.log(`📋 Mocked confirmation dialog: "${message}" - returning: ${returnValue}`);
+
+      // For askConfirmation calls, we need to return the appropriate MessageItem
+      if (items.length >= 2 && typeof items[0] === 'object' && typeof items[1] === 'object') {
+        // This is likely an askConfirmation call with MessageItem options
+        const confirmItem = items[0];
+        const cancelItem = items[1];
+        return returnValue ? confirmItem : cancelItem;
+      }
+
+      // Fallback for other warning message calls
+      return returnValue ? items[0] : items[1];
+    };
+
+    this.mockCleanups.push(() => {
+      vscode.window.showWarningMessage = originalShowWarningMessage;
+    });
+  }
+
+  /**
+   * Simulate multiple confirmation dialogs with boolean return values
+   */
+  static mockAskConfirmations(returnValues: boolean[]): void {
+    let currentIndex = 0;
+    const originalShowWarningMessage = vscode.window.showWarningMessage;
+
+    vscode.window.showWarningMessage = async (message: string, ...items: any[]) => {
+      const returnValue = returnValues[currentIndex] ?? returnValues[returnValues.length - 1];
+      console.log(`📋 Mocked confirmation dialog ${currentIndex + 1}: "${message}" - returning: ${returnValue}`);
+
+      // For askConfirmation calls, we need to return the appropriate MessageItem
+      if (items.length >= 2 && typeof items[0] === 'object' && typeof items[1] === 'object') {
+        // This is likely an askConfirmation call with MessageItem options
+        const confirmItem = items[0];
+        const cancelItem = items[1];
+        currentIndex++;
+        return returnValue ? confirmItem : cancelItem;
+      }
+
+      // Fallback for other warning message calls
+      currentIndex++;
+      return returnValue ? items[0] : items[1];
+    };
+
+    this.mockCleanups.push(() => {
+      vscode.window.showWarningMessage = originalShowWarningMessage;
+    });
+  }
+
+  /**
    * Restore all mocked VS Code APIs
    */
   static restoreAllMocks(): void {

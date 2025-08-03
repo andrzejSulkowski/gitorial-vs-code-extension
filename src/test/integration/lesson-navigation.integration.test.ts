@@ -1,7 +1,5 @@
-import * as assert from 'assert';
 import * as vscode from 'vscode';
-import * as path from 'path';
-import * as fs from 'node:fs/promises';
+import * as assert from 'assert';
 import { IntegrationTestUtils } from './test-utils';
 import { INTEGRATION_TEST_CONFIG } from './test-config';
 
@@ -57,43 +55,21 @@ suite('Integration: Lesson Navigation', () => {
     // Wait for clone to complete and find the actual repository path
     console.log('Looking for cloned repository in subdirectory...');
 
-    // Since we configured subdirectory mode, look in the workspace tutorials subdirectory
-    const expectedSubdirectoryPath = path.join(process.cwd(), 'rust-state-machine');
+    // Find the cloned repository using the new utility
+    sharedClonedRepoPath = await IntegrationTestUtils.findClonedRepository('rust-state-machine') || '';
 
-    try {
-      await fs.access(expectedSubdirectoryPath);
-      // Check if it's actually a git repository
-      const gitDir = path.join(expectedSubdirectoryPath, '.git');
-      await fs.access(gitDir);
-
-      sharedClonedRepoPath = expectedSubdirectoryPath;
-      console.log(`✅ Found tutorial in subdirectory: ${sharedClonedRepoPath}`);
+    if (!sharedClonedRepoPath) {
+      console.log('⚠️ Could not locate cloned repository - tests may fail');
+    } else {
+      console.log(`Shared repository cloned at: ${sharedClonedRepoPath}`);
+      // Track for cleanup
       IntegrationTestUtils.trackTutorialPath(sharedClonedRepoPath);
-
-    } catch (_error) {
-      // Fall back to searching temp directories if subdirectory approach failed
-      console.log('⚠️ Subdirectory clone not found, searching temp directories...');
-
-      // Use a shorter timeout and more frequent polling for faster detection
-      const foundPath = await IntegrationTestUtils.findClonedRepositoryPath('rust-state-machine');
-      if (foundPath) {
-        sharedClonedRepoPath = foundPath;
-        console.log(`✅ Found tutorial in temp directory: ${sharedClonedRepoPath}`);
-        IntegrationTestUtils.trackTutorialPath(sharedClonedRepoPath);
-      } else {
-        console.warn('⚠️ Could not locate cloned repository - tests may fail');
-        // Don't throw here, let individual tests handle the missing repository
-      }
     }
-
-    console.log(`Shared repository cloned at: ${sharedClonedRepoPath}`);
 
     // Note: In the test environment, workspace switching causes extension host restart
     // which breaks the integration tests. We'll test what we can within the constraints.
     console.log('Integration test environment ready - workspace switching limitations noted');
     console.log('The repository has been successfully cloned and will be used for testing');
-
-    console.log('Lesson Navigation Integration test environment ready');
   });
 
   suiteTeardown(async function() {

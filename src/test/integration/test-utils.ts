@@ -349,72 +349,47 @@ export class IntegrationTestUtils {
   }
 
   /**
-   * Find the actual cloned repository path for navigation tests
-   * Searches in test directories and common temp locations
+   * Get the expected repository path based on current environment
    */
-  static async findClonedRepositoryPath(repoName: string = 'rust-state-machine'): Promise<string | null> {
-    // First check in all test directories created during this session
-    for (const createdPath of this.createdPaths) {
-      try {
-        const foundPath = await this.searchForRepositoryRecursively(createdPath, repoName, 5);
-        if (foundPath) {
-          console.log(`✅ Found cloned repository in test directory: ${foundPath}`);
-          return foundPath;
-        }
-      } catch {
-        // Continue searching
-      }
-    }
+  static getExpectedRepositoryPath(repositoryName: string): string {
+    // Check if there's a current workspace
+    const workspaceFolders = vscode.workspace.workspaceFolders;
+    const hasWorkspace = workspaceFolders && workspaceFolders.length > 0;
 
-    // Then check common temp directory locations for integration-execution directories
-    const tempLocations = [
-      os.tmpdir(), // Standard Node.js temp directory
-      '/tmp', // Unix standard
-      '/var/tmp', // Unix alternative
-      path.join(os.homedir(), '.tmp'), // User home fallback
+    if (hasWorkspace) {
+      // With workspace: repository goes in tutorials subdirectory
+      return path.join(process.cwd(), 'tutorials', repositoryName);
+    } else {
+      // Without workspace: repository goes directly in current directory
+      return path.join(process.cwd(), repositoryName);
+    }
+  }
+
+  /**
+   * Find cloned repository in expected locations
+   */
+  static async findClonedRepository(repositoryName: string): Promise<string | undefined> {
+    const expectedPaths = [
+      // Try workspace subdirectory first (CI environment)
+      path.join(process.cwd(), 'tutorials', repositoryName),
+      // Try current directory (local development)
+      path.join(process.cwd(), repositoryName),
+      // Try temp directories as fallback
+      path.join(os.tmpdir(), repositoryName),
     ];
 
-    // Also check for macOS-style temp directories
-    const osTmpDir = os.tmpdir();
-    if (osTmpDir.startsWith('/var/folders/')) {
-      tempLocations.unshift(osTmpDir);
-    }
-
-    for (const tempLocation of tempLocations) {
+    for (const repoPath of expectedPaths) {
       try {
-        const e2eExecutionPath = path.join(tempLocation, 'integration-execution');
-        const repoPath = path.join(e2eExecutionPath, repoName);
-
-        // Check if the repository directory exists
         await fs.access(repoPath);
-
-        // Additional check: make sure it's actually a git repository
-        const gitDir = path.join(repoPath, '.git');
-        await fs.access(gitDir);
-
-        console.log(`✅ Found cloned repository at: ${repoPath}`);
+        console.log(`✅ Found repository at: ${repoPath}`);
         return repoPath;
       } catch {
-        // Continue searching in next location
+        // Repository not found at this path, try next
       }
     }
 
-    // If still not found, try searching recursively in temp directories
-    console.log('🔍 Repository not found in standard locations, searching recursively...');
-    for (const tempLocation of tempLocations) {
-      try {
-        const foundPath = await this.searchForRepositoryRecursively(tempLocation, repoName, 3);
-        if (foundPath) {
-          console.log(`✅ Found cloned repository recursively at: ${foundPath}`);
-          return foundPath;
-        }
-      } catch {
-        // Continue searching
-      }
-    }
-
-    console.log('❌ Could not locate cloned repository');
-    return null;
+    console.log(`❌ Repository not found in any expected location: ${expectedPaths.join(', ')}`);
+    return undefined;
   }
 
   /**

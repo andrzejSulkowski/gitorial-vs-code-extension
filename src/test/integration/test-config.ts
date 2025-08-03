@@ -6,12 +6,12 @@
 export const INTEGRATION_TEST_CONFIG = {
   /** Timeout configurations for different test operations */
   TIMEOUTS: {
-    /** Suite setup timeout - allows for extension activation and environment setup */
-    SUITE_SETUP: 60000,
+    /** Suite setup timeout - allows for extension activation and GitHub cloning */
+    SUITE_SETUP: 180000,
     /** Individual test execution timeout */
     TEST_EXECUTION: 30000,
-    /** Extended timeout for network operations like cloning */
-    NETWORK_OPERATION: 60000,
+    /** Extended timeout for network operations like cloning from GitHub */
+    NETWORK_OPERATION: 180000,
     /** Quick operations timeout */
     QUICK_OPERATION: 10000,
     /** Cleanup operations timeout */

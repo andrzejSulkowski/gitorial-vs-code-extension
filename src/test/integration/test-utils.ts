@@ -591,97 +591,6 @@ export class IntegrationTestUtils {
   }
 
   /**
-   * Load tutorial from specific path (for test environments where workspace switching doesn't work)
-   */
-  static async loadTutorialFromPath(tutorialPath: string): Promise<boolean> {
-    try {
-      console.log(`🔧 Loading tutorial directly from path: ${tutorialPath}`);
-
-      // Get the extension instance
-      const extension = await this.waitForExtensionActivation();
-      const extensionAPI = extension.exports;
-
-      if (extensionAPI && extensionAPI.tutorialController) {
-        // Directly call the tutorialController's openFromPath method
-        // Note: This may cause workspace switching and extension host restart
-        const loadPromise = extensionAPI.tutorialController.openFromPath({ path: tutorialPath });
-
-        // Give the load operation some time to complete before the workspace switch
-        await Promise.race([
-          loadPromise,
-          new Promise(resolve => setTimeout(resolve, 3000)),
-        ]);
-
-        console.log(`✅ Tutorial load initiated from: ${tutorialPath}`);
-        return true;
-      } else {
-        console.warn('❌ Extension API or tutorialController not available');
-        return false;
-      }
-    } catch (error) {
-      console.error('❌ Failed to load tutorial from path:', error);
-      // Even if there's an error (possibly due to workspace switch), consider it successful
-      // if the error indicates the workspace is changing
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      if (errorMessage && this.isWorkspaceSwitchingError(errorMessage)) {
-        console.log('📝 Workspace switching detected - tutorial likely loaded successfully');
-        return true;
-      }
-      return false;
-    }
-  }
-
-  /**
-   * Wait for specific file to be opened in editor
-   */
-  static async waitForFileToOpen(
-    fileName: string,
-    timeout: number = INTEGRATION_TEST_CONFIG.TIMEOUTS.FILE_OPERATION,
-    matchType: 'exact' | 'basename' | 'endsWith' = 'basename',
-  ): Promise<vscode.TextEditor | null> {
-    return new Promise((resolve) => {
-      const startTime = Date.now();
-
-      const checkForFile = () => {
-        const activeEditor = vscode.window.activeTextEditor;
-        if (activeEditor && this.fileMatches(activeEditor.document.fileName, fileName, matchType)) {
-          resolve(activeEditor);
-          return;
-        }
-
-        if (Date.now() - startTime > timeout) {
-          resolve(null);
-          return;
-        }
-
-        setTimeout(checkForFile, INTEGRATION_TEST_CONFIG.POLLING.DEFAULT_INTERVAL);
-      };
-
-      checkForFile();
-    });
-  }
-
-  /**
-   * Check if a file path matches the expected file name using different matching strategies
-   */
-  private static fileMatches(filePath: string, expectedFileName: string, matchType: 'exact' | 'basename' | 'endsWith'): boolean {
-    switch (matchType) {
-    case 'exact':
-      return filePath === expectedFileName;
-    case 'basename':
-      return path.basename(filePath) === expectedFileName;
-    case 'endsWith': {
-      // Ensure we match complete path segments to avoid false positives
-      const normalizedPath = filePath.replace(/\\/g, '/');
-      const normalizedExpected = expectedFileName.replace(/\\/g, '/');
-      return normalizedPath.endsWith('/' + normalizedExpected) || normalizedPath === normalizedExpected;
-    }
-    default:
-      return false;
-    }
-  }
-
-  /**
    * Get current git branch in repository
    */
   static async getCurrentBranch(repositoryPath: string): Promise<string> {
@@ -700,20 +609,7 @@ export class IntegrationTestUtils {
   }
 
   /**
-   * Close all webview panels
-   */
-  private static async closeAllWebviews(): Promise<void> {
-    // This would need to be implemented based on how the extension manages webviews
-    // For now, we'll use a simple approach
-    try {
-      await vscode.commands.executeCommand('workbench.action.closeAllEditors');
-    } catch (error) {
-      console.warn('Failed to close all editors:', error);
-    }
-  }
-
-  /**
-   * Wait for a condition to be true
+   * Wait for a condition to be met with timeout
    */
   static async waitForCondition(
     condition: () => boolean | Promise<boolean>,
@@ -782,39 +678,6 @@ export class IntegrationTestUtils {
         console.warn('⚠️ Continuing test execution despite configuration failure');
       }
     }
-  }
-
-  /**
-   * Create a local mock repository for testing (when we need local file operations)
-   */
-  static async createLocalMockRepository(): Promise<{ path: string; url: string }> {
-    const remotePath = path.join(this.testDir, 'local-mock-repo');
-    await fs.mkdir(remotePath, { recursive: true });
-    this.createdPaths.push(remotePath);
-
-    const git = simpleGit(remotePath);
-    await git.init(['--bare']);
-
-    // Create a local repo to push to the remote
-    const localPath = path.join(this.testDir, 'local-for-remote');
-    await fs.mkdir(localPath, { recursive: true });
-    this.createdPaths.push(localPath);
-
-    const localGit = simpleGit(localPath);
-    await localGit.init();
-    await localGit.addConfig('user.name', 'Test User');
-    await localGit.addConfig('user.email', 'test@example.com');
-
-    // Create tutorial structure and push
-    await this.createTutorialStructure(localPath, localGit);
-    await localGit.addRemote('origin', remotePath);
-    await localGit.push(['origin', 'main']);
-    await localGit.push(['origin', 'gitorial']);
-
-    return {
-      path: remotePath,
-      url: `file://${remotePath}`,
-    };
   }
 }
 

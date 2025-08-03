@@ -37,6 +37,7 @@ suite('Integration: Lesson Navigation', () => {
       await IntegrationTestUtils.executeCommand('gitorial.cloneTutorial');
     } catch (_error) {
       // Continue with the test setup even if clone fails
+      console.warn('Clone command failed during setup, continuing with tests');
     }
 
     // Find the cloned repository

@@ -55,12 +55,19 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install -y xvfb
+
+    - name: Configure Git for integration tests
+      run: |
+        git config --global user.name "GitHub Actions"
+        git config --global user.email "actions@github.com"
+        git config --global url."https://x-access-token:${{ github.token }}@github.com/".insteadOf "https://github.com/"
         
     - name: Run integration tests
       run: |
         xvfb-run -a pnpm run test:integration
       env:
         DISPLAY: :99
+        GITHUB_TOKEN: ${{ github.token }}
         
     - name: Upload test results
       if: always()

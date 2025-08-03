@@ -57,8 +57,8 @@ suite('Integration: Lesson Navigation', () => {
     // Wait for clone to complete and find the actual repository path
     console.log('Looking for cloned repository in subdirectory...');
 
-    // Since we configured subdirectory mode, look in the workspace root first
-    const expectedSubdirectoryPath = path.join(process.cwd(), 'rust-state-machine');
+    // Since we configured subdirectory mode, look in the workspace tutorials subdirectory
+    const expectedSubdirectoryPath = path.join(process.cwd(), 'tutorials', 'rust-state-machine');
 
     try {
       await fs.access(expectedSubdirectoryPath);

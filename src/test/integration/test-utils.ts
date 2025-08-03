@@ -350,10 +350,23 @@ export class IntegrationTestUtils {
 
   /**
    * Find the actual cloned repository path for navigation tests
-   * Searches for integration-execution directories in all common temp directory locations
+   * Searches in test directories and common temp locations
    */
   static async findClonedRepositoryPath(repoName: string = 'rust-state-machine'): Promise<string | null> {
-    // Common temp directory locations to check
+    // First check in all test directories created during this session
+    for (const createdPath of this.createdPaths) {
+      try {
+        const foundPath = await this.searchForRepositoryRecursively(createdPath, repoName, 5);
+        if (foundPath) {
+          console.log(`✅ Found cloned repository in test directory: ${foundPath}`);
+          return foundPath;
+        }
+      } catch {
+        // Continue searching
+      }
+    }
+
+    // Then check common temp directory locations for integration-execution directories
     const tempLocations = [
       os.tmpdir(), // Standard Node.js temp directory
       '/tmp', // Unix standard
@@ -364,7 +377,7 @@ export class IntegrationTestUtils {
     // Also check for macOS-style temp directories
     const osTmpDir = os.tmpdir();
     if (osTmpDir.startsWith('/var/folders/')) {
-      tempLocations.unshift(osTmpDir); // Prioritize the OS-detected temp directory
+      tempLocations.unshift(osTmpDir);
     }
 
     for (const tempLocation of tempLocations) {
@@ -386,11 +399,11 @@ export class IntegrationTestUtils {
       }
     }
 
-    // If not found, try searching recursively in temp directories
+    // If still not found, try searching recursively in temp directories
     console.log('🔍 Repository not found in standard locations, searching recursively...');
     for (const tempLocation of tempLocations) {
       try {
-        const foundPath = await this.searchForRepositoryRecursively(tempLocation, repoName);
+        const foundPath = await this.searchForRepositoryRecursively(tempLocation, repoName, 3);
         if (foundPath) {
           console.log(`✅ Found cloned repository recursively at: ${foundPath}`);
           return foundPath;

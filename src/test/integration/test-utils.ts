@@ -41,15 +41,6 @@ class GitHubRepositoryProvider implements RepositoryProvider {
   }
 }
 
-class LocalRepositoryProvider implements RepositoryProvider {
-  constructor(private testUtils: typeof IntegrationTestUtils) {}
-
-  async getTestRepository(): Promise<{ path: string; url: string }> {
-    const localRepo = await this.testUtils.createLocalMockRepository();
-    return localRepo;
-  }
-}
-
 export class IntegrationTestUtils {
   private static testDir: string;
   private static createdPaths: string[] = [];
@@ -57,8 +48,6 @@ export class IntegrationTestUtils {
   private static repositoryProvider: RepositoryProvider;
   private static gitOperationCache = new Map<string, any>();
   private static mockCleanups: Array<() => void> = [];
-  private static webviewPanelRegistry: Set<vscode.WebviewPanel> = new Set();
-  private static webviewPanelDisposable: vscode.Disposable | undefined;
 
   /**
    * Initialize test environment with configurable repository provider
@@ -71,7 +60,7 @@ export class IntegrationTestUtils {
 
     // Configure repository provider based on environment
     if (useLocalRepo || process.env.GITORIAL_USE_LOCAL_REPO === 'true') {
-      this.repositoryProvider = new LocalRepositoryProvider(IntegrationTestUtils);
+      throw new Error('Local repository provider not implemented - use GitHub provider');
     } else {
       // Default to GitHub provider with rust-state-machine repo
       this.repositoryProvider = new GitHubRepositoryProvider('https://github.com/shawntabrizi/rust-state-machine');
@@ -82,9 +71,6 @@ export class IntegrationTestUtils {
    * Clean up all test artifacts
    */
   static async cleanup(): Promise<void> {
-    // Close all tutorial webviews
-    await this.closeAllWebviews();
-
     // Restore all mocks
     this.restoreAllMocks();
 
@@ -101,15 +87,229 @@ export class IntegrationTestUtils {
     // Clear git operation cache
     this.gitOperationCache.clear();
 
-    // Clean up webview panel tracking
-    if (this.webviewPanelDisposable) {
-      this.webviewPanelDisposable.dispose();
-      this.webviewPanelDisposable = undefined;
-    }
-    this.webviewPanelRegistry.clear();
-
     // Clean up tutorial directories created during tests
     await this.cleanupAllTutorialDirectories();
+  }
+
+  /**
+   * Wait for extension activation
+   */
+  static async waitForExtensionActivation(extensionId: string = 'AndrzejSulkowski.gitorial'): Promise<vscode.Extension<any>> {
+    const extension = vscode.extensions.getExtension(extensionId);
+    if (!extension) {
+      throw new Error(`Extension ${extensionId} not found`);
+    }
+
+    if (!extension.isActive) {
+      console.log('🔄 Activating extension...');
+      await extension.activate();
+    }
+
+    return extension;
+  }
+
+  /**
+   * Create a test repository with gitorial structure
+   */
+  static async createTestRepository(name: string = 'test-tutorial'): Promise<TestRepository> {
+    const repoPath = path.join(this.testDir, name);
+    await fs.mkdir(repoPath, { recursive: true });
+    this.createdPaths.push(repoPath);
+
+    const git = simpleGit(repoPath);
+
+    // Initialize git repository
+    await git.init();
+    await git.addConfig('user.name', 'Test User');
+    await git.addConfig('user.email', 'test@example.com');
+
+    // Create initial commit structure
+    await this.createTutorialStructure(repoPath, git);
+
+    return {
+      path: repoPath,
+      git,
+    };
+  }
+
+  /**
+   * Create tutorial file structure with multiple steps
+   */
+  private static async createTutorialStructure(repoPath: string, git: SimpleGit): Promise<void> {
+    // Create tutorial files
+    const readmePath = path.join(repoPath, 'README.md');
+    await fs.writeFile(readmePath, '# Test Tutorial\n\nThis is a test tutorial for e2e testing.');
+
+    const srcDir = path.join(repoPath, 'src');
+    await fs.mkdir(srcDir, { recursive: true });
+
+    // Step 1: Initial file with TODO
+    const step1File = path.join(srcDir, 'main.ts');
+    await fs.writeFile(step1File, '// TODO: Implement basic functionality\nexport function hello() {\n  // TODO: return greeting\n}');
+
+    await git.add('.');
+    await git.commit('Step 1: Initial setup with TODOs');
+    const step1Hash = await git.revparse(['HEAD']);
+
+    // Step 2: Partial implementation
+    await fs.writeFile(step1File, '// Implement basic functionality\nexport function hello() {\n  return \'Hello, World!\';\n}\n\n// TODO: Add advanced features');
+
+    const step2File = path.join(srcDir, 'utils.ts');
+    await fs.writeFile(step2File, '// TODO: Implement utility functions\nexport function capitalize(str: string): string {\n  // TODO: implement capitalization\n  return str;\n}');
+
+    await git.add('.');
+    await git.commit('Step 2: Basic implementation with more TODOs');
+    const _step2Hash = await git.revparse(['HEAD']);
+
+    // Step 3: Complete implementation
+    await fs.writeFile(step1File, '// Complete basic functionality\nexport function hello(name?: string) {\n  return name ? `Hello, ${name}!` : \'Hello, World!\';\n}\n\n// Advanced features implemented\nexport function farewell(name?: string) {\n  return name ? `Goodbye, ${name}!` : \'Goodbye!\';\n}');
+
+    await fs.writeFile(step2File, '// Utility functions implemented\nexport function capitalize(str: string): string {\n  return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();\n}\n\nexport function reverse(str: string): string {\n  return str.split(\'\').reverse().join(\'\');\n}');
+
+    await git.add('.');
+    await git.commit('Step 3: Complete implementation');
+    const _step3Hash = await git.revparse(['HEAD']);
+
+    // Create gitorial branch pointing to step 1
+    await git.checkoutBranch('gitorial', step1Hash);
+
+    // Stay on gitorial branch (with TODO content) for testing
+    // This ensures the test repository has the expected TODO content
+  }
+
+  /**
+   * Execute VS Code command and wait for completion
+   * Only allows whitelisted commands for security
+   */
+  static async executeCommand(command: string, ...args: any[]): Promise<any> {
+    // Security: Whitelist allowed commands to prevent command injection
+    const allowedCommands = [
+      'gitorial.cloneTutorial',
+      'gitorial.openTutorial',
+      'gitorial.openWorkspaceTutorial',
+      'gitorial.navigateToNextStep',
+      'gitorial.navigateToPreviousStep',
+      'workbench.action.closeAllEditors', // Used in cleanup
+    ];
+
+    if (!allowedCommands.includes(command)) {
+      throw new Error(`Security: Unauthorized command execution attempted: ${command}`);
+    }
+
+    try {
+      const result = await vscode.commands.executeCommand(command, ...args);
+      return result;
+    } catch (error) {
+      // Check if this is a workspace-related error that we can handle gracefully
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      if (this.isWorkspaceSwitchingError(errorMessage)) {
+        return null; // Return null instead of throwing for workspace switching errors
+      }
+
+      throw error;
+    }
+  }
+
+  /**
+   * Simulate user input for input boxes
+   */
+  static mockInputBox(returnValue: string | undefined): void {
+    const originalShowInputBox = vscode.window.showInputBox;
+    vscode.window.showInputBox = async () => returnValue;
+
+    // Register cleanup function instead of using timeout
+    this.mockCleanups.push(() => {
+      vscode.window.showInputBox = originalShowInputBox;
+    });
+  }
+
+  /**
+   * Simulate file picker dialog
+   */
+  static mockOpenDialog(returnValue: vscode.Uri[] | undefined): void {
+    const originalShowOpenDialog = vscode.window.showOpenDialog;
+    vscode.window.showOpenDialog = async () => {
+      // Ensure directory exists if returnValue is provided
+      if (returnValue && returnValue[0]) {
+        const dirPath = returnValue[0].fsPath;
+        try {
+          await fs.mkdir(dirPath, { recursive: true });
+        } catch (error) {
+          console.warn(`Could not create test directory ${dirPath}:`, error);
+        }
+      }
+      return returnValue;
+    };
+
+    this.mockCleanups.push(() => {
+      vscode.window.showOpenDialog = originalShowOpenDialog;
+    });
+  }
+
+  /**
+   * Simulate warning dialog with boolean return value for askConfirmation
+   */
+  static mockAskConfirmation(returnValue: boolean): void {
+    const originalShowWarningMessage = vscode.window.showWarningMessage;
+    vscode.window.showWarningMessage = async (_message: string, ...items: any[]) => {
+      // For askConfirmation calls, we need to return the appropriate MessageItem
+      if (items.length >= 2 && typeof items[0] === 'object' && typeof items[1] === 'object') {
+        // This is likely an askConfirmation call with MessageItem options
+        const confirmItem = items[0];
+        const cancelItem = items[1];
+        return returnValue ? confirmItem : cancelItem;
+      }
+
+      // Fallback for other warning message calls
+      return returnValue ? items[0] : items[1];
+    };
+
+    this.mockCleanups.push(() => {
+      vscode.window.showWarningMessage = originalShowWarningMessage;
+    });
+  }
+
+  /**
+   * Simulate multiple confirmation dialogs with boolean return values
+   */
+  static mockAskConfirmations(returnValues: boolean[]): void {
+    let currentIndex = 0;
+    const originalShowWarningMessage = vscode.window.showWarningMessage;
+
+    vscode.window.showWarningMessage = async (_message: string, ...items: any[]) => {
+      const returnValue = returnValues[currentIndex] ?? returnValues[returnValues.length - 1];
+
+      // For askConfirmation calls, we need to return the appropriate MessageItem
+      if (items.length >= 2 && typeof items[0] === 'object' && typeof items[1] === 'object') {
+        // This is likely an askConfirmation call with MessageItem options
+        const confirmItem = items[0];
+        const cancelItem = items[1];
+        currentIndex++;
+        return returnValue ? confirmItem : cancelItem;
+      }
+
+      // Fallback for other warning message calls
+      currentIndex++;
+      return returnValue ? items[0] : items[1];
+    };
+
+    this.mockCleanups.push(() => {
+      vscode.window.showWarningMessage = originalShowWarningMessage;
+    });
+  }
+
+  /**
+   * Restore all mocked VS Code APIs
+   */
+  static restoreAllMocks(): void {
+    this.mockCleanups.forEach(cleanup => {
+      try {
+        cleanup();
+      } catch (error) {
+        console.warn('Failed to restore mock:', error);
+      }
+    });
+    this.mockCleanups = [];
   }
 
   /**
@@ -381,14 +581,12 @@ export class IntegrationTestUtils {
     for (const repoPath of expectedPaths) {
       try {
         await fs.access(repoPath);
-        console.log(`✅ Found repository at: ${repoPath}`);
         return repoPath;
       } catch {
         // Repository not found at this path, try next
       }
     }
 
-    console.log(`❌ Repository not found in any expected location: ${expectedPaths.join(', ')}`);
     return undefined;
   }
 
@@ -431,420 +629,6 @@ export class IntegrationTestUtils {
       }
       return false;
     }
-  }
-
-  /**
-   * Recursively search for repository directory
-   */
-  private static async searchForRepositoryRecursively(baseDir: string, repoName: string, maxDepth: number = 3): Promise<string | null> {
-    if (maxDepth <= 0) {
-      return null;
-    }
-
-    try {
-      const entries = await fs.readdir(baseDir, { withFileTypes: true });
-
-      for (const entry of entries) {
-        if (!entry.isDirectory()) {
-          continue;
-        }
-
-        const fullPath = path.join(baseDir, entry.name);
-
-        // Check if this directory is our target repository
-        if (entry.name === repoName) {
-          const gitDir = path.join(fullPath, '.git');
-          try {
-            await fs.access(gitDir);
-            return fullPath; // Found it!
-          } catch {
-            // Not a git repository, continue searching
-          }
-        }
-
-        // Recursively search subdirectories (but avoid hidden directories for performance)
-        if (!entry.name.startsWith('.') && entry.name !== 'node_modules') {
-          const recursiveResult = await this.searchForRepositoryRecursively(fullPath, repoName, maxDepth - 1);
-          if (recursiveResult) {
-            return recursiveResult;
-          }
-        }
-      }
-    } catch {
-      // Ignore access errors and continue
-    }
-
-    return null;
-  }
-
-  /**
-   * Create a test repository with gitorial structure
-   */
-  static async createTestRepository(name: string = 'test-tutorial'): Promise<TestRepository> {
-    const repoPath = path.join(this.testDir, name);
-    await fs.mkdir(repoPath, { recursive: true });
-    this.createdPaths.push(repoPath);
-
-    const git = simpleGit(repoPath);
-
-    // Initialize git repository
-    await git.init();
-    await git.addConfig('user.name', 'Test User');
-    await git.addConfig('user.email', 'test@example.com');
-
-    // Create initial commit structure
-    await this.createTutorialStructure(repoPath, git);
-
-    return {
-      path: repoPath,
-      git,
-    };
-  }
-
-  /**
-   * Create tutorial file structure with multiple steps
-   */
-  private static async createTutorialStructure(repoPath: string, git: SimpleGit): Promise<void> {
-    // Create tutorial files
-    const readmePath = path.join(repoPath, 'README.md');
-    await fs.writeFile(readmePath, '# Test Tutorial\n\nThis is a test tutorial for e2e testing.');
-
-    const srcDir = path.join(repoPath, 'src');
-    await fs.mkdir(srcDir, { recursive: true });
-
-    // Step 1: Initial file with TODO
-    const step1File = path.join(srcDir, 'main.ts');
-    await fs.writeFile(step1File, '// TODO: Implement basic functionality\nexport function hello() {\n  // TODO: return greeting\n}');
-
-    await git.add('.');
-    await git.commit('Step 1: Initial setup with TODOs');
-    const step1Hash = await git.revparse(['HEAD']);
-
-    // Step 2: Partial implementation
-    await fs.writeFile(step1File, '// Implement basic functionality\nexport function hello() {\n  return \'Hello, World!\';\n}\n\n// TODO: Add advanced features');
-
-    const step2File = path.join(srcDir, 'utils.ts');
-    await fs.writeFile(step2File, '// TODO: Implement utility functions\nexport function capitalize(str: string): string {\n  // TODO: implement capitalization\n  return str;\n}');
-
-    await git.add('.');
-    await git.commit('Step 2: Basic implementation with more TODOs');
-    const _step2Hash = await git.revparse(['HEAD']);
-
-    // Step 3: Complete implementation
-    await fs.writeFile(step1File, '// Complete basic functionality\nexport function hello(name?: string) {\n  return name ? `Hello, ${name}!` : \'Hello, World!\';\n}\n\n// Advanced features implemented\nexport function farewell(name?: string) {\n  return name ? `Goodbye, ${name}!` : \'Goodbye!\';\n}');
-
-    await fs.writeFile(step2File, '// Utility functions implemented\nexport function capitalize(str: string): string {\n  return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();\n}\n\nexport function reverse(str: string): string {\n  return str.split(\'\').reverse().join(\'\');\n}');
-
-    await git.add('.');
-    await git.commit('Step 3: Complete implementation');
-    const _step3Hash = await git.revparse(['HEAD']);
-
-    // Create gitorial branch pointing to step 1
-    await git.checkoutBranch('gitorial', step1Hash);
-
-    // Stay on gitorial branch (with TODO content) for testing
-    // This ensures the test repository has the expected TODO content
-  }
-
-  /**
-   * Create a workspace for testing
-   */
-  static async createTestWorkspace(repositoryPath: string): Promise<TestWorkspace> {
-    const workspaceUri = vscode.Uri.file(repositoryPath);
-
-    return {
-      uri: workspaceUri,
-      path: repositoryPath,
-    };
-  }
-
-  /**
-   * Wait for extension activation
-   */
-  static async waitForExtensionActivation(extensionId: string = 'AndrzejSulkowski.gitorial'): Promise<vscode.Extension<any>> {
-    const extension = vscode.extensions.getExtension(extensionId);
-    if (!extension) {
-      throw new Error(`Extension ${extensionId} not found`);
-    }
-
-    if (!extension.isActive) {
-      console.log('🔄 Activating extension...');
-      await extension.activate();
-    }
-
-    return extension;
-  }
-
-  /**
-   * Initialize webview panel tracking
-   */
-  private static initWebviewPanelTracking(): void {
-    if (this.webviewPanelDisposable) {
-      return; // Already initialized
-    }
-
-    // Track webview panel creation through the extension API
-    this.webviewPanelDisposable = vscode.window.onDidChangeActiveTextEditor(() => {
-      // This is a workaround since VS Code doesn't provide direct webview panel creation events
-      // In a real implementation, the extension would need to notify us when panels are created
-    });
-  }
-
-  /**
-   * Register a webview panel for tracking
-   */
-  static registerWebviewPanel(panel: vscode.WebviewPanel): void {
-    this.webviewPanelRegistry.add(panel);
-
-    // Clean up when panel is disposed
-    panel.onDidDispose(() => {
-      this.webviewPanelRegistry.delete(panel);
-    });
-  }
-
-  /**
-   * Wait for webview panel to be created with proper tracking
-   */
-  static async waitForWebviewPanel(
-    viewType?: string,
-    timeout: number = INTEGRATION_TEST_CONFIG.TIMEOUTS.QUICK_OPERATION,
-  ): Promise<vscode.WebviewPanel | null> {
-    this.initWebviewPanelTracking();
-
-    return new Promise((resolve) => {
-      const startTime = Date.now();
-
-      const checkForPanel = () => {
-        // Check registered panels for matching view type
-        for (const panel of this.webviewPanelRegistry) {
-          if (!viewType || panel.viewType === viewType) {
-            resolve(panel);
-            return;
-          }
-        }
-
-        if (Date.now() - startTime > timeout) {
-          resolve(null);
-          return;
-        }
-
-        // Continue checking
-        setTimeout(checkForPanel, INTEGRATION_TEST_CONFIG.POLLING.WEBVIEW_CHECK_INTERVAL);
-      };
-
-      checkForPanel();
-    });
-  }
-
-  /**
-   * Get all active webview panels
-   */
-  static getActiveWebviewPanels(viewType?: string): vscode.WebviewPanel[] {
-    const panels = Array.from(this.webviewPanelRegistry);
-    return viewType ? panels.filter(panel => panel.viewType === viewType) : panels;
-  }
-
-  /**
-   * Execute VS Code command and wait for completion
-   * Only allows whitelisted commands for security
-   */
-  static async executeCommand(command: string, ...args: any[]): Promise<any> {
-    // Security: Whitelist allowed commands to prevent command injection
-    const allowedCommands = [
-      'gitorial.cloneTutorial',
-      'gitorial.openTutorial',
-      'gitorial.openWorkspaceTutorial',
-      'gitorial.navigateToNextStep',
-      'gitorial.navigateToPreviousStep',
-      'workbench.action.closeAllEditors', // Used in cleanup
-    ];
-
-    if (!allowedCommands.includes(command)) {
-      throw new Error(`Security: Unauthorized command execution attempted: ${command}`);
-    }
-
-    console.log(`🎯 Executing command: ${command}`, args.length > 0 ? 'with args' : '');
-    try {
-      const result = await vscode.commands.executeCommand(command, ...args);
-      console.log(`✅ Command ${command} completed`);
-      return result;
-    } catch (error) {
-      // Check if this is a workspace-related error that we can handle gracefully
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      if (this.isWorkspaceSwitchingError(errorMessage)) {
-        console.log(`📝 Workspace switching detected during command ${command} - this may be expected`);
-        return null; // Return null instead of throwing for workspace switching errors
-      }
-
-      console.error(`❌ Command ${command} failed:`, error);
-      throw error;
-    }
-  }
-
-  /**
-   * Simulate user input for input boxes
-   */
-  static mockInputBox(returnValue: string | undefined): void {
-    const originalShowInputBox = vscode.window.showInputBox;
-    vscode.window.showInputBox = async () => returnValue;
-
-    // Register cleanup function instead of using timeout
-    this.mockCleanups.push(() => {
-      vscode.window.showInputBox = originalShowInputBox;
-    });
-  }
-
-  /**
-   * Simulate user selection for quick pick
-   */
-  static mockQuickPick(returnValue: any): void {
-    const originalShowQuickPick = vscode.window.showQuickPick;
-    vscode.window.showQuickPick = async () => returnValue;
-
-    this.mockCleanups.push(() => {
-      vscode.window.showQuickPick = originalShowQuickPick;
-    });
-  }
-
-  /**
-   * Mock confirmation dialogs (showInformationMessage with buttons)
-   */
-  static mockConfirmationDialog(returnValue: string | undefined): void {
-    const originalShowInformationMessage = vscode.window.showInformationMessage;
-    vscode.window.showInformationMessage = async (message: string, ..._items: any[]) => {
-      console.log(`📋 Mocked dialog: "${message}" - returning: ${returnValue}`);
-      return returnValue as any;
-    };
-
-    this.mockCleanups.push(() => {
-      vscode.window.showInformationMessage = originalShowInformationMessage;
-    });
-  }
-
-  /**
-   * Mock multiple confirmation dialogs in sequence
-   */
-  static mockConfirmationDialogs(returnValues: (string | undefined)[]): void {
-    const originalShowInformationMessage = vscode.window.showInformationMessage;
-    let callIndex = 0;
-
-    vscode.window.showInformationMessage = async (message: string, ..._items: any[]) => {
-      const returnValue = returnValues[callIndex] || returnValues[returnValues.length - 1];
-      console.log(`📋 Mocked dialog ${callIndex + 1}: "${message}" - returning: ${returnValue}`);
-      callIndex++;
-      return returnValue as any;
-    };
-
-    this.mockCleanups.push(() => {
-      vscode.window.showInformationMessage = originalShowInformationMessage;
-    });
-  }
-
-  /**
-   * Mock warning dialogs (showWarningMessage with buttons)
-   */
-  static mockWarningDialog(returnValue: string | undefined): void {
-    const originalShowWarningMessage = vscode.window.showWarningMessage;
-    vscode.window.showWarningMessage = async (message: string, ..._items: any[]) => {
-      console.log(`⚠️ Mocked warning dialog: "${message}" - returning: ${returnValue}`);
-      return returnValue as any;
-    };
-
-    this.mockCleanups.push(() => {
-      vscode.window.showWarningMessage = originalShowWarningMessage;
-    });
-  }
-
-  /**
-   * Simulate file picker dialog
-   */
-  static mockOpenDialog(returnValue: vscode.Uri[] | undefined): void {
-    const originalShowOpenDialog = vscode.window.showOpenDialog;
-    vscode.window.showOpenDialog = async () => {
-      // Ensure directory exists if returnValue is provided
-      if (returnValue && returnValue[0]) {
-        const dirPath = returnValue[0].fsPath;
-        try {
-          await fs.mkdir(dirPath, { recursive: true });
-        } catch (error) {
-          console.warn(`Could not create test directory ${dirPath}:`, error);
-        }
-      }
-      return returnValue;
-    };
-
-    this.mockCleanups.push(() => {
-      vscode.window.showOpenDialog = originalShowOpenDialog;
-    });
-  }
-
-  /**
-   * Simulate warning dialog with boolean return value for askConfirmation
-   */
-  static mockAskConfirmation(returnValue: boolean): void {
-    const originalShowWarningMessage = vscode.window.showWarningMessage;
-    vscode.window.showWarningMessage = async (message: string, ...items: any[]) => {
-      console.log(`📋 Mocked confirmation dialog: "${message}" - returning: ${returnValue}`);
-
-      // For askConfirmation calls, we need to return the appropriate MessageItem
-      if (items.length >= 2 && typeof items[0] === 'object' && typeof items[1] === 'object') {
-        // This is likely an askConfirmation call with MessageItem options
-        const confirmItem = items[0];
-        const cancelItem = items[1];
-        return returnValue ? confirmItem : cancelItem;
-      }
-
-      // Fallback for other warning message calls
-      return returnValue ? items[0] : items[1];
-    };
-
-    this.mockCleanups.push(() => {
-      vscode.window.showWarningMessage = originalShowWarningMessage;
-    });
-  }
-
-  /**
-   * Simulate multiple confirmation dialogs with boolean return values
-   */
-  static mockAskConfirmations(returnValues: boolean[]): void {
-    let currentIndex = 0;
-    const originalShowWarningMessage = vscode.window.showWarningMessage;
-
-    vscode.window.showWarningMessage = async (message: string, ...items: any[]) => {
-      const returnValue = returnValues[currentIndex] ?? returnValues[returnValues.length - 1];
-      console.log(`📋 Mocked confirmation dialog ${currentIndex + 1}: "${message}" - returning: ${returnValue}`);
-
-      // For askConfirmation calls, we need to return the appropriate MessageItem
-      if (items.length >= 2 && typeof items[0] === 'object' && typeof items[1] === 'object') {
-        // This is likely an askConfirmation call with MessageItem options
-        const confirmItem = items[0];
-        const cancelItem = items[1];
-        currentIndex++;
-        return returnValue ? confirmItem : cancelItem;
-      }
-
-      // Fallback for other warning message calls
-      currentIndex++;
-      return returnValue ? items[0] : items[1];
-    };
-
-    this.mockCleanups.push(() => {
-      vscode.window.showWarningMessage = originalShowWarningMessage;
-    });
-  }
-
-  /**
-   * Restore all mocked VS Code APIs
-   */
-  static restoreAllMocks(): void {
-    this.mockCleanups.forEach(cleanup => {
-      try {
-        cleanup();
-      } catch (error) {
-        console.warn('Failed to restore mock:', error);
-      }
-    });
-    this.mockCleanups = [];
   }
 
   /**
@@ -925,23 +709,6 @@ export class IntegrationTestUtils {
       await vscode.commands.executeCommand('workbench.action.closeAllEditors');
     } catch (error) {
       console.warn('Failed to close all editors:', error);
-    }
-  }
-
-  /**
-   * Assert that a file contains specific content
-   */
-  static async assertFileContent(filePath: string, expectedContent: string | RegExp): Promise<void> {
-    const actualContent = await fs.readFile(filePath, 'utf-8');
-
-    if (typeof expectedContent === 'string') {
-      if (!actualContent.includes(expectedContent)) {
-        throw new Error(`File ${filePath} does not contain expected content: ${expectedContent}`);
-      }
-    } else {
-      if (!expectedContent.test(actualContent)) {
-        throw new Error(`File ${filePath} does not match expected pattern: ${expectedContent}`);
-      }
     }
   }
 

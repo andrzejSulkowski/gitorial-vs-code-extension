@@ -66,8 +66,8 @@ suite('Integration: Clone Tutorial Workflow', () => {
         // Execute clone command
         await IntegrationTestUtils.executeCommand('gitorial.cloneTutorial');
 
-        // Wait for clone operation to complete - check subdirectory location
-        const expectedClonePath = path.join(process.cwd(), 'tutorials', INTEGRATION_TEST_CONFIG.DIRECTORIES.TEST_REPO_NAME);
+        // Wait for clone operation to complete - check workspace root location
+        const expectedClonePath = path.join(process.cwd(), INTEGRATION_TEST_CONFIG.DIRECTORIES.TEST_REPO_NAME);
 
         await IntegrationTestUtils.waitForCondition(async () => {
           try {

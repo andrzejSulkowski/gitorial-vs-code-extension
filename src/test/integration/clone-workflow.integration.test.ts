@@ -20,7 +20,6 @@ suite('Integration: Clone Tutorial Workflow', () => {
     await IntegrationTestUtils.initialize();
     _extensionContext = await IntegrationTestUtils.waitForExtensionActivation();
 
-    // Create mock remote repository for cloning tests
     mockRemoteRepo = await IntegrationTestUtils.createMockRemoteRepository();
   });
 
@@ -34,10 +33,8 @@ suite('Integration: Clone Tutorial Workflow', () => {
     test('should clone tutorial repository and open automatically', async function() {
       this.timeout(INTEGRATION_TEST_CONFIG.TIMEOUTS.TEST_EXECUTION);
 
-      // Configure extension for subdirectory mode
       await IntegrationTestUtils.configureExtensionSetting('gitorial', 'cloneLocation', 'subdirectory');
 
-      // Mock user inputs for clone command
       IntegrationTestUtils.mockInputBox(mockRemoteRepo.url);
       const workspaceRoot = vscode.Uri.file(process.cwd());
       IntegrationTestUtils.mockOpenDialog([workspaceRoot]);
@@ -45,10 +42,8 @@ suite('Integration: Clone Tutorial Workflow', () => {
       IntegrationTestUtils.mockAskConfirmation(true);
 
       try {
-        // Execute clone command
         await IntegrationTestUtils.executeCommand('gitorial.cloneTutorial');
 
-        // Wait for clone operation to complete
         const expectedClonePath = IntegrationTestUtils.getExpectedRepositoryPath(INTEGRATION_TEST_CONFIG.DIRECTORIES.TEST_REPO_NAME);
 
         await IntegrationTestUtils.waitForCondition(async () => {
@@ -60,20 +55,15 @@ suite('Integration: Clone Tutorial Workflow', () => {
           }
         }, INTEGRATION_TEST_CONFIG.TIMEOUTS.NETWORK_OPERATION);
 
-        // Track the cloned tutorial path for cleanup
         IntegrationTestUtils.trackTutorialPath(expectedClonePath);
 
-        // Verify cloned repository structure
         const clonedRepoPath = expectedClonePath;
 
-        // Check if it's a git repository
         const gitDirPath = path.join(clonedRepoPath, '.git');
         await fs.access(gitDirPath);
 
-        // Verify gitorial branch exists
         const _currentBranch = await IntegrationTestUtils.getCurrentBranch(clonedRepoPath);
 
-        // Verify repository is clean
         const isClean = await IntegrationTestUtils.isRepositoryClean(clonedRepoPath);
         assert.ok(isClean, 'Cloned repository should be in clean state');
 
@@ -88,21 +78,17 @@ suite('Integration: Clone Tutorial Workflow', () => {
 
       console.log('Testing: Clone to existing directory (reusing previous clone)');
 
-      // Configure extension for subdirectory mode
       await IntegrationTestUtils.configureExtensionSetting('gitorial', 'cloneLocation', 'subdirectory');
 
-      // Mock user inputs for clone command with existing directory
-      IntegrationTestUtils.mockInputBox(mockRemoteRepo.url); // Repository URL input
+      IntegrationTestUtils.mockInputBox(mockRemoteRepo.url);
 
-      // Mock confirmation dialogs for subdirectory mode and overwrite
-      IntegrationTestUtils.mockAskConfirmations([true, true]); // Handle subdirectory mode and tutorial opening
-      IntegrationTestUtils.mockAskConfirmation(true); // Handle "Folder already exists" dialog
+      IntegrationTestUtils.mockAskConfirmations([true, true]);
+      IntegrationTestUtils.mockAskConfirmation(true);
 
       try {
         await IntegrationTestUtils.executeCommand('gitorial.cloneTutorial');
         console.log('Existing directory handling test completed');
       } catch (_error) {
-        // Expected behavior - might fail due to existing directory
         console.log('Existing directory handled appropriately');
       }
     });
@@ -114,7 +100,6 @@ suite('Integration: Clone Tutorial Workflow', () => {
 
       console.log('Testing: Repository access error handling');
 
-      // Test with invalid repository URL (covers network errors, missing repos, etc.)
       const invalidUrl = 'https://github.com/nonexistent/invalid-repo';
       IntegrationTestUtils.mockInputBox(invalidUrl);
 
@@ -131,8 +116,7 @@ suite('Integration: Clone Tutorial Workflow', () => {
 
       console.log('Testing: Empty user input handling');
 
-      // Mock empty/cancelled input
-      IntegrationTestUtils.mockInputBox(undefined); // User cancelled URL input
+      IntegrationTestUtils.mockInputBox(undefined);
 
       try {
         await IntegrationTestUtils.executeCommand('gitorial.cloneTutorial');

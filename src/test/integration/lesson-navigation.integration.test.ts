@@ -16,31 +16,25 @@ suite('Integration: Lesson Navigation', () => {
   suiteSetup(async function() {
     this.timeout(INTEGRATION_TEST_CONFIG.TIMEOUTS.SUITE_SETUP);
 
-    // Configure extension to use subdirectory mode for tests
     await IntegrationTestUtils.configureExtensionSetting('gitorial', 'cloneLocation', 'subdirectory');
 
     await IntegrationTestUtils.initialize();
     _extensionContext = await IntegrationTestUtils.waitForExtensionActivation();
 
-    // Create mock remote repository for navigation tests
     mockRemoteRepo = await IntegrationTestUtils.createMockRemoteRepository();
 
-    // Setup mocks for clone operation
     IntegrationTestUtils.mockInputBox(mockRemoteRepo.url);
     const workspaceRoot = vscode.Uri.file(process.cwd());
     IntegrationTestUtils.mockOpenDialog([workspaceRoot]);
     IntegrationTestUtils.mockAskConfirmations([true, true]);
     IntegrationTestUtils.mockAskConfirmation(true);
 
-    // Execute clone command
     try {
       await IntegrationTestUtils.executeCommand('gitorial.cloneTutorial');
     } catch (_error) {
-      // Continue with the test setup even if clone fails
       console.warn('Clone command failed during setup, continuing with tests');
     }
 
-    // Find the cloned repository
     sharedClonedRepoPath = await IntegrationTestUtils.findClonedRepository('rust-state-machine') || '';
 
     if (sharedClonedRepoPath) {
@@ -58,14 +52,11 @@ suite('Integration: Lesson Navigation', () => {
     test('should verify cloned repository state is clean', async function() {
       this.timeout(INTEGRATION_TEST_CONFIG.TIMEOUTS.QUICK_OPERATION);
 
-      // Verify repository is clean (no uncommitted changes)
       const isClean = await IntegrationTestUtils.isRepositoryClean(sharedClonedRepoPath);
       assert.ok(isClean, 'Cloned repository should be in clean state');
 
-      // Verify repository is on expected branch
       const currentBranch = await IntegrationTestUtils.getCurrentBranch(sharedClonedRepoPath);
 
-      // The repository should be on 'gitorial' branch or a valid commit hash
       const isValidState = currentBranch === 'gitorial' ||
                            (currentBranch.length >= 7 && /^[a-f0-9]+$/.test(currentBranch));
       assert.ok(isValidState, `Repository should be on gitorial branch or valid commit, got: ${currentBranch}`);
@@ -76,13 +67,11 @@ suite('Integration: Lesson Navigation', () => {
     test('should execute navigation commands without errors', async function() {
       this.timeout(INTEGRATION_TEST_CONFIG.TIMEOUTS.TEST_EXECUTION);
 
-      // Check if we have a valid repository path
       if (!sharedClonedRepoPath) {
         console.log('⚠️ Skipping navigation test - no repository available');
-        return; // Skip this test if repository wasn't cloned
+        return;
       }
 
-      // Verify extension and commands are available
       try {
         const extension = await IntegrationTestUtils.waitForExtensionActivation();
         const extensionAPI = extension.exports;
@@ -93,10 +82,8 @@ suite('Integration: Lesson Navigation', () => {
         throw error;
       }
 
-      // Test current repository state
       const initialBranch = await IntegrationTestUtils.getCurrentBranch(sharedClonedRepoPath);
 
-      // Test navigation commands execute properly (even if no tutorial is active)
       try {
         await IntegrationTestUtils.executeCommand('gitorial.navigateToNextStep');
       } catch (error) {
@@ -111,11 +98,8 @@ suite('Integration: Lesson Navigation', () => {
         throw error;
       }
 
-      // Verify repository state is still accessible after navigation attempts
       const finalBranch = await IntegrationTestUtils.getCurrentBranch(sharedClonedRepoPath);
 
-      // In test environment without active tutorial, we expect no state change
-      // This is normal and expected behavior
       if (finalBranch === initialBranch) {
         console.log('✅ Repository state unchanged - expected in test environment without active tutorial');
       }
@@ -124,13 +108,11 @@ suite('Integration: Lesson Navigation', () => {
     test('should handle tutorial loading workflow', async function() {
       this.timeout(INTEGRATION_TEST_CONFIG.TIMEOUTS.TEST_EXECUTION);
 
-      // Check if we have a valid repository path
       if (!sharedClonedRepoPath) {
         console.log('⚠️ Skipping tutorial loading test - no repository available');
-        return; // Skip this test if repository wasn't cloned
+        return;
       }
 
-      // Test the tutorial loading workflow without triggering workspace switching
       try {
         const extension = await IntegrationTestUtils.waitForExtensionActivation();
         const extensionAPI = extension.exports;
@@ -139,8 +121,6 @@ suite('Integration: Lesson Navigation', () => {
           console.log('✅ Tutorial controller is available and ready');
           console.log('✅ Tutorial loading infrastructure verified');
 
-          // In a real environment, the tutorial would load and switch workspaces
-          // In test environment, we verify the components are available
           console.log('ℹ️ Skipping actual tutorial loading to avoid workspace switch in test environment');
         } else {
           throw new Error('Tutorial controller not available');

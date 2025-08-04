@@ -2,7 +2,7 @@ import { Tutorial } from '@domain/models/Tutorial';
 import { IFileSystem } from '@domain/ports/IFileSystem';
 import { IProgressReporter } from '@domain/ports/IProgressReporter';
 import { IUserInteraction } from '@domain/ports/IUserInteraction';
-import { TutorialService } from '@domain/services/TutorialService';
+import { TutorialService } from '@domain/services/tutorial-service/TutorialService';
 import * as vscode from 'vscode';
 import { AutoOpenState } from '@infra/state/AutoOpenState';
 import { asTutorialId } from '@gitorial/shared-types';

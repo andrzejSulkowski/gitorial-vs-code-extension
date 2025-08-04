@@ -1,6 +1,6 @@
 import { Tutorial } from '@domain/models/Tutorial';
 import { IUserInteraction } from '@domain/ports/IUserInteraction';
-import { TutorialService } from '@domain/services/TutorialService';
+import { TutorialService } from '@domain/services/tutorial-service/TutorialService';
 import * as vscode from 'vscode';
 
 export type Args = {

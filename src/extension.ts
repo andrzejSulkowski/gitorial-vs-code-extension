@@ -17,7 +17,7 @@ import { createFileSystemAdapter } from '@infra/adapters/VSCodeFileSystemAdapter
 // Domain
 import { DiffService } from '@domain/services/DiffService';
 import { TutorialRepositoryImpl } from '@domain/repositories/TutorialRepositoryImpl';
-import { TutorialService } from '@domain/services/TutorialService';
+import { TutorialService } from '@domain/services/tutorial-service';
 import { TutorialViewModelConverter } from '@domain/converters/TutorialViewModelConverter';
 import { TutorialChangeDetector } from '@domain/utils/TutorialChangeDetector';
 import { TutorialDisplayService } from '@domain/services/TutorialDisplayService';

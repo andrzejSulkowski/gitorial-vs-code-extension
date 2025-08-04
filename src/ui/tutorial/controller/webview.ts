@@ -16,6 +16,7 @@ interface ChangeAnalysis {
   tutorialChanged: boolean;
   stepChanged: boolean;
   solutionStateChanged: boolean;
+  contentChanged: boolean;
 }
 
 /**
@@ -77,6 +78,10 @@ export class Controller {
     }
     if (changes.solutionStateChanged) {
       await this._handleSolutionToggle(vm);
+    }
+
+    if (changes.contentChanged) {
+      await this._handleContentChange(vm);
     }
 
     // Update internal state after successful operation
@@ -143,6 +148,7 @@ export class Controller {
       solutionStateChanged:
         tutorial?.isShowingSolution !== undefined &&
         this.tutorialViewModel?.isShowingSolution !== tutorial.isShowingSolution,
+      contentChanged: this.tutorialViewModel?.steps[tutorial.currentStep.index].htmlContent !== tutorial.steps[tutorial.currentStep.index].htmlContent,
     };
   }
 
@@ -185,6 +191,21 @@ export class Controller {
       category: 'tutorial',
       type: 'solution-toggled',
       payload: { isShowingSolution },
+    };
+
+    await this.webviewPanelManager.sendMessage(message);
+  }
+
+  private async _handleContentChange(tutorial: Readonly<TutorialViewModel>): Promise<void> {
+    const htmlContent = tutorial.steps[tutorial.currentStep.index].htmlContent;
+    if (!htmlContent) {
+      throw new Error('Content change detected but no html content found');
+    }
+
+    const message: ExtensionToWebviewTutorialMessage = {
+      category: 'tutorial',
+      type: 'data-updated',
+      payload: tutorial,
     };
 
     await this.webviewPanelManager.sendMessage(message);

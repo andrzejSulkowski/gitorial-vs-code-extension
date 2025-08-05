@@ -1,3 +1,5 @@
+import { UrlValidator } from "./UrlValidator";
+
 export interface CommandValidationResult {
   isValid: boolean;
   sanitizedCommand?: string;
@@ -224,14 +226,9 @@ export class CommandValidator {
    * Sanitizes arguments specific to git commands
    */
   private static sanitizeGitArgument(arg: string): string | null {
-    // For URLs, allow HTTPS git URLs only
-    if (arg.startsWith('https://')) {
-      // Validate using existing URL validator patterns
-      const urlPattern = /^https:\/\/(github\.com|gitlab\.com|bitbucket\.org)\/[a-zA-Z0-9._-]+\/[a-zA-Z0-9._-]+(?:\.git)?$/;
-      if (!urlPattern.test(arg)) {
-        return null;
-      }
-      return arg;
+    if (arg.startsWith('https://') || arg.startsWith('ssh://')) {
+      const result = UrlValidator.validateRepositoryUrl(arg);
+      return result.isValid ? result.normalizedUrl || arg : null;
     }
 
     // For paths, ensure they don't contain dangerous patterns

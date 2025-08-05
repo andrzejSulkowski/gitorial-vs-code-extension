@@ -1,4 +1,4 @@
-import { UrlValidator } from "./UrlValidator";
+import { UrlValidator } from './UrlValidator';
 
 export interface CommandValidationResult {
   isValid: boolean;

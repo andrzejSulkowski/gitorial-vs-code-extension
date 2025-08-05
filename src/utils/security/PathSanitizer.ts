@@ -122,7 +122,6 @@ export class PathSanitizer {
       /\.\./g,           // Path traversal
       /[<>:"|?*]/g,      // Windows reserved characters
       /[\x00-\x1f]/g,    // Control characters
-      /^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])$/i, // Windows reserved names
       /\$\{.*\}/g,       // Variable substitution patterns
       /`.*`/g,           // Command substitution
       /\||\&\&|\|\|/g,   // Command chaining

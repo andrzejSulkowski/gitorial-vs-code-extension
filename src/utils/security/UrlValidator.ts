@@ -161,7 +161,10 @@ export class UrlValidator {
     const suspiciousPatterns = [
       /\.\./,  // Path traversal
       /\/\//,  // Double slashes (potential redirect)
-      /%[0-9a-f]{2}/i,  // URL encoding (potential obfuscation)
+      /%2e%2e/i,  // URL encoded path traversal (..)
+      /%2f%2e%2e%2f/i,  // URL encoded path traversal (/../)
+      /%00/i,  // Null byte injection
+      /%3c%3e/i,  // URL encoded HTML injection (<>)
       /[<>'"]/,  // HTML injection characters
     ];
 

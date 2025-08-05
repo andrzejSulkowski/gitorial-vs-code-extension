@@ -183,11 +183,12 @@ export class PathSanitizer {
       return false;
     }
 
-    // Check for hidden/system patterns that might be exploited
+    // Check for hidden files - block all except explicitly safe ones
     if (component.startsWith('.') && component.length > 1) {
-      const hiddenPatterns = /^\.(env|git|ssh|aws)$/i;
-      if (hiddenPatterns.test(component)) {
-        return false;
+      // Allow only specific safe hidden files/directories commonly found in repositories
+      const safeHiddenPatterns = /^\.(gitignore|gitattributes|github|vscode|editorconfig)$/i;
+      if (!safeHiddenPatterns.test(component)) {
+        return false; // Block all other hidden files for security
       }
     }
 

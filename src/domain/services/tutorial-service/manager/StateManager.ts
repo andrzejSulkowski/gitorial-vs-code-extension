@@ -41,8 +41,7 @@ export class StateManager {
       openTabFsPaths,
     );
 
-    // Update the tutorial's internal state
-    tutorial.lastPersistedOpenTabFsPaths = openTabFsPaths;
+    tutorial.setLastPersistedOpenTabFsPaths(openTabFsPaths);
   }
 
   /**

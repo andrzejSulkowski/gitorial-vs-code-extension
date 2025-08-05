@@ -140,15 +140,29 @@ export class Controller {
 
   /**
    * Analyzes what has changed between current and new state
+   * Returns a ChangeAnalysis object indicating which aspects have changed.
    */
   private _analyzeChanges(tutorial: Readonly<TutorialViewModel>): ChangeAnalysis {
+    const prev = this.tutorialViewModel;
+    const curr = tutorial;
+
+    const tutorialChanged = prev?.id !== curr.id;
+
+    const stepChanged = prev?.currentStep.index !== curr.currentStep.index;
+
+    const solutionStateChanged =
+      curr?.isShowingSolution !== undefined &&
+      prev?.isShowingSolution !== curr.isShowingSolution;
+
+    const prevStep = prev?.steps.at(curr.currentStep.index);
+    const currStep = curr.steps.at(curr.currentStep.index);
+    const contentChanged = prevStep?.htmlContent !== currStep?.htmlContent;
+
     return {
-      tutorialChanged: this.tutorialViewModel?.id !== tutorial.id,
-      stepChanged: this.tutorialViewModel?.currentStep.index !== tutorial.currentStep.index,
-      solutionStateChanged:
-        tutorial?.isShowingSolution !== undefined &&
-        this.tutorialViewModel?.isShowingSolution !== tutorial.isShowingSolution,
-      contentChanged: this.tutorialViewModel?.steps[tutorial.currentStep.index].htmlContent !== tutorial.steps[tutorial.currentStep.index].htmlContent,
+      tutorialChanged,
+      stepChanged,
+      solutionStateChanged,
+      contentChanged,
     };
   }
 

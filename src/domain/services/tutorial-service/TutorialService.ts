@@ -43,7 +43,6 @@ export interface LoadTutorialOptions {
 export class TutorialService {
   private _tutorial: Tutorial | null = null;
   private _gitOperations: IGitOperations | null = null;
-  private readonly workspaceId: string | undefined;
   private readonly contentManager: ContentManager;
   private readonly navigationManager: NavigationManager;
   private readonly stateManager: StateManager;
@@ -61,7 +60,6 @@ export class TutorialService {
     this.contentManager = new ContentManager(stepContentRepository);
     this.navigationManager = new NavigationManager(activeTutorialStateRepository, this.contentManager);
     this.stateManager = new StateManager(activeTutorialStateRepository, workspaceId);
-    this.workspaceId = workspaceId;
   }
 
   //   _      _  __                     _

@@ -105,20 +105,14 @@ export class NavigationManager {
     oldIndex: number,
   ): Promise<void> {
     try {
-      // Checkout the new step's commit
       await gitOperations.checkoutAndClean(tutorial.activeStep.commitHash);
-
-      // Enrich the step with content
       await this.contentManager.enrichStep(tutorial, tutorial.activeStep);
-
-      // Save the updated tutorial state
       await this.activeTutorialStateRepository.saveActiveTutorial(
         tutorial.id,
         tutorial.activeStep.id,
         tutorial.lastPersistedOpenTabFsPaths || [],
       );
     } catch (error) {
-      // Rollback to previous step on error
       tutorial.goTo(oldIndex);
       console.error('NavigationManager: Error during _afterStepChange:', error);
       throw error;

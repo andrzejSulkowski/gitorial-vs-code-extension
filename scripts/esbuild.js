@@ -51,7 +51,14 @@ function postBuildCleanup() {
 
 async function main() {
   const ctx = await esbuild.context({
-    entryPoints: ['src/extension.ts', 'src/test/extension.test.ts'],
+    entryPoints: [
+      'src/extension.ts', 
+      'src/test/extension.test.ts',
+      'src/test/integration/test-config.ts',
+      'src/test/integration/clone-workflow.integration.test.ts',
+      'src/test/integration/core-workflows.integration.test.ts',
+      'src/test/integration/lesson-navigation.integration.test.ts'
+    ],
     bundle: true,
     format: 'cjs',
     minify: production,

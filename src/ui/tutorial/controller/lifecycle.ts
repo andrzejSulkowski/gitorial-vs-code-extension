@@ -325,11 +325,12 @@ export class Controller {
       return false;
     }
 
-    // Check if tutorial path is within workspace (including subdirectories)
-    const normalizedWorkspace = workspacePath.endsWith('/') ? workspacePath : workspacePath + '/';
-    const normalizedTutorial = tutorialPath.endsWith('/') ? tutorialPath : tutorialPath + '/';
+    const tutorialUri = vscode.Uri.file(tutorialPath);
 
-    return normalizedTutorial.startsWith(normalizedWorkspace);
+    // Check if tutorial is within workspace by comparing normalized paths
+    const relativePath = vscode.workspace.asRelativePath(tutorialUri, false);
+    // If the path is not relative (starts with ..), it's outside the workspace
+    return !relativePath.startsWith('..');
   }
 
   // === USER INTERACTIONS ===

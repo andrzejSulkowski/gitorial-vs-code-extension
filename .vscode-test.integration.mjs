@@ -1,10 +1,11 @@
 import { defineConfig } from '@vscode/test-cli';
+import { INTEGRATION_TEST_CONFIG } from './out/test/integration/test-config.js';
 
 export default defineConfig({
   files: 'out/test/integration/**/*.integration.test.js',
   mocha: {
     ui: 'tdd',
-    timeout: 30000, // Keep consistent with INTEGRATION_TEST_CONFIG.TIMEOUTS.VSCODE_TEST
+    timeout: INTEGRATION_TEST_CONFIG.TIMEOUTS.VSCODE_TEST, // 60000 ms for VS Code tests
     color: true,
     reporter: 'spec'
   },

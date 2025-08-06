@@ -77,12 +77,14 @@ suite('Integration: Core Workflows', () => {
 
       try {
         await IntegrationTestUtils.executeCommand('gitorial.openTutorial');
-      } catch (_error) {
+      } catch (error) {
+        console.log('Expected error for invalid tutorial path:', error);
       }
 
       try {
         await IntegrationTestUtils.executeCommand('gitorial.openWorkspaceTutorial');
-      } catch (_error) {
+      } catch (error) {
+        console.log('Expected error for invalid workspace tutorial:', error);
       }
     });
   });
@@ -98,7 +100,8 @@ suite('Integration: Core Workflows', () => {
 
       try {
         await IntegrationTestUtils.executeCommand('gitorial.openTutorial');
-      } catch (_error) {
+      } catch (error) {
+        console.log('Expected error for invalid git repository:', error);
       }
     });
   });

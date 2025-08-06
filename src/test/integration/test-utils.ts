@@ -124,12 +124,21 @@ export class IntegrationTestUtils {
       throw new Error(`Security: Unauthorized command execution attempted: ${command}`);
     }
 
+    const workspaceRelatedErrors = [
+      'workspace.*switching',
+      'extension host.*restart',
+      'workspace.*folder.*changed',
+      'workspace.*update',
+      'extension.*host.*terminated',
+      'workspaceFolders.*changed',
+    ];
+
     try {
       const result = await vscode.commands.executeCommand(command, ...args);
       return result;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      if (errorMessage.includes('workspace.*switching') || errorMessage.includes('extension host.*restart') || errorMessage.includes('workspace.*folder.*changed') || errorMessage.includes('workspace.*update') || errorMessage.includes('extension.*host.*terminated') || errorMessage.includes('workspaceFolders.*changed')) {
+      if (workspaceRelatedErrors.some(pattern => errorMessage.includes(pattern))) {
         return null;
       }
 

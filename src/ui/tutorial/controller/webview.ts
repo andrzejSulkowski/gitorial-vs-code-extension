@@ -16,6 +16,7 @@ interface ChangeAnalysis {
   tutorialChanged: boolean;
   stepChanged: boolean;
   solutionStateChanged: boolean;
+  contentChanged: boolean;
 }
 
 /**
@@ -79,6 +80,10 @@ export class Controller {
       await this._handleSolutionToggle(vm);
     }
 
+    if (changes.contentChanged) {
+      await this._handleContentChange(vm);
+    }
+
     // Update internal state after successful operation
     this._updateInternalState(vm);
   }
@@ -135,14 +140,29 @@ export class Controller {
 
   /**
    * Analyzes what has changed between current and new state
+   * Returns a ChangeAnalysis object indicating which aspects have changed.
    */
   private _analyzeChanges(tutorial: Readonly<TutorialViewModel>): ChangeAnalysis {
+    const prev = this.tutorialViewModel;
+    const curr = tutorial;
+
+    const tutorialChanged = prev?.id !== curr.id;
+
+    const stepChanged = prev?.currentStep.index !== curr.currentStep.index;
+
+    const solutionStateChanged =
+      curr?.isShowingSolution !== undefined &&
+      prev?.isShowingSolution !== curr.isShowingSolution;
+
+    const prevStep = prev?.steps.at(curr.currentStep.index);
+    const currStep = curr.steps.at(curr.currentStep.index);
+    const contentChanged = prevStep?.htmlContent !== currStep?.htmlContent;
+
     return {
-      tutorialChanged: this.tutorialViewModel?.id !== tutorial.id,
-      stepChanged: this.tutorialViewModel?.currentStep.index !== tutorial.currentStep.index,
-      solutionStateChanged:
-        tutorial?.isShowingSolution !== undefined &&
-        this.tutorialViewModel?.isShowingSolution !== tutorial.isShowingSolution,
+      tutorialChanged,
+      stepChanged,
+      solutionStateChanged,
+      contentChanged,
     };
   }
 
@@ -185,6 +205,21 @@ export class Controller {
       category: 'tutorial',
       type: 'solution-toggled',
       payload: { isShowingSolution },
+    };
+
+    await this.webviewPanelManager.sendMessage(message);
+  }
+
+  private async _handleContentChange(tutorial: Readonly<TutorialViewModel>): Promise<void> {
+    const htmlContent = tutorial.steps[tutorial.currentStep.index].htmlContent;
+    if (!htmlContent) {
+      throw new Error('Content change detected but no html content found');
+    }
+
+    const message: ExtensionToWebviewTutorialMessage = {
+      category: 'tutorial',
+      type: 'data-updated',
+      payload: tutorial,
     };
 
     await this.webviewPanelManager.sendMessage(message);

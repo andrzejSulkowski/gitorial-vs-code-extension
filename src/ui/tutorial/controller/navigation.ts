@@ -1,4 +1,4 @@
-import { TutorialService } from '@domain/services/TutorialService';
+import { TutorialService } from '@domain/services/tutorial-service';
 import { IUserInteraction } from '@domain/ports/IUserInteraction';
 import { Tutorial } from '@domain/models/Tutorial';
 import { WebviewToExtensionTutorialMessage } from '@gitorial/shared-types';

@@ -90,4 +90,8 @@ export class Tutorial {
     this.steps[index] = this.steps[index].toEnrichedStep(markdown);
     return this;
   }
+
+  public setLastPersistedOpenTabFsPaths(paths: string[]): void {
+    this.lastPersistedOpenTabFsPaths = paths;
+  }
 }

@@ -1,7 +1,7 @@
 import { Step } from '@domain/models/Step';
 import { Tutorial } from '@domain/models/Tutorial';
 import { StoredTutorialState } from '@domain/repositories/IActiveTutorialStateRepository';
-import { LoadTutorialOptions } from '@domain/services/tutorial-service/TutorialService';
+import { LoadTutorialOptions } from '@domain/services/tutorial-service';
 
 export class StepResolver {
   /**

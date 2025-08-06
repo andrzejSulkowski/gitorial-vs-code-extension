@@ -10,7 +10,7 @@ export class NavigationManager {
   constructor(
     private readonly activeTutorialStateRepository: IActiveTutorialStateRepository,
     private readonly contentManager: ContentManager,
-  ) {}
+  ) { }
 
   /**
    * Navigate to the next step
@@ -47,6 +47,9 @@ export class NavigationManager {
     gitOperations: IGitOperations,
     stepIndex: number,
   ): Promise<void> {
+    if (stepIndex < 0) {
+      throw new Error(`NavigationManager: Invalid step index: ${stepIndex}`);
+    }
     const targetStep = tutorial.steps.at(stepIndex);
     if (!targetStep) {
       throw new Error(`NavigationManager: Invalid step index: ${stepIndex}`);

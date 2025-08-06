@@ -8,18 +8,23 @@ export class StateManager {
   constructor(
     private readonly activeTutorialStateRepository: IActiveTutorialStateRepository,
     private readonly workspaceId?: string,
-  ) {}
+  ) { }
 
   /**
    * Saves the current tutorial state to persistent storage
    * @param tutorial - The tutorial to save state for
    */
   async saveActiveTutorialState(tutorial: Tutorial): Promise<void> {
-    await this.activeTutorialStateRepository.saveActiveTutorial(
-      tutorial.id,
-      tutorial.activeStep.id,
-      tutorial.lastPersistedOpenTabFsPaths || [],
-    );
+    try {
+      await this.activeTutorialStateRepository.saveActiveTutorial(
+        tutorial.id,
+        tutorial.activeStep.id,
+        tutorial.lastPersistedOpenTabFsPaths || [],
+      );
+    } catch (error) {
+      console.error('StateManager: Failed to save active tutorial state:', error);
+      throw new Error(`Failed to persist tutorial state: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   }
 
   /**

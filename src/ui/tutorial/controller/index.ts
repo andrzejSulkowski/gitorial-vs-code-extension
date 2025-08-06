@@ -2,7 +2,7 @@ import { IProgressReporter } from '@domain/ports/IProgressReporter';
 import { IUserInteraction } from '@domain/ports/IUserInteraction';
 import { WebviewPanelManager } from '@ui/webview/WebviewPanelManager';
 import { IFileSystem } from '@domain/ports/IFileSystem';
-import { TutorialService } from '@domain/services/tutorial-service/TutorialService';
+import { TutorialService } from '@domain/services/tutorial-service';
 import { AutoOpenState } from '@infra/state/AutoOpenState';
 import { WebviewToExtensionTutorialMessage } from '@gitorial/shared-types';
 import { IWebviewTutorialMessageHandler } from '@ui/webview/WebviewMessageHandler';

@@ -176,13 +176,25 @@ export class UrlValidator {
       }
     }
 
+    // Disallow embedded credentials; allow SSH with 'git' username and no password
+    if (url.username || url.password) {
+      const isAllowedSshUser =
+        url.protocol === 'ssh:' &&
+        !!url.username &&
+        url.username.toLowerCase() === 'git' &&
+        !url.password;
+      if (!isAllowedSshUser) {
+        return { isValid: false, error: 'Credentials in repository URLs are not allowed' };
+      }
+    }
+
     // Check for non-standard ports (except SSH default)
     if (url.port && url.port !== '22' && url.port !== '443' && url.port !== '80') {
       return { isValid: false, error: 'Non-standard ports not allowed for security' };
     }
 
     // Validate repository path structure
-    if (url.protocol === 'https:') {
+    if (url.protocol === 'https:' || url.protocol === 'ssh:') {
       const pathParts = url.pathname.split('/').filter(part => part.length > 0);
       if (pathParts.length < 2) {
         return { isValid: false, error: 'Repository URL must include owner and repository name' };
@@ -197,10 +209,14 @@ export class UrlValidator {
    */
   private static normalizeUrl(url: URL): string {
     // Remove trailing slash and .git extension
-    let normalizedPath = url.pathname.replace(/\/$/, '').replace(/\.git$/, '');
+    const normalizedPath = url.pathname.replace(/\/$/, '').replace(/\.git$/, '');
+
+    // Preserve SSH userinfo and port when present
+    const userInfo = url.username ? `${url.username}@` : '';
+    const portInfo = url.port ? `:${url.port}` : '';
 
     // Ensure proper repository path format
-    return `${url.protocol}//${url.hostname}${normalizedPath}`;
+    return `${url.protocol}//${userInfo}${url.hostname}${portInfo}${normalizedPath}`;
   }
 
   /**

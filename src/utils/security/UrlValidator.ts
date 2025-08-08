@@ -9,7 +9,9 @@ export interface UrlValidationResult {
 export interface UrlValidationOptions {
   allowedProtocols?: string[];
   allowedHosts?: string[];
-  requireHttps?: boolean;
+  // When true, only secure protocols are accepted. Secure means HTTPS or SSH.
+  // Name kept for backwards compatibility.
+  requireSecureProtocols?: boolean;
   maxLength?: number;
 }
 
@@ -27,7 +29,7 @@ export class UrlValidator {
       'codeberg.org',
       'sourceforge.net',
     ],
-    requireHttps: true,
+    requireSecureProtocols: true,
     maxLength: 2048,
   };
 
@@ -74,8 +76,8 @@ export class UrlValidator {
       }
 
       // HTTPS requirement
-      if (opts.requireHttps && parsedUrl.protocol !== 'https:' && parsedUrl.protocol !== 'ssh:') {
-        return { isValid: false, error: 'HTTPS protocol required for security' };
+      if (opts.requireSecureProtocols && parsedUrl.protocol !== 'https:' && parsedUrl.protocol !== 'ssh:') {
+        return { isValid: false, error: 'HTTPS or SSH protocol required for security' };
       }
 
       // Host validation

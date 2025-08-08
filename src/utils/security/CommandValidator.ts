@@ -279,9 +279,12 @@ export class CommandValidator {
       let urlFound = false;
       for (let i = 1; i < args.length; i++) {
         if (!args[i].startsWith('-') && !urlFound) {
-          // This should be the URL
-          if (!args[i].startsWith('https://')) {
-            return { isValid: false, error: 'Git clone only supports HTTPS URLs' };
+          // This should be the repository URL; enforce secure protocols only
+          const value = args[i];
+          const isHttps = value.startsWith('https://');
+          const isSsh = value.startsWith('ssh://');
+          if (!isHttps && !isSsh) {
+            return { isValid: false, error: 'Git clone only supports HTTPS or SSH URLs' };
           }
           urlFound = true;
         }

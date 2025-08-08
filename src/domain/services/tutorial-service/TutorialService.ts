@@ -381,16 +381,34 @@ export class TutorialService {
    * Always ensures: navigation + git checkout + step enrichment
    * This fixes the bug where some code paths didn't enrich steps properly
    */
+  /**
+   * Consistently prepares a step for activation
+   * Always ensures: navigation + git checkout + step enrichment
+   * If checkoutAndClean fails, roll back to the previous step/commit.
+   */
   private async _prepareStep(targetStep: Step): Promise<void> {
     if (!this._tutorial || !this._gitOperations) {
       throw new Error('TutorialService: Cannot prepare step without active tutorial and git operations');
     }
 
-    // Navigate tutorial to target step
-    this._tutorial.goTo(targetStep.index);
+    const previousStepIndex = this._tutorial.activeStepIndex;
+    const previousCommitHash = this._tutorial.activeStep.commitHash;
 
-    // Checkout the commit and enrich the step (always consistent!)
-    await this._gitOperations.checkoutAndClean(targetStep.commitHash);
-    await this._enrichActiveStep();
+    this._tutorial.goTo(targetStep.index);
+    try {
+      await this._gitOperations.checkoutAndClean(targetStep.commitHash);
+      await this._enrichActiveStep();
+    } catch (error) {
+      console.error('TutorialService: Failed to checkout and clean, rolling back to previous step.', error);
+
+      this._tutorial.goTo(previousStepIndex);
+      try {
+        await this._gitOperations.checkoutAndClean(previousCommitHash);
+        await this._enrichActiveStep();
+      } catch (rollbackError) {
+        console.error('TutorialService: Rollback to previous commit also failed.', rollbackError);
+      }
+      throw error;
+    }
   }
 }

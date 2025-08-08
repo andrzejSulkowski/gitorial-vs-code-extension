@@ -79,7 +79,7 @@ export class Controller {
     if (changes.solutionStateChanged) {
       await this._handleSolutionToggle(vm);
     }
-
+    //TODO: This is not very elegant. We only want to update this when nothing changed - besides the step content (like initial load)
     if (changes.contentChanged) {
       await this._handleContentChange(vm);
     }

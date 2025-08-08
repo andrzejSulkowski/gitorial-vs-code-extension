@@ -116,8 +116,25 @@ export class NavigationManager {
         tutorial.lastPersistedOpenTabFsPaths || [],
       );
     } catch (error) {
-      tutorial.goTo(oldIndex);
       console.error('NavigationManager: Error during _afterStepChange:', error);
+
+      //Rollback to the previous step
+      try {
+        const previousCommitHash = tutorial.steps[oldIndex]?.commitHash;
+        if (previousCommitHash) {
+          await gitOperations.checkoutAndClean(previousCommitHash);
+        }
+        tutorial.goTo(oldIndex);
+        await this.contentManager.enrichStep(tutorial, tutorial.activeStep);
+        await this.activeTutorialStateRepository.saveActiveTutorial(
+          tutorial.id,
+          tutorial.activeStep.id,
+          tutorial.lastPersistedOpenTabFsPaths || [],
+        );
+      } catch (rollbackError) {
+        console.error('NavigationManager: Failed to rollback after navigation error:', rollbackError);
+      }
+
       throw error;
     }
   }

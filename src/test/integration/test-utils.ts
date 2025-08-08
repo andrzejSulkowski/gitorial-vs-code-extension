@@ -124,13 +124,13 @@ export class IntegrationTestUtils {
       throw new Error(`Security: Unauthorized command execution attempted: ${command}`);
     }
 
-    const workspaceRelatedErrors = [
-      'workspace.*switching',
-      'extension host.*restart',
-      'workspace.*folder.*changed',
-      'workspace.*update',
-      'extension.*host.*terminated',
-      'workspaceFolders.*changed',
+    const workspaceRelatedErrorPatterns: RegExp[] = [
+      /workspace.*switching/i,
+      /extension\s*host.*restart/i,
+      /workspace.*folder.*changed/i,
+      /workspace.*update/i,
+      /extension.*host.*terminated/i,
+      /workspacefolders.*changed/i,
     ];
 
     try {
@@ -138,7 +138,7 @@ export class IntegrationTestUtils {
       return result;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      if (workspaceRelatedErrors.some(pattern => errorMessage.includes(pattern))) {
+      if (workspaceRelatedErrorPatterns.some(pattern => pattern.test(errorMessage))) {
         return null;
       }
 

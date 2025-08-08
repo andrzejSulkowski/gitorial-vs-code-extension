@@ -92,6 +92,6 @@ export class Tutorial {
   }
 
   public setLastPersistedOpenTabFsPaths(paths: string[]): void {
-    this.lastPersistedOpenTabFsPaths = paths;
+    this.lastPersistedOpenTabFsPaths = [...paths];
   }
 }

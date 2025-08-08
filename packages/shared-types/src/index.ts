@@ -2,6 +2,7 @@
 export * from './domain/TutorialId';
 export * from './domain/StepType';
 export * from './domain/StepData';
+export * from './domain/AuthorMode';
 
 // # UI
 

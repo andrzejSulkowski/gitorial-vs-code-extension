@@ -1,5 +1,6 @@
 export * from './TutorialMessages';
 export * from './SystemMessages';
+export * from './AuthorMessages';
 
 import type {
   ExtensionToWebviewTutorialMessage,
@@ -9,6 +10,10 @@ import type {
   ExtensionToWebviewSystemMessage,
   WebviewToExtensionSystemMessage,
 } from './SystemMessages';
+import type {
+  ExtensionToWebviewAuthorMessage,
+  WebviewToExtensionAuthorMessage,
+} from './AuthorMessages';
 
 /**
  * All possible messages sent from Extension → Webview
@@ -17,7 +22,8 @@ import type {
  */
 export type ExtensionToWebviewMessage =
   | ExtensionToWebviewTutorialMessage
-  | ExtensionToWebviewSystemMessage;
+  | ExtensionToWebviewSystemMessage
+  | ExtensionToWebviewAuthorMessage;
 
 /**
  * All possible messages sent from Webview → Extension
@@ -26,7 +32,8 @@ export type ExtensionToWebviewMessage =
  */
 export type WebviewToExtensionMessage =
   | WebviewToExtensionTutorialMessage
-  | WebviewToExtensionSystemMessage;
+  | WebviewToExtensionSystemMessage
+  | WebviewToExtensionAuthorMessage;
 
 /**
  * Category-based type guards for Webview → Extension messages
@@ -43,6 +50,12 @@ export function isSystemMessage(
   return message.category === 'system';
 }
 
+export function isAuthorMessage(
+  message: WebviewToExtensionMessage,
+): message is WebviewToExtensionAuthorMessage {
+  return message.category === 'author';
+}
+
 /**
  * Category-based type guards for Extension → Webview messages
  */
@@ -56,6 +69,12 @@ export function isOutgoingSystemMessage(
   message: ExtensionToWebviewMessage,
 ): message is ExtensionToWebviewSystemMessage {
   return message.category === 'system';
+}
+
+export function isOutgoingAuthorMessage(
+  message: ExtensionToWebviewMessage,
+): message is ExtensionToWebviewAuthorMessage {
+  return message.category === 'author';
 }
 
 /**

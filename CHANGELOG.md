@@ -50,3 +50,9 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 - Introduce eslint formatting
 - refactor webview svelte to use purly rune syntax
 - CI workflow to release to GitHub releases
+
+## [0.2.2] - 2025-08-08
+
+- Fix initial Webview screen not loading markdown
+- Security Enhancements
+- Integration Tests

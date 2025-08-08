@@ -1,6 +1,6 @@
 # Gitorial
 
-![Version](https://img.shields.io/badge/version-0.2.1-yellow)
+![Version](https://img.shields.io/badge/version-0.2.2-yellow)
 ![VS Code](https://img.shields.io/badge/VS%20Code-1.87.0+-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 

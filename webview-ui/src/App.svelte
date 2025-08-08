@@ -1,5 +1,6 @@
 <script lang="ts">
   import Tutorial from './lib/components/Tutorial.svelte';
+  import AuthorMode from './lib/components/AuthorMode.svelte';
   import { onMount } from 'svelte';
   import { createMessageRouter } from './lib/stores/messageRouter';
   import { systemStore } from './lib/stores/systemStore.svelte';
@@ -16,11 +17,14 @@
   });
 
   const isLoading = systemStore.isLoading;
+  const isAuthorMode = systemStore.isAuthorMode;
 </script>
 
 <main>
   {#if isLoading}
     <div class="loading-indicator">Loading...</div>
+  {:else if isAuthorMode}
+    <AuthorMode />
   {:else}
     <Tutorial />
   {/if}

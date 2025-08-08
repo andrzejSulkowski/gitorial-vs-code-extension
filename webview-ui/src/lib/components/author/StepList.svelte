@@ -72,6 +72,13 @@
     dragOverIndex = null;
   }
 
+  function handleStepKeydown(index: number, event: KeyboardEvent) {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      handleStepClick(index);
+    }
+  }
+
   function getStepTypeColor(type: string): string {
     switch (type) {
       case 'section': return '#007acc';
@@ -105,6 +112,7 @@
       role="button"
       tabindex="0"
       onclick={() => handleStepClick(index)}
+      onkeydown={(e) => handleStepKeydown(index, e)}
       ondragstart={(e) => handleDragStart(index, e)}
       ondragover={(e) => handleDragOver(index, e)}
       ondragleave={handleDragLeave}

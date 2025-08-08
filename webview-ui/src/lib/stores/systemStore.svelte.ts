@@ -4,11 +4,13 @@ import { sendMessage } from '../utils/messaging';
 interface SystemState {
   isLoading: boolean;
   lastError: string | null;
+  isAuthorMode: boolean;
 }
 
 const initialState: SystemState = {
   isLoading: false,
   lastError: null,
+  isAuthorMode: false,
 };
 
 let systemState = $state<SystemState>(initialState);
@@ -19,6 +21,13 @@ export const systemStore = {
   },
   get lastError() {
     return systemState.lastError;
+  },
+  get isAuthorMode() {
+    return systemState.isAuthorMode;
+  },
+
+  setAuthorMode(isActive: boolean) {
+    systemState.isAuthorMode = isActive;
   },
 
   handleMessage(message: ExtensionToWebviewSystemMessage) {

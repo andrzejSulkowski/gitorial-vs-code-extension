@@ -2,7 +2,7 @@ import { IProgressReporter } from '@domain/ports/IProgressReporter';
 import { IUserInteraction } from '@domain/ports/IUserInteraction';
 import { WebviewPanelManager } from '@ui/webview/WebviewPanelManager';
 import { IFileSystem } from '@domain/ports/IFileSystem';
-import { TutorialService } from '@domain/services/TutorialService';
+import { TutorialService } from '@domain/services/tutorial-service';
 import { AutoOpenState } from '@infra/state/AutoOpenState';
 import { WebviewToExtensionTutorialMessage } from '@gitorial/shared-types';
 import { IWebviewTutorialMessageHandler } from '@ui/webview/WebviewMessageHandler';
@@ -122,8 +122,16 @@ export class TutorialController implements IWebviewTutorialMessageHandler {
       await this.webviewController.display(tutorial);
     } else {
       if (result.reason === 'error') {
-        this.userInteraction.showErrorMessage(`Failed to clone and open tutorial: ${result.error}`);
+        // Show a user-friendly error message
+        if (result.error.includes('failed to load tutorial from path')) {
+          this.userInteraction.showErrorMessage(
+            'Could not load tutorial from the selected folder. Please ensure the folder contains a valid Gitorial tutorial with a gitorial branch.',
+          );
+        } else {
+          this.userInteraction.showErrorMessage(`Failed to open tutorial: ${result.error}`);
+        }
       }
+      // Note: user-cancelled errors are not shown to avoid notification spam
     }
   }
   //   _    _      _   _    _                 _ _
@@ -232,5 +240,19 @@ export class TutorialController implements IWebviewTutorialMessageHandler {
     } else {
       console.warn('Received unknown command from webview:', message);
     }
+  }
+
+  /**
+   * Navigates to the next step in the current tutorial.
+   */
+  public async navigateToNextStep(): Promise<void> {
+    await this.navigationController.navigateToNextStep();
+  }
+
+  /**
+   * Navigates to the previous step in the current tutorial.
+   */
+  public async navigateToPreviousStep(): Promise<void> {
+    await this.navigationController.navigateToPreviousStep();
   }
 }

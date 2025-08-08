@@ -4,17 +4,18 @@
 - Depends on repositories, not infrastructure
 */
 
-import { Tutorial } from '../models/Tutorial';
-import { ITutorialRepository } from '../repositories/ITutorialRepository';
-import { IGitOperationsFactory } from '../ports/IGitOperationsFactory';
-import { IGitOperations } from '../ports/IGitOperations';
-import {
-  IActiveTutorialStateRepository,
-  StoredTutorialState,
-} from '../repositories/IActiveTutorialStateRepository';
-import { EnrichedStep } from '../models/EnrichedStep';
-import { Step } from '../models/Step';
-import { IStepContentRepository } from '../ports/IStepContentRepository';
+import { Tutorial } from '../../models/Tutorial';
+import { ITutorialRepository } from '../../repositories/ITutorialRepository';
+import { IGitOperationsFactory } from '../../ports/IGitOperationsFactory';
+import { IGitOperations } from '../../ports/IGitOperations';
+import { IActiveTutorialStateRepository } from '../../repositories/IActiveTutorialStateRepository';
+import { EnrichedStep } from '../../models/EnrichedStep';
+import { Step } from '../../models/Step';
+import { IStepContentRepository } from '../../ports/IStepContentRepository';
+import { StepResolver } from './utils/StepResolver';
+import { ContentManager } from './manager/ContentManager';
+import { NavigationManager } from './manager/NavigationManager';
+import { StateManager } from './manager/StateManager';
 
 /**
  * Options for loading a tutorial
@@ -42,7 +43,9 @@ export interface LoadTutorialOptions {
 export class TutorialService {
   private _tutorial: Tutorial | null = null;
   private _gitOperations: IGitOperations | null = null;
-  private readonly workspaceId: string | undefined;
+  private readonly contentManager: ContentManager;
+  private readonly navigationManager: NavigationManager;
+  private readonly stateManager: StateManager;
 
   /**
    * Create a new TutorialService
@@ -50,11 +53,13 @@ export class TutorialService {
   constructor(
     private readonly repository: ITutorialRepository,
     private readonly gitOperationsFactory: IGitOperationsFactory,
-    private readonly stepContentRepository: IStepContentRepository,
+    stepContentRepository: IStepContentRepository,
     private readonly activeTutorialStateRepository: IActiveTutorialStateRepository,
     workspaceId?: string,
   ) {
-    this.workspaceId = workspaceId;
+    this.contentManager = new ContentManager(stepContentRepository);
+    this.navigationManager = new NavigationManager(activeTutorialStateRepository, this.contentManager);
+    this.stateManager = new StateManager(activeTutorialStateRepository, workspaceId);
   }
 
   //   _      _  __                     _
@@ -84,7 +89,7 @@ export class TutorialService {
       await this._gitOperations.ensureGitorialBranch();
     } catch (error) {
       console.error(`TutorialService: Failed to ensure gitorial branch for ${localPath}:`, error);
-      await this.activeTutorialStateRepository.clearActiveTutorial();
+      await this.stateManager.clearActiveTutorialState();
       this._gitOperations = null;
       return null;
     }
@@ -92,7 +97,7 @@ export class TutorialService {
     const tutorial = await this.repository.findByPath(localPath);
     if (!tutorial) {
       console.warn(`TutorialService: No tutorial found at path ${localPath}`);
-      await this.activeTutorialStateRepository.clearActiveTutorial();
+      await this.stateManager.clearActiveTutorialState();
       return null;
     }
 
@@ -112,7 +117,7 @@ export class TutorialService {
     try {
       this._gitOperations = await this.gitOperationsFactory.fromClone(repoUrl, targetPath);
       //Cloning indicates "fresh start" and therefore we clear the state
-      await this.activeTutorialStateRepository.clearActiveTutorial();
+      await this.stateManager.clearActiveTutorialState();
       try {
         await this._gitOperations.ensureGitorialBranch();
       } catch (error) {
@@ -148,7 +153,7 @@ export class TutorialService {
     }
     this._tutorial = null;
     this._gitOperations = null;
-    await this.activeTutorialStateRepository.clearActiveTutorial();
+    await this.stateManager.clearActiveTutorialState();
   }
 
   /**
@@ -159,41 +164,31 @@ export class TutorialService {
     options: LoadTutorialOptions = {},
   ): Promise<void> {
     this._tutorial = tutorial;
-    const persistedState: StoredTutorialState | undefined =
-      await this.activeTutorialStateRepository.getActiveTutorial();
     this._tutorial.isShowingSolution = !!options.showSolution;
 
-    const fallbackToFirstStep = async (context: string, error: unknown) => {
-      console.error(`TutorialService: Error during _activateTutorial for ${context}`, error);
-      this.activeTutorialStateRepository.clearActiveTutorial();
+    try {
+      // 1. Load persisted state
+      const persistedState = await this.activeTutorialStateRepository.getActiveTutorial();
+
+      // 2. Resolve target step using clean logic (no more branching!)
+      const targetStep = StepResolver.resolveTargetStep(tutorial, options, persistedState);
+
+      // 3. Consistently prepare the step (always enrich)
+      await this._prepareStep(targetStep);
+
+      // 4. Setup tab restoration
+      const effectiveInitialTabs: string[] =
+        options.initialOpenTabFsPaths ?? persistedState?.openFileUris ?? [];
+      this._tutorial.lastPersistedOpenTabFsPaths = effectiveInitialTabs;
+
+      // 5. Persist the active tutorial state
+      await this._saveActiveTutorialState();
+    } catch (error) {
+      // Fallback to first step on any error
+      console.error('TutorialService: Error during tutorial activation, falling back to first step:', error);
+      await this.stateManager.clearActiveTutorialState();
       await this.forceStepIndex(0);
-    };
-
-    if (options.initialStepCommitHash) {
-      try {
-        await this.forceStepCommitHash(options.initialStepCommitHash);
-      } catch (e) {
-        await fallbackToFirstStep(`initial step commit hash: ${options.initialStepCommitHash}`, e);
-      }
-    } else if (persistedState?.currentStepId) {
-      try {
-        await this.forceStepId(persistedState.currentStepId);
-      } catch (e) {
-        await fallbackToFirstStep(`persisted step id: ${persistedState.currentStepId}`, e);
-      }
-    } else {
-      // Default: checkout the first commit in the "gitorial" branch
-      await this.gitOperations?.checkout(tutorial.activeStep.commitHash);
-      await this._enrichActiveStep();
     }
-
-    const effectiveInitialTabs: string[] =
-      options.initialOpenTabFsPaths ?? persistedState?.openFileUris ?? [];
-
-    this._tutorial.lastPersistedOpenTabFsPaths = effectiveInitialTabs;
-
-    // Persist the active tutorial state
-    await this._saveActiveTutorialState();
   }
   //    _____      _   _
   //   / ____|    | | | |
@@ -237,13 +232,7 @@ export class TutorialService {
       );
     }
 
-    const targetStep = this._tutorial.steps.at(stepIndex);
-    if (!targetStep) {
-      throw new Error(`TutorialService: Invalid step index: ${stepIndex}`);
-    }
-    const oldStepIndex = this._tutorial.activeStepIndex;
-    this._tutorial.goTo(stepIndex);
-    await this._afterStepChange(oldStepIndex);
+    await this.navigationManager.navigateToStepIndex(this._tutorial, this._gitOperations, stepIndex);
   }
 
   /**
@@ -257,13 +246,8 @@ export class TutorialService {
         'TutorialService: no active tutorial, or no git operations for forceStepCommitHash.',
       );
     }
-    const oldStepIndex = this._tutorial.activeStepIndex;
-    const targetStep = this._tutorial.steps.find(s => s.commitHash === commitHash);
-    if (!targetStep) {
-      throw new Error(`TutorialService: Invalid step commit hash: ${commitHash}`);
-    }
-    this._tutorial.goTo(targetStep.index);
-    await this._afterStepChange(oldStepIndex);
+
+    await this.navigationManager.navigateToStepCommitHash(this._tutorial, this._gitOperations, commitHash);
   }
 
   /**
@@ -274,15 +258,8 @@ export class TutorialService {
     if (!this._tutorial || !this._gitOperations) {
       throw new Error('TutorialService: no active tutorial, or no git operations for forceStepId.');
     }
-    const oldStepIndex = this._tutorial.activeStepIndex;
-    const targetStep = this._tutorial.steps.find(s => s.id === stepId);
-    if (!targetStep) {
-      throw new Error(`TutorialService: Invalid step id: ${stepId}`);
-    }
-    if (targetStep.id !== this._tutorial.activeStep.id) {
-      this._tutorial.goTo(targetStep.index);
-      await this._afterStepChange(oldStepIndex);
-    }
+
+    await this.navigationManager.navigateToStepId(this._tutorial, this._gitOperations, stepId);
   }
 
   /**
@@ -293,12 +270,8 @@ export class TutorialService {
     if (!this._tutorial || !this._gitOperations) {
       return false;
     }
-    const oldIndex = this._tutorial.activeStepIndex;
-    if (!this._tutorial.next()) {
-      return false;
-    }
-    await this._afterStepChange(oldIndex);
-    return true;
+
+    return await this.navigationManager.navigateToNext(this._tutorial, this._gitOperations);
   }
 
   /**
@@ -309,30 +282,11 @@ export class TutorialService {
     if (!this._tutorial || !this._gitOperations) {
       return false;
     }
-    const oldIndex = this._tutorial.activeStepIndex;
-    if (!this._tutorial.prev()) {
-      return false;
-    }
-    await this._afterStepChange(oldIndex);
-    return true;
+
+    return await this.navigationManager.navigateToPrevious(this._tutorial, this._gitOperations);
   }
 
-  private async _afterStepChange(oldIndex: number): Promise<void> {
-    try {
-      if (this._tutorial && this._gitOperations) {
-        await this._gitOperations.checkoutAndClean(this._tutorial.activeStep.commitHash);
-      } else {
-        throw new Error(
-          'TutorialService: no active tutorial, or no git operations for _afterStepChange.',
-        );
-      }
-      await this._enrichActiveStep();
-      await this._saveActiveTutorialState();
-    } catch (error) {
-      this._tutorial?.goTo(oldIndex);
-      console.error('TutorialService: Error during _afterStepChange:', error);
-    }
-  }
+
 
   //TODO: We could just check if there is a Gitorial branch and this would mean there is a tutorial instead of loading the whole thing like done preivously
   public async isTutorial() {}
@@ -352,10 +306,10 @@ export class TutorialService {
    * @returns An array of fsPath strings or undefined if not available.
    */
   public getRestoredOpenTabFsPaths(): string[] | undefined {
-    if (this._tutorial && this._tutorial.lastPersistedOpenTabFsPaths) {
-      return this._tutorial.lastPersistedOpenTabFsPaths;
+    if (!this._tutorial) {
+      return undefined;
     }
-    return undefined;
+    return this.stateManager.getRestoredOpenTabFsPaths(this._tutorial);
   }
 
   /**
@@ -363,20 +317,14 @@ export class TutorialService {
    * @param openTabFsPaths An array of fsPath strings representing the currently open tutorial files.
    */
   public async updatePersistedOpenTabs(openTabFsPaths: string[]): Promise<void> {
-    if (this.workspaceId && this._tutorial) {
-      await this.activeTutorialStateRepository.saveActiveTutorial(
-        this._tutorial.id,
-        this._tutorial.activeStep.id,
-        openTabFsPaths,
-      );
-      if (this._tutorial) {
-        this._tutorial.lastPersistedOpenTabFsPaths = openTabFsPaths;
-      }
-    } else {
+    if (!this._tutorial) {
       console.warn(
-        'TutorialService: Cannot update persisted open tabs. No active workspace, tutorial, or current step.',
+        'TutorialService: Cannot update persisted open tabs. No active tutorial.',
       );
+      return;
     }
+
+    await this.stateManager.updatePersistedOpenTabs(this._tutorial, openTabFsPaths);
   }
 
   private async _saveActiveTutorialState(): Promise<void> {
@@ -384,11 +332,7 @@ export class TutorialService {
       console.warn('TutorialService: no active tutorial for _saveActiveTutorialState.');
       return;
     }
-    await this.activeTutorialStateRepository.saveActiveTutorial(
-      this._tutorial.id,
-      this._tutorial.activeStep.id,
-      this._tutorial.lastPersistedOpenTabFsPaths || [],
-    );
+    await this.stateManager.saveActiveTutorialState(this._tutorial);
   }
 
   //    _____       _       _   _               __  __                                                   _
@@ -406,7 +350,7 @@ export class TutorialService {
     if (!this._tutorial) {
       return;
     }
-    this._tutorial.isShowingSolution = show ?? !this._tutorial.isShowingSolution;
+    await this.contentManager.toggleSolution(this._tutorial, show);
   }
 
   //    _____            _             _     __  __                                                   _
@@ -427,32 +371,44 @@ export class TutorialService {
     }
 
     const targetStep = this._tutorial.activeStep;
-    if (targetStep instanceof EnrichedStep) {
-      return;
-    } else {
-      try {
-        const markdown = await this._loadMarkdown();
-        this._tutorial.enrichStep(targetStep.index, markdown);
-      } catch (error) {
-        console.error(
-          `TutorialService: Error during _enrichActiveStep for step ${targetStep.title}:`,
-          error,
-        );
-      }
-    }
+    await this.contentManager.enrichStep(this._tutorial, targetStep);
   }
 
-  private async _loadMarkdown() {
-    if (!this._tutorial) {
-      throw new Error('_loadMarkdown - no active tutorial inside TutorialService');
+
+
+  /**
+   * Consistently prepares a step for activation
+   * Always ensures: navigation + git checkout + step enrichment
+   * This fixes the bug where some code paths didn't enrich steps properly
+   */
+  /**
+   * Consistently prepares a step for activation
+   * Always ensures: navigation + git checkout + step enrichment
+   * If checkoutAndClean fails, roll back to the previous step/commit.
+   */
+  private async _prepareStep(targetStep: Step): Promise<void> {
+    if (!this._tutorial || !this._gitOperations) {
+      throw new Error('TutorialService: Cannot prepare step without active tutorial and git operations');
     }
 
-    const markdown = await this.stepContentRepository.getStepMarkdownContent(
-      this._tutorial.localPath,
-    );
-    if (!markdown) {
-      throw new Error('Error occurred while processing markdown');
+    const previousStepIndex = this._tutorial.activeStepIndex;
+    const previousCommitHash = this._tutorial.activeStep.commitHash;
+
+    this._tutorial.goTo(targetStep.index);
+    try {
+      await this._gitOperations.checkoutAndClean(targetStep.commitHash);
+      await this._enrichActiveStep();
+    } catch (error) {
+      console.error('TutorialService: Failed to checkout and clean, rolling back to previous step.', error);
+
+      this._tutorial.goTo(previousStepIndex);
+      try {
+        await this._gitOperations.checkoutAndClean(previousCommitHash);
+        await this._enrichActiveStep();
+      } catch (rollbackError) {
+        console.error('TutorialService: Rollback to previous commit also failed.', rollbackError);
+      }
+      throw error;
     }
-    return markdown;
   }
 }

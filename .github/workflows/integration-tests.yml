@@ -1,0 +1,90 @@
+name: Integration Tests
+
+on:
+  push:
+    branches: [ main, dev ]
+  pull_request:
+    branches: [ main, dev ]
+  workflow_dispatch:
+
+jobs:
+  e2e-tests:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [20]
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup pnpm
+      uses: pnpm/action-setup@v4
+      with:
+        version: 10
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'pnpm'
+
+    - name: Install dependencies
+      run: pnpm install --frozen-lockfile
+
+    - name: Build shared packages
+      run: pnpm run build:shared
+
+    - name: Type check
+      run: pnpm run typecheck
+
+    - name: Lint code
+      run: pnpm run lint
+
+    - name: Build extension
+      run: pnpm run build:extension
+
+    - name: Build webview
+      run: pnpm run build:webview
+
+    - name: Run unit tests
+      run: pnpm run test:unit
+
+    - name: Setup virtual display for integration tests
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y xvfb
+
+    - name: Configure Git for integration tests
+      run: |
+        git config --global user.name "GitHub Actions"
+        git config --global user.email "actions@github.com"
+        git config --global url."https://x-access-token:${{ github.token }}@github.com/".insteadOf "https://github.com/"
+
+    - name: Run integration tests
+      run: |
+        xvfb-run -a pnpm run test:integration
+      env:
+        DISPLAY: :99
+        GITHUB_TOKEN: ${{ github.token }}
+
+    - name: Upload test results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: test-results-${{ matrix.node-version }}
+        path: |
+          test-results/
+          coverage/
+        retention-days: 7
+
+    - name: Upload extension logs
+      if: failure()
+      uses: actions/upload-artifact@v4
+      with:
+        name: extension-logs-${{ matrix.node-version }}
+        path: |
+          .vscode-test/
+          /tmp/gitorial-integration-tests-*
+        retention-days: 3

@@ -90,6 +90,7 @@ export class GitAdapter implements IGitOperations, IGitChanges {
         console.log(
           'GitAdapter: Local \'gitorial\' branch found. Attempting force checkout (dropping local changes)...',
         );
+        //TODO: Remove the force checkout and prompt the user to commit or stash their changes instead!
         await this.git.checkout(['-f', 'gitorial']);
         console.log('GitAdapter: Successfully force checked out local \'gitorial\' branch.');
         return;

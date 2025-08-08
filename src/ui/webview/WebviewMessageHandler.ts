@@ -7,6 +7,7 @@ import {
   WebviewToExtensionMessage,
   WebviewToExtensionSystemMessage,
   WebviewToExtensionTutorialMessage,
+  WebviewToExtensionAuthorMessage,
 } from '@gitorial/shared-types';
 
 /**
@@ -21,6 +22,10 @@ export interface IWebviewSystemMessageHandler {
   handleWebviewMessage(message: WebviewToExtensionSystemMessage): void;
 }
 
+export interface IWebviewAuthorMessageHandler {
+  handleWebviewMessage(message: WebviewToExtensionAuthorMessage): Promise<void>;
+}
+
 /**
  * Processes messages from the webview and maps UI actions to the TutorialController.
  */
@@ -28,13 +33,14 @@ export class WebviewMessageHandler {
   constructor(
     private readonly tutorialMessageHandler: IWebviewTutorialMessageHandler,
     private readonly systemMessageHandler: IWebviewSystemMessageHandler,
+    private readonly authorMessageHandler: IWebviewAuthorMessageHandler,
   ) {}
 
   /**
    * Handles messages received from the webview panel.
    * @param message The message object received from the webview.
    */
-  public handleMessage(message: WebviewToExtensionMessage): void {
+  public async handleMessage(message: WebviewToExtensionMessage): Promise<void> {
     switch (message.category) {
     case 'tutorial': {
       this.tutorialMessageHandler.handleWebviewMessage(message);
@@ -42,6 +48,10 @@ export class WebviewMessageHandler {
     }
     case 'system': {
       this.systemMessageHandler.handleWebviewMessage(message);
+      break;
+    }
+    case 'author': {
+      await this.authorMessageHandler.handleWebviewMessage(message);
       break;
     }
     default: {

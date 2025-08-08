@@ -61,6 +61,14 @@ function createAuthorStore() {
         state.isEditing = message.payload.isEditing;
         state.isLoading = false;
         state.isDirty = false;
+        
+        // Activate author mode in the system store when we receive a manifest
+        if (typeof window !== 'undefined') {
+          // Import systemStore dynamically to avoid circular dependencies
+          import('./systemStore.svelte').then(({ systemStore }) => {
+            systemStore.setAuthorMode(true);
+          });
+        }
         break;
 
       case 'publishResult':
@@ -83,7 +91,7 @@ function createAuthorStore() {
 
   function loadManifest(repositoryPath: string) {
     state.isLoading = true;
-    sendMessage<WebviewToExtensionAuthorMessage>({
+    sendMessage({
       category: 'author',
       type: 'loadManifest',
       payload: { repositoryPath },
@@ -93,7 +101,7 @@ function createAuthorStore() {
   function saveManifest() {
     if (!state.manifest) return;
     
-    sendMessage<WebviewToExtensionAuthorMessage>({
+    sendMessage({
       category: 'author',
       type: 'saveManifest',
       payload: { manifest: state.manifest },
@@ -105,7 +113,7 @@ function createAuthorStore() {
   function addStep(step: ManifestStep, index?: number) {
     if (!state.manifest) return;
 
-    sendMessage<WebviewToExtensionAuthorMessage>({
+    sendMessage({
       category: 'author',
       type: 'addStep',
       payload: { step, index },
@@ -129,7 +137,7 @@ function createAuthorStore() {
     if (!state.manifest || index < 0 || index >= state.manifest.steps.length) return;
     if (state.manifest.steps.length === 1) return; // Can't remove last step
 
-    sendMessage<WebviewToExtensionAuthorMessage>({
+    sendMessage({
       category: 'author',
       type: 'removeStep',
       payload: { index },
@@ -157,7 +165,7 @@ function createAuthorStore() {
   function updateStep(index: number, step: ManifestStep) {
     if (!state.manifest || index < 0 || index >= state.manifest.steps.length) return;
 
-    sendMessage<WebviewToExtensionAuthorMessage>({
+    sendMessage({
       category: 'author',
       type: 'updateStep',
       payload: { index, step },
@@ -180,7 +188,7 @@ function createAuthorStore() {
     if (fromIndex < 0 || fromIndex >= state.manifest.steps.length) return;
     if (toIndex < 0 || toIndex >= state.manifest.steps.length) return;
 
-    sendMessage<WebviewToExtensionAuthorMessage>({
+    sendMessage({
       category: 'author',
       type: 'reorderStep',
       payload: { fromIndex, toIndex },
@@ -224,7 +232,7 @@ function createAuthorStore() {
     state.publishStatus = 'publishing';
     state.publishError = null;
 
-    sendMessage<WebviewToExtensionAuthorMessage>({
+    sendMessage({
       category: 'author',
       type: 'publishTutorial',
       payload: { manifest: state.manifest, forceOverwrite },
@@ -234,7 +242,7 @@ function createAuthorStore() {
   function previewTutorial() {
     if (!state.manifest) return;
 
-    sendMessage<WebviewToExtensionAuthorMessage>({
+    sendMessage({
       category: 'author',
       type: 'previewTutorial',
       payload: { manifest: state.manifest },
@@ -242,7 +250,7 @@ function createAuthorStore() {
   }
 
   function validateCommit(commitHash: string) {
-    sendMessage<WebviewToExtensionAuthorMessage>({
+    sendMessage({
       category: 'author',
       type: 'validateCommit',
       payload: { commitHash },
@@ -250,7 +258,7 @@ function createAuthorStore() {
   }
 
   function exitAuthorMode() {
-    sendMessage<WebviewToExtensionAuthorMessage>({
+    sendMessage({
       category: 'author',
       type: 'exitAuthorMode',
       payload: {},

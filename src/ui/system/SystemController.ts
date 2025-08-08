@@ -1,6 +1,8 @@
 import {
   WebviewToExtensionSystemMessage,
   ExtensionToWebviewSystemMessage,
+  ExtensionToWebviewAuthorMessage,
+  AuthorManifestData,
 } from '@gitorial/shared-types';
 import { IWebviewSystemMessageHandler } from '../webview/WebviewMessageHandler';
 import * as vscode from 'vscode';
@@ -156,6 +158,64 @@ export class SystemController implements IWebviewSystemMessageHandler {
       break;
     default:
       console.warn('SystemController: Unknown system message type:', message.type);
+    }
+  }
+
+  // ============ AUTHOR MODE SUPPORT ============
+
+  /**
+   * Set author mode state in the webview
+   */
+  public async setAuthorMode(isActive: boolean): Promise<void> {
+    console.log(`SystemController: Setting author mode to ${isActive}`);
+    // For now, the webview will determine the mode based on whether it receives author messages
+    // In the future, we could add a specific system message for mode switching
+  }
+
+  /**
+   * Send author manifest to webview
+   */
+  public async sendAuthorManifest(manifest: AuthorManifestData, isEditing: boolean): Promise<void> {
+    if (this.webviewPanelManager) {
+      const authorMessage: ExtensionToWebviewAuthorMessage = {
+        category: 'author',
+        type: 'manifestLoaded',
+        payload: { manifest, isEditing },
+      };
+      await this.webviewPanelManager.sendMessage(authorMessage);
+    }
+  }
+
+  /**
+   * Send publish result to webview
+   */
+  public async sendPublishResult(success: boolean, error?: string, publishedCommits?: Array<{
+    originalCommit: string;
+    newCommit: string;
+    stepTitle: string;
+    stepType: string;
+  }>): Promise<void> {
+    if (this.webviewPanelManager) {
+      const authorMessage: ExtensionToWebviewAuthorMessage = {
+        category: 'author',
+        type: 'publishResult',
+        payload: { success, error, publishedCommits },
+      };
+      await this.webviewPanelManager.sendMessage(authorMessage);
+    }
+  }
+
+  /**
+   * Send validation warnings to webview
+   */
+  public async sendValidationWarnings(warnings: string[]): Promise<void> {
+    if (this.webviewPanelManager) {
+      const authorMessage: ExtensionToWebviewAuthorMessage = {
+        category: 'author',
+        type: 'validationWarnings',
+        payload: { warnings },
+      };
+      await this.webviewPanelManager.sendMessage(authorMessage);
     }
   }
 

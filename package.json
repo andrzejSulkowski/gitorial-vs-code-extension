@@ -85,6 +85,26 @@
       {
         "command": "gitorial.openTutorial",
         "title": "Gitorial: Open Tutorial"
+      },
+      {
+        "command": "gitorial.enterAuthorMode",
+        "title": "Gitorial: Enter Author Mode",
+        "icon": "$(edit)"
+      },
+      {
+        "command": "gitorial.exitAuthorMode",
+        "title": "Gitorial: Exit Author Mode",
+        "icon": "$(close)"
+      },
+      {
+        "command": "gitorial.createNewTutorial",
+        "title": "Gitorial: Create New Tutorial",
+        "icon": "$(add)"
+      },
+      {
+        "command": "gitorial.publishTutorial",
+        "title": "Gitorial: Publish Tutorial",
+        "icon": "$(cloud-upload)"
       }
     ],
     "uriHandler": [

@@ -27,11 +27,14 @@ import { TutorialSolutionWorkflow } from '@ui/tutorial/TutorialSolutionWorkflow'
 import { TutorialUriHandler } from '@ui/deep-link/UriHandler';
 import { TutorialController } from '@ui/tutorial/controller';
 import { CommandHandler } from '@ui/tutorial/CommandHandler';
+import { AuthorModeCommandHandler } from '@ui/tutorial/AuthorModeCommandHandler';
+import { AuthorModeController } from '@ui/tutorial/AuthorModeController';
 import { EditorManager } from '@ui/tutorial/manager/EditorManager';
 import { SystemController } from '@ui/system/SystemController';
 import {
   IWebviewSystemMessageHandler,
   IWebviewTutorialMessageHandler,
+  IWebviewAuthorMessageHandler,
   WebviewMessageHandler,
 } from '@ui/webview/WebviewMessageHandler';
 import { WebviewPanelManager } from '@ui/webview/WebviewPanelManager';
@@ -47,14 +50,26 @@ export async function activate(context: vscode.ExtensionContext): Promise<{
 }> {
   console.log('📖 Gitorial extension active');
 
-  const { tutorialController, autoOpenState } =
-    await bootstrapApplication(context);
+  const { 
+    tutorialController, 
+    autoOpenState, 
+    systemController,
+    gitOperationsFactory,
+    fileSystemAdapter,
+    userInteractionAdapter,
+  } = await bootstrapApplication(context);
 
   // --- VS Code Specific Registrations (Infrastructure concern, performed here) ---
   const commandHandler = new CommandHandler(tutorialController, autoOpenState);
   const uriHandler = new TutorialUriHandler(tutorialController);
+  
+  // Author Mode Command Handler
+  const authorModeCommandHandler = new AuthorModeCommandHandler(
+    systemController,
+  );
 
   commandHandler.register(context);
+  authorModeCommandHandler.register(context);
   uriHandler.register(context);
 
   await checkAndHandleAutoOpenState(tutorialController, autoOpenState);
@@ -141,22 +156,38 @@ async function bootstrapApplication(context: vscode.ExtensionContext) {
   // Add services to context subscriptions for proper disposal
   context.subscriptions.push(solutionWorkflow);
 
+  // Create a placeholder webview panel manager first
+  let webviewPanelManager: WebviewPanelManager;
+  
+  // --- UI Layer Controllers ---
+  const systemController = new SystemController(context, {} as WebviewPanelManager);
+  
+  // Author Mode Controller
+  const authorModeController = new AuthorModeController(
+    systemController,
+  );
+
   const tutorialMessageHandler: IWebviewTutorialMessageHandler = {
     handleWebviewMessage: msg => tutorialController.handleWebviewMessage(msg),
   };
   const systemMessageHandler: IWebviewSystemMessageHandler = {
     handleWebviewMessage: msg => systemController.handleWebviewMessage(msg),
   };
+  const authorMessageHandler: IWebviewAuthorMessageHandler = {
+    handleWebviewMessage: msg => authorModeController.handleWebviewMessage(msg),
+  };
   const webviewMessageHandler = new WebviewMessageHandler(
     tutorialMessageHandler,
     systemMessageHandler,
+    authorMessageHandler,
   );
-  const webviewPanelManager = new WebviewPanelManager(context.extensionUri, msg =>
+  webviewPanelManager = new WebviewPanelManager(context.extensionUri, msg =>
     webviewMessageHandler.handleMessage(msg),
   );
+  
+  // Update the system controller with the real webview panel manager
+  (systemController as any).webviewPanelManager = webviewPanelManager;
 
-  // --- UI Layer Controllers ---
-  const systemController = new SystemController(context, webviewPanelManager);
   const tutorialController = new TutorialController(
     progressReportAdapter,
     userInteractionAdapter,
@@ -174,6 +205,9 @@ async function bootstrapApplication(context: vscode.ExtensionContext) {
   return {
     tutorialController,
     autoOpenState,
+    systemController,
+    gitOperationsFactory,
+    fileSystemAdapter,
     userInteractionAdapter,
     activeTutorialStateRepository,
     tutorialRepository,

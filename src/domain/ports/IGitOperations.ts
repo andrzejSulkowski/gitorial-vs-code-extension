@@ -288,4 +288,71 @@ export interface IGitOperations {
    * @returns A promise that resolves to an array of relative file paths.
    */
   getChangesInCommit(commitHash: string): Promise<string[]>;
+
+  // TODO: Author mode methods - implement later
+  // /**
+  //  * Get the current branch name
+  //  * @returns The name of the current branch
+  //  */
+  // getCurrentBranch(): Promise<string>;
+
+  // /**
+  //  * Check if a branch exists (locally or remotely)
+  //  * @param branchName The name of the branch to check
+  //  * @returns True if the branch exists, false otherwise
+  //  */
+  // branchExists(branchName: string): Promise<boolean>;
+
+  // /**
+  //  * Create a new branch from a base branch
+  //  * @param branchName The name of the new branch
+  //  * @param baseBranch The base branch to create from (optional, defaults to current)
+  //  */
+  // createBranch(branchName: string, baseBranch?: string): Promise<void>;
+
+  // /**
+  //  * Checkout a branch
+  //  * @param branchName The name of the branch to checkout
+  //  */
+  // checkoutBranch(branchName: string): Promise<void>;
+
+  // /**
+  //  * Delete a branch
+  //  * @param branchName The name of the branch to delete
+  //  * @param force Whether to force delete (optional)
+  //  */
+  // deleteBranch(branchName: string, force?: boolean): Promise<void>;
+
+  // /**
+  //  * Get commit information
+  //  * @param commitHash The commit hash to get info for
+  //  * @returns Commit information including hash, message, author, and date
+  //  */
+  // getCommitInfo(commitHash: string): Promise<{
+  //   hash: string;
+  //   message: string;
+  //   author: string;
+  //   date: Date;
+  // } | null>;
+
+  // /**
+  //  * Cherry-pick a commit with optional custom message
+  //  * @param commitHash The commit hash to cherry-pick
+  //  * @param customMessage Optional custom commit message
+  //  */
+  // cherryPick(commitHash: string, customMessage?: string): Promise<void>;
+
+  // /**
+  //  * Create a new commit with the current staged changes
+  //  * @param message The commit message
+  //  * @returns The hash of the new commit
+  //  */
+  // createCommit(message: string): Promise<string>;
+
+  // /**
+  //  * Get the commit message for a specific commit
+  //  * @param commitHash The commit hash
+  //  * @returns The commit message
+  //  */
+  // getCommitMessage(commitHash: string): Promise<string>;
 }

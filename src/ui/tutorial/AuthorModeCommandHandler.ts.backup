@@ -1,0 +1,304 @@
+import * as vscode from 'vscode';
+import * as path from 'path';
+import { AuthorManifest } from '@domain/models/AuthorManifest';
+import { TutorialPublishService } from '@domain/services/TutorialPublishService';
+import { IGitOperations } from '@domain/ports/IGitOperations';
+import { IFileSystem } from '@domain/ports/IFileSystem';
+import { IUserInteraction } from '@domain/ports/IUserInteraction';
+import { SystemController } from '@ui/system/SystemController';
+import type { AuthorManifestData } from '@gitorial/shared-types';
+import { ok, err, Result, ResultAsync } from 'neverthrow';
+
+export class AuthorModeCommandHandler {
+  private publishService: TutorialPublishService;
+
+  constructor(
+    private gitOperations: IGitOperations,
+    private fileSystem: IFileSystem,
+    private userInteraction: IUserInteraction,
+    private systemController: SystemController,
+  ) {
+    this.publishService = new TutorialPublishService(gitOperations);
+  }
+
+  /**
+   * Enters author mode for the current workspace
+   */
+  public async handleEnterAuthorMode(): Promise<void> {
+    try {
+      const workspaceFolder = this.getActiveWorkspaceFolder();
+      if (!workspaceFolder) {
+        await this.userInteraction.showError('No workspace folder is open. Please open a Git repository to use Author Mode.');
+        return;
+      }
+
+      const manifestPath = path.join(workspaceFolder.fsPath, '.gitorial', 'manifest.json');
+      
+      // Check if manifest exists, if not offer to create one
+      const manifestExists = await this.fileSystem.fileExists(manifestPath);
+      let manifest: AuthorManifest;
+
+      if (manifestExists) {
+        const loadResult = await this.loadExistingManifest(manifestPath);
+        if (loadResult.isErr()) {
+          await this.userInteraction.showError(`Failed to load manifest: ${loadResult.error}`);
+          return;
+        }
+        manifest = loadResult.value;
+      } else {
+        const createResult = await this.promptCreateNewManifest(workspaceFolder.fsPath);
+        if (createResult.isErr()) {
+          if (createResult.error !== 'CANCELLED') {
+            await this.userInteraction.showError(`Failed to create manifest: ${createResult.error}`);
+          }
+          return;
+        }
+        manifest = createResult.value;
+        
+        // Save the new manifest
+        await this.saveManifest(manifestPath, manifest);
+      }
+
+      // Enter author mode
+      await this.systemController.setAuthorMode(true);
+      await this.systemController.sendAuthorManifest(manifest.toJSON(), true);
+
+      await this.userInteraction.showInformation('Author Mode activated! You can now manage your tutorial steps.');
+
+    } catch (error) {
+      console.error('Error entering author mode:', error);
+      await this.userInteraction.showError(`Failed to enter Author Mode: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  /**
+   * Exits author mode and returns to normal tutorial mode
+   */
+  public async handleExitAuthorMode(): Promise<void> {
+    try {
+      await this.systemController.setAuthorMode(false);
+      await this.userInteraction.showInformation('Exited Author Mode. Returned to tutorial view.');
+    } catch (error) {
+      console.error('Error exiting author mode:', error);
+      await this.userInteraction.showError(`Failed to exit Author Mode: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  /**
+   * Creates a new tutorial manifest from scratch
+   */
+  public async handleCreateNewTutorial(): Promise<void> {
+    try {
+      const workspaceFolder = this.getActiveWorkspaceFolder();
+      if (!workspaceFolder) {
+        await this.userInteraction.showError('No workspace folder is open. Please open a Git repository to create a tutorial.');
+        return;
+      }
+
+      const createResult = await this.promptCreateNewManifest(workspaceFolder.fsPath);
+      if (createResult.isErr()) {
+        if (createResult.error !== 'CANCELLED') {
+          await this.userInteraction.showError(`Failed to create tutorial: ${createResult.error}`);
+        }
+        return;
+      }
+
+      const manifest = createResult.value;
+      const manifestPath = path.join(workspaceFolder.fsPath, '.gitorial', 'manifest.json');
+      
+      // Create .gitorial directory if it doesn't exist
+      const gitorialDir = path.dirname(manifestPath);
+      if (!await this.fileSystem.directoryExists(gitorialDir)) {
+        await this.fileSystem.createDirectory(gitorialDir);
+      }
+
+      await this.saveManifest(manifestPath, manifest);
+
+      // Enter author mode with the new manifest
+      await this.systemController.setAuthorMode(true);
+      await this.systemController.sendAuthorManifest(manifest.toJSON(), true);
+
+      await this.userInteraction.showInformation('New tutorial created! You can now add steps to build your tutorial.');
+
+    } catch (error) {
+      console.error('Error creating new tutorial:', error);
+      await this.userInteraction.showError(`Failed to create tutorial: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  /**
+   * Publishes the current tutorial manifest to the gitorial branch
+   */
+  public async handlePublishTutorial(): Promise<void> {
+    try {
+      const workspaceFolder = this.getActiveWorkspaceFolder();
+      if (!workspaceFolder) {
+        await this.userInteraction.showError('No workspace folder is open.');
+        return;
+      }
+
+      const manifestPath = path.join(workspaceFolder.fsPath, '.gitorial', 'manifest.json');
+      const manifestExists = await this.fileSystem.fileExists(manifestPath);
+      
+      if (!manifestExists) {
+        await this.userInteraction.showError('No tutorial manifest found. Please create a tutorial first.');
+        return;
+      }
+
+      const loadResult = await this.loadExistingManifest(manifestPath);
+      if (loadResult.isErr()) {
+        await this.userInteraction.showError(`Failed to load manifest: ${loadResult.error}`);
+        return;
+      }
+
+      const manifest = loadResult.value;
+
+      // Show progress indicator
+      await vscode.window.withProgress({
+        location: vscode.ProgressLocation.Notification,
+        title: 'Publishing Tutorial',
+        cancellable: false,
+      }, async (progress) => {
+        progress.report({ increment: 10, message: 'Validating manifest...' });
+
+        const publishResult = await this.publishService.publishTutorial(manifest);
+        
+        if (publishResult.isErr()) {
+          if (publishResult.error === 'BRANCH_EXISTS_CONFIRMATION_NEEDED') {
+            progress.report({ increment: 0, message: 'Requesting confirmation...' });
+            
+            const shouldOverwrite = await this.userInteraction.showWarningMessage(
+              `The branch '${manifest.publishBranch}' already exists. Do you want to overwrite it?`,
+              'Overwrite Branch',
+              'Cancel'
+            );
+
+            if (shouldOverwrite === 'Overwrite Branch') {
+              progress.report({ increment: 50, message: 'Publishing with overwrite...' });
+              const overwriteResult = await this.publishService.publishTutorialForced(manifest);
+              
+              if (overwriteResult.isErr()) {
+                throw new Error(overwriteResult.error);
+              }
+              
+              progress.report({ increment: 100, message: 'Published successfully!' });
+              await this.userInteraction.showInformation(
+                `Tutorial published successfully to branch '${manifest.publishBranch}' with ${overwriteResult.value.publishedCommits.length} steps.`
+              );
+            }
+            return;
+          } else {
+            throw new Error(publishResult.error);
+          }
+        }
+
+        progress.report({ increment: 100, message: 'Published successfully!' });
+        await this.userInteraction.showInformation(
+          `Tutorial published successfully to branch '${manifest.publishBranch}' with ${publishResult.value.publishedCommits.length} steps.`
+        );
+      });
+
+    } catch (error) {
+      console.error('Error publishing tutorial:', error);
+      await this.userInteraction.showError(`Failed to publish tutorial: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  /**
+   * Registers all author mode commands with VS Code
+   */
+  public register(context: vscode.ExtensionContext): void {
+    context.subscriptions.push(
+      vscode.commands.registerCommand('gitorial.enterAuthorMode', () => this.handleEnterAuthorMode()),
+    );
+
+    context.subscriptions.push(
+      vscode.commands.registerCommand('gitorial.exitAuthorMode', () => this.handleExitAuthorMode()),
+    );
+
+    context.subscriptions.push(
+      vscode.commands.registerCommand('gitorial.createNewTutorial', () => this.handleCreateNewTutorial()),
+    );
+
+    context.subscriptions.push(
+      vscode.commands.registerCommand('gitorial.publishTutorial', () => this.handlePublishTutorial()),
+    );
+
+    console.log('Author Mode commands registered.');
+  }
+
+  // Private helper methods
+
+  private getActiveWorkspaceFolder(): vscode.WorkspaceFolder | undefined {
+    const workspaceFolders = vscode.workspace.workspaceFolders;
+    if (!workspaceFolders || workspaceFolders.length === 0) {
+      return undefined;
+    }
+    
+    // For now, use the first workspace folder
+    // TODO: In the future, we could add logic to determine the active folder
+    return workspaceFolders[0];
+  }
+
+  private async loadExistingManifest(manifestPath: string): Promise<Result<AuthorManifest, string>> {
+    try {
+      const manifestContent = await this.fileSystem.readFile(manifestPath);
+      const manifestData = JSON.parse(manifestContent) as AuthorManifestData;
+      
+      const createResult = AuthorManifest.create(manifestData);
+      if (createResult.isErr()) {
+        return err(`Invalid manifest: ${createResult.error}`);
+      }
+      
+      return ok(createResult.value);
+    } catch (error) {
+      return err(`Failed to load manifest: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  private async promptCreateNewManifest(workspacePath: string): Promise<Result<AuthorManifest, string>> {
+    try {
+      // Get current branch as authoring branch
+      const currentBranch = await this.gitOperations.getCurrentBranch();
+      
+      // Prompt for publish branch name
+      const publishBranch = await this.userInteraction.showInputBox({
+        prompt: 'Enter the name of the branch to publish the tutorial to',
+        value: 'gitorial',
+        validateInput: (value) => {
+          if (!value.trim()) {
+            return 'Branch name cannot be empty';
+          }
+          if (value.trim() === currentBranch) {
+            return 'Publish branch cannot be the same as the current branch';
+          }
+          return undefined;
+        },
+      });
+
+      if (!publishBranch) {
+        return err('CANCELLED');
+      }
+
+      const manifestData: AuthorManifestData = {
+        authoringBranch: currentBranch,
+        publishBranch: publishBranch.trim(),
+        steps: [],
+      };
+
+      const createResult = AuthorManifest.create(manifestData);
+      if (createResult.isErr()) {
+        return err(`Failed to create manifest: ${createResult.error}`);
+      }
+
+      return ok(createResult.value);
+    } catch (error) {
+      return err(`Failed to create manifest: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  private async saveManifest(manifestPath: string, manifest: AuthorManifest): Promise<void> {
+    const manifestContent = JSON.stringify(manifest.toJSON(), null, 2);
+    await this.fileSystem.writeFile(manifestPath, manifestContent);
+  }
+}

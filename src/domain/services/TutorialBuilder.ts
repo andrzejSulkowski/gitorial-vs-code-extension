@@ -141,15 +141,15 @@ export class TutorialBuilder {
   public static extractStepsFromCommits(commits: DomainCommit[], tutorialId: TutorialId): Step[] {
     const chronologicalCommits = [...commits].reverse();
     const steps: Step[] = [];
-    const validTypes: ReadonlyArray<StepType> = ['section', 'template', 'solution', 'action'];
+    const validTypes: ReadonlyArray<StepType> = [
+      'section',
+      'template',
+      'solution',
+      'action',
+      'readme',
+    ];
 
-    let relevantCommits = chronologicalCommits;
-    if (
-      relevantCommits.length > 0 &&
-      relevantCommits[0].message.toLowerCase().startsWith('readme:')
-    ) {
-      relevantCommits = relevantCommits.slice(1);
-    }
+    const relevantCommits = chronologicalCommits;
 
     relevantCommits.forEach((commit, index) => {
       const message = commit.message.trim();

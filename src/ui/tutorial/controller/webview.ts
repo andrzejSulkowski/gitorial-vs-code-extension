@@ -180,10 +180,8 @@ export class Controller {
    * Handle step change within same tutorial
    */
   private async _handleStepChange(tutorial: Readonly<TutorialViewModel>): Promise<void> {
-    const htmlContent = tutorial.steps[tutorial.currentStep.index].htmlContent;
-    if (!htmlContent) {
-      throw new Error('Step change detected but no html content found');
-    }
+    const htmlContent =
+      tutorial.steps[tutorial.currentStep.index].htmlContent ?? '<p></p>';
 
     const message: ExtensionToWebviewTutorialMessage = {
       category: 'tutorial',
@@ -211,10 +209,8 @@ export class Controller {
   }
 
   private async _handleContentChange(tutorial: Readonly<TutorialViewModel>): Promise<void> {
-    const htmlContent = tutorial.steps[tutorial.currentStep.index].htmlContent;
-    if (!htmlContent) {
-      throw new Error('Content change detected but no html content found');
-    }
+    const htmlContent =
+      tutorial.steps[tutorial.currentStep.index].htmlContent ?? '<p></p>';
 
     const message: ExtensionToWebviewTutorialMessage = {
       category: 'tutorial',

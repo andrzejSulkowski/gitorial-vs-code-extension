@@ -280,6 +280,13 @@ export class IntegrationTestUtils {
     return undefined;
   }
 
+  static async execGit(repositoryPath: string, args: string[]): Promise<string> {
+    const git = simpleGit(repositoryPath);
+    // simple-git returns string for raw
+    const result = await git.raw(args as any);
+    return typeof result === 'string' ? result : String(result);
+  }
+
   static async getCurrentBranch(repositoryPath: string): Promise<string> {
     const git = simpleGit(repositoryPath);
     try {

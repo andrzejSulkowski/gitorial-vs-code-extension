@@ -289,6 +289,12 @@ export interface IGitOperations {
    */
   getChangesInCommit(commitHash: string): Promise<string[]>;
 
+  /**
+   * Synthesize/force-update the local 'gitorial' branch from the provided ordered steps.
+   * Each step is applied as a commit with the given message, starting from the first as base.
+   */
+  synthesizeGitorialBranch(steps: Array<{ commit: string; message: string }>): Promise<void>;
+
   // TODO: Author mode methods - implement later
   // /**
   //  * Get the current branch name

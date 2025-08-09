@@ -1,9 +1,11 @@
 import * as vscode from 'vscode';
 import { SystemController } from '@ui/system/SystemController';
+import { AuthorModeController } from './AuthorModeController';
 
 export class AuthorModeCommandHandler {
   constructor(
     private systemController: SystemController,
+    private authorModeController: AuthorModeController,
   ) {}
 
   /**
@@ -11,21 +13,24 @@ export class AuthorModeCommandHandler {
    */
   public async handleEnterAuthorMode(): Promise<void> {
     try {
-      // For now, just activate author mode in the UI
+      console.log('🔥 AUTHOR MODE: Starting activation...');
+      
+      // Stop any loading state and activate author mode
+      console.log('🔥 AUTHOR MODE: Hiding global loading...');
+      await this.systemController.hideGlobalLoading();
+      
+      console.log('🔥 AUTHOR MODE: Setting author mode true...');
       await this.systemController.setAuthorMode(true);
+
+      console.log('🔥 AUTHOR MODE: Loading initial manifest (from file or gitorial branch)...');
+      await this.authorModeController.loadInitialManifest();
       
-      // Create a basic empty manifest
-      const basicManifest = {
-        authoringBranch: 'main',
-        publishBranch: 'gitorial',
-        steps: [],
-      };
-      
-      await this.systemController.sendAuthorManifest(basicManifest, true);
-      
+      console.log('🔥 AUTHOR MODE: Showing success message...');
       vscode.window.showInformationMessage('Author Mode activated! This is a basic implementation.');
+      
+      console.log('🔥 AUTHOR MODE: Activation complete!');
     } catch (error) {
-      console.error('Error entering author mode:', error);
+      console.error('❌ AUTHOR MODE ERROR:', error);
       vscode.window.showErrorMessage(`Failed to enter Author Mode: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
@@ -71,16 +76,27 @@ export class AuthorModeCommandHandler {
    * Registers all author mode commands with VS Code
    */
   public register(context: vscode.ExtensionContext): void {
+    console.log('🔥 REGISTERING AUTHOR MODE COMMANDS...');
+    
     context.subscriptions.push(
-      vscode.commands.registerCommand('gitorial.enterAuthorMode', () => this.handleEnterAuthorMode()),
+      vscode.commands.registerCommand('gitorial.enterAuthorMode', () => {
+        console.log('🔥 AUTHOR MODE COMMAND TRIGGERED: enterAuthorMode');
+        return this.handleEnterAuthorMode();
+      }),
     );
 
     context.subscriptions.push(
-      vscode.commands.registerCommand('gitorial.exitAuthorMode', () => this.handleExitAuthorMode()),
+      vscode.commands.registerCommand('gitorial.exitAuthorMode', () => {
+        console.log('🔥 AUTHOR MODE COMMAND TRIGGERED: exitAuthorMode');
+        return this.handleExitAuthorMode();
+      }),
     );
 
     context.subscriptions.push(
-      vscode.commands.registerCommand('gitorial.createNewTutorial', () => this.handleCreateNewTutorial()),
+      vscode.commands.registerCommand('gitorial.createNewTutorial', () => {
+        console.log('🔥 AUTHOR MODE COMMAND TRIGGERED: createNewTutorial');
+        return this.handleCreateNewTutorial();
+      }),
     );
 
     context.subscriptions.push(

@@ -173,6 +173,27 @@ export class SystemController implements IWebviewSystemMessageHandler {
   }
 
   /**
+   * Save a backup of the author manifest to global state keyed by repo path
+   */
+  public async saveAuthorManifestBackup(repoPath: string, manifest: AuthorManifestData): Promise<void> {
+    const key = this.getManifestBackupKey(repoPath);
+    await this.extensionContext.globalState.update(key, manifest);
+  }
+
+  /**
+   * Retrieve a backup manifest from global state
+   */
+  public getAuthorManifestBackup(repoPath: string): AuthorManifestData | null {
+    const key = this.getManifestBackupKey(repoPath);
+    const data = this.extensionContext.globalState.get<AuthorManifestData | undefined>(key);
+    return data ?? null;
+  }
+
+  private getManifestBackupKey(repoPath: string): string {
+    return `authorManifestBackup:${repoPath}`;
+  }
+
+  /**
    * Send author manifest to webview
    */
   public async sendAuthorManifest(manifest: AuthorManifestData, isEditing: boolean): Promise<void> {

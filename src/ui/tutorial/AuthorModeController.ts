@@ -1,7 +1,11 @@
 import {
   WebviewToExtensionAuthorMessage,
+  type AuthorManifestData,
+  type ManifestStep,
 } from '@gitorial/shared-types';
 import { SystemController } from '@ui/system/SystemController';
+import { IGitOperationsFactory } from 'src/domain/ports/IGitOperationsFactory';
+import * as vscode from 'vscode';
 
 export interface IWebviewAuthorMessageHandler {
   handleWebviewMessage(message: WebviewToExtensionAuthorMessage): Promise<void>;
@@ -10,7 +14,11 @@ export interface IWebviewAuthorMessageHandler {
 export class AuthorModeController implements IWebviewAuthorMessageHandler {
   constructor(
     private systemController: SystemController,
+    private gitFactory: IGitOperationsFactory,
   ) {}
+
+  private currentWorkspacePath: string | null = null;
+  private currentManifest: AuthorManifestData | null = null;
 
   public async handleWebviewMessage(message: WebviewToExtensionAuthorMessage): Promise<void> {
     console.log('AuthorModeController: Received webview message', message);
@@ -18,27 +26,27 @@ export class AuthorModeController implements IWebviewAuthorMessageHandler {
     try {
       switch (message.type) {
         case 'loadManifest':
-          await this.handleLoadManifest();
+          await this.handleLoadManifest(message.payload.repositoryPath);
           break;
 
         case 'saveManifest':
-          await this.handleSaveManifest();
+          await this.handleSaveManifest(message.payload.manifest);
           break;
 
         case 'addStep':
-          await this.handleAddStep();
+          await this.handleAddStep(message.payload.step, message.payload.index);
           break;
 
         case 'removeStep':
-          await this.handleRemoveStep();
+          await this.handleRemoveStep(message.payload.index);
           break;
 
         case 'updateStep':
-          await this.handleUpdateStep();
+          await this.handleUpdateStep(message.payload.index, message.payload.step);
           break;
 
         case 'reorderStep':
-          await this.handleReorderStep();
+          await this.handleReorderStep(message.payload.fromIndex, message.payload.toIndex);
           break;
 
         case 'publishTutorial':
@@ -70,39 +78,166 @@ export class AuthorModeController implements IWebviewAuthorMessageHandler {
     }
   }
 
-  private async handleLoadManifest(): Promise<void> {
-    console.log('AuthorModeController: Load manifest (basic implementation)');
-    // Send a basic empty manifest
-    await this.systemController.sendAuthorManifest({
-      authoringBranch: 'main',
-      publishBranch: 'gitorial',
-      steps: [],
-    }, false);
+  /**
+   * Public API: load manifest for the current workspace (or provided path)
+   */
+  public async loadInitialManifest(repoPath?: string): Promise<void> {
+    await this.handleLoadManifest(repoPath);
   }
 
-  private async handleSaveManifest(): Promise<void> {
-    console.log('AuthorModeController: Save manifest (basic implementation)');
+  private async handleLoadManifest(repoPath?: string): Promise<void> {
+    console.log('AuthorModeController: Load manifest');
+    const workspace = repoPath ?? vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    if (!workspace) {
+      await this.systemController.sendAuthorManifest({ authoringBranch: 'main', publishBranch: 'gitorial', steps: [] }, false);
+      return;
+    }
+
+    this.currentWorkspacePath = workspace;
+    let manifest = await this.readManifest(workspace);
+    if (manifest.steps.length === 0) {
+      const backup = this.systemController.getAuthorManifestBackup(workspace);
+      if (backup) {
+        manifest = backup;
+      } else {
+        manifest = await this.readManifestOrImport(workspace);
+      }
+    }
+    this.currentManifest = manifest;
+    await this.systemController.sendAuthorManifest(manifest, false);
   }
 
-  private async handleAddStep(): Promise<void> {
-    console.log('AuthorModeController: Add step (basic implementation)');
+  private async handleSaveManifest(manifest: AuthorManifestData): Promise<void> {
+    console.log('AuthorModeController: Save manifest');
+    const workspace = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    if (!workspace) return;
+    const fs = vscode.workspace.fs;
+    const manifestDir = vscode.Uri.joinPath(vscode.Uri.file(workspace), '.gitorial');
+    const manifestUri = vscode.Uri.joinPath(manifestDir, 'manifest.json');
+    try {
+      await fs.createDirectory(manifestDir);
+    } catch {}
+    await fs.writeFile(manifestUri, new TextEncoder().encode(JSON.stringify(manifest, null, 2)));
+    await this.systemController.saveAuthorManifestBackup(workspace, manifest);
   }
 
-  private async handleRemoveStep(): Promise<void> {
-    console.log('AuthorModeController: Remove step (basic implementation)');
+  // --- Manifest persistence ---
+  private async readManifest(workspacePath: string): Promise<AuthorManifestData> {
+    const fs = vscode.workspace.fs;
+    const manifestUri = vscode.Uri.joinPath(vscode.Uri.file(workspacePath), '.gitorial', 'manifest.json');
+    try {
+      const content = await fs.readFile(manifestUri);
+      const json = JSON.parse(Buffer.from(content).toString('utf-8')) as AuthorManifestData;
+      return json;
+    } catch {
+      return {
+        authoringBranch: 'main',
+        publishBranch: 'gitorial',
+        steps: [],
+      };
+    }
   }
 
-  private async handleUpdateStep(): Promise<void> {
-    console.log('AuthorModeController: Update step (basic implementation)');
+  private async readManifestOrImport(workspacePath: string): Promise<AuthorManifestData> {
+    const existing = await this.readManifest(workspacePath);
+    if (existing.steps.length > 0) return existing;
+
+    // No manifest steps yet. If repo has a gitorial branch, import from it.
+    try {
+      const git = this.gitFactory.fromPath(workspacePath);
+      const info = await git.getRepoInfo();
+      const hasGitorial = info.branches.all.includes('gitorial');
+      if (!hasGitorial) return existing;
+
+      const commits = await git.getCommits('gitorial');
+      const allowed = ['section', 'template', 'solution', 'action', 'readme'] as const;
+      type Allowed = typeof allowed[number];
+      const steps: ManifestStep[] = commits
+        .map(c => {
+          const msg = c.message.trim();
+          for (const t of allowed) {
+            const prefix = `${t}:`;
+            if (msg.toLowerCase().startsWith(prefix)) {
+              const title = msg.slice(prefix.length).trim();
+              return { commit: c.hash, type: t as Allowed, title } as ManifestStep;
+            }
+          }
+          return null;
+        })
+        .filter((s): s is ManifestStep => !!s);
+
+      // git log usually returns newest first; for tutorials we want oldest first (first lesson at top)
+      const stepsOldestFirst = steps.slice().reverse();
+
+      return {
+        authoringBranch: info.branches.current || 'main',
+        publishBranch: 'gitorial',
+        steps: stepsOldestFirst,
+      };
+    } catch (e) {
+      console.warn('AuthorModeController: import from gitorial failed, using empty manifest', e);
+      return existing;
+    }
   }
 
-  private async handleReorderStep(): Promise<void> {
-    console.log('AuthorModeController: Reorder step (basic implementation)');
+  private async handleAddStep(step: ManifestStep, index?: number): Promise<void> {
+    console.log('AuthorModeController: Add step');
+    const manifest = await this.getOrLoadManifest();
+    const steps = [...manifest.steps];
+    const insertAt = typeof index === 'number' && index >= 0 && index <= steps.length ? index : steps.length;
+    steps.splice(insertAt, 0, step);
+    this.currentManifest = { ...manifest, steps };
+    await this.writeManifest();
+  }
+
+  private async handleRemoveStep(index: number): Promise<void> {
+    console.log('AuthorModeController: Remove step');
+    const manifest = await this.getOrLoadManifest();
+    if (index < 0 || index >= manifest.steps.length) return;
+    const steps = manifest.steps.filter((_, i) => i !== index);
+    this.currentManifest = { ...manifest, steps };
+    await this.writeManifest();
+  }
+
+  private async handleUpdateStep(index: number, step: ManifestStep): Promise<void> {
+    console.log('AuthorModeController: Update step');
+    const manifest = await this.getOrLoadManifest();
+    if (index < 0 || index >= manifest.steps.length) return;
+    const steps = [...manifest.steps];
+    steps[index] = step;
+    this.currentManifest = { ...manifest, steps };
+    await this.writeManifest();
+  }
+
+  private async handleReorderStep(fromIndex: number, toIndex: number): Promise<void> {
+    console.log('AuthorModeController: Reorder step');
+    const manifest = await this.getOrLoadManifest();
+    if (fromIndex === toIndex) return;
+    if (fromIndex < 0 || fromIndex >= manifest.steps.length) return;
+    if (toIndex < 0 || toIndex >= manifest.steps.length) return;
+    const steps = [...manifest.steps];
+    const [moved] = steps.splice(fromIndex, 1);
+    steps.splice(toIndex, 0, moved);
+    this.currentManifest = { ...manifest, steps };
+    await this.writeManifest();
   }
 
   private async handlePublishTutorial(): Promise<void> {
-    console.log('AuthorModeController: Publish tutorial (basic implementation)');
-    await this.systemController.sendPublishResult(false, 'Publishing not yet implemented');
+    console.log('AuthorModeController: Publish tutorial');
+    const workspace = this.currentWorkspacePath ?? vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? null;
+    if (!workspace) {
+      await this.systemController.sendPublishResult(false, 'No workspace open');
+      return;
+    }
+    const manifest = await this.getOrLoadManifest();
+    try {
+      const git = this.gitFactory.fromPath(workspace);
+      const steps = manifest.steps.map(s => ({ commit: s.commit, message: `${s.type}: ${s.title}` }));
+      await git.synthesizeGitorialBranch(steps);
+      await this.systemController.sendPublishResult(true);
+    } catch (e: any) {
+      await this.systemController.sendPublishResult(false, e?.message ?? String(e));
+    }
   }
 
   private async handlePreviewTutorial(): Promise<void> {
@@ -116,5 +251,28 @@ export class AuthorModeController implements IWebviewAuthorMessageHandler {
 
   private async handleExitAuthorMode(): Promise<void> {
     await this.systemController.setAuthorMode(false);
+  }
+
+  // --- Helpers ---
+  private async getOrLoadManifest(): Promise<AuthorManifestData> {
+    if (!this.currentWorkspacePath) {
+      this.currentWorkspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? null;
+    }
+    if (!this.currentWorkspacePath) {
+      return this.currentManifest ?? { authoringBranch: 'main', publishBranch: 'gitorial', steps: [] };
+    }
+    if (this.currentManifest) return this.currentManifest;
+    this.currentManifest = await this.readManifest(this.currentWorkspacePath);
+    return this.currentManifest;
+  }
+
+  private async writeManifest(): Promise<void> {
+    if (!this.currentWorkspacePath || !this.currentManifest) return;
+    const fs = vscode.workspace.fs;
+    const dir = vscode.Uri.joinPath(vscode.Uri.file(this.currentWorkspacePath), '.gitorial');
+    const uri = vscode.Uri.joinPath(dir, 'manifest.json');
+    try { await fs.createDirectory(dir); } catch {}
+    await fs.writeFile(uri, new TextEncoder().encode(JSON.stringify(this.currentManifest, null, 2)));
+    await this.systemController.saveAuthorManifestBackup(this.currentWorkspacePath, this.currentManifest);
   }
 }

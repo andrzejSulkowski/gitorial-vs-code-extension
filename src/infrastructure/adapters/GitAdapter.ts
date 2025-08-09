@@ -272,6 +272,11 @@ export class GitAdapter implements IGitOperations, IGitChanges {
    * Checkout a specific commit and clean the working directory
    */
   public async checkoutAndClean(commitHash: string): Promise<void> {
+    // Ensure no in-progress merge/rebase/cherry-pick blocks operations
+    try { await this.git.raw(['merge', '--abort']); } catch {}
+    try { await this.git.raw(['cherry-pick', '--abort']); } catch {}
+    try { await this.git.raw(['rebase', '--abort']); } catch {}
+    try { await this.git.reset(['--merge']); } catch {}
     try {
       await this.git.checkout(commitHash);
     } catch (error: any) {
@@ -447,6 +452,62 @@ export class GitAdapter implements IGitOperations, IGitChanges {
         return [];
       }
       console.error(`GitAdapter: Error getting changes in commit ${commitHash}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Simplified synthesis: creates/force-updates local 'gitorial' branch by resetting to first step,
+   * then replaying commits with new messages. For now, we soft reset and commit messages only,
+   * not cherry-picking file contents (stub for full implementation).
+   */
+  public async synthesizeGitorialBranch(steps: Array<{ commit: string; message: string }>): Promise<void> {
+    if (steps.length === 0) return;
+
+    // Build a clean, linear history on an orphan branch, then replace 'gitorial'
+    const tmpBranch = 'gitorial_tmp';
+    try {
+      // Create orphan branch
+      await this.git.checkout(['--orphan', tmpBranch]);
+
+      // Remove tracked/untracked files from working tree
+      await this.git.raw(['rm', '-rf', '.']).catch(() => {});
+      await this.git.clean(['-fd']).catch(() => {});
+
+      // Seed first step by checking out its tree and committing with curated message
+      const first = steps[0];
+      // Populate working tree with files from the first commit
+      await this.git.raw(['checkout', first.commit, '--', '.']);
+      await this.git.add(['-A']);
+      await this.git.commit(first.message, undefined, { '--allow-empty': null });
+
+      // Replay remaining steps via cherry-pick with auto-resolution
+      for (let i = 1; i < steps.length; i++) {
+        const step = steps[i];
+        try {
+          await this.git.raw(['cherry-pick', '--no-commit', '-X', 'theirs', step.commit]);
+        } catch (_err) {
+          try {
+            await this.git.raw(['checkout', '--theirs', '.']);
+            await this.git.add(['-A']);
+          } catch {}
+        }
+        try {
+          await this.git.commit(step.message, undefined, { '--allow-empty': null });
+        } catch (commitErr) {
+          await this.git.raw(['cherry-pick', '--abort']).catch(() => {});
+          throw commitErr;
+        }
+      }
+
+      // Force-replace/point 'gitorial' to the new linear history
+      await this.git.branch(['-D', 'gitorial']).catch(() => {});
+      await this.git.checkout(['-B', 'gitorial']); // rename current HEAD to 'gitorial'
+      // Clean up tmp branch if it still exists
+      await this.git.branch(['-D', tmpBranch]).catch(() => {});
+    } catch (error) {
+      // Try to abort any in-progress state on failure
+      await this.git.raw(['cherry-pick', '--abort']).catch(() => {});
       throw error;
     }
   }

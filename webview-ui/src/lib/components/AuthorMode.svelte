@@ -62,11 +62,15 @@
       </div>
       
       <div class="header-actions">
-        {#if isDirty}
-          <button class="save-button" onclick={handleSave}>
-            Save Changes
-          </button>
-        {/if}
+        <button 
+          class="save-button" 
+          class:disabled={!isDirty}
+          onclick={handleSave}
+          disabled={!isDirty}
+          title={!isDirty ? 'No changes to save' : 'Save pending changes'}
+        >
+          Save Changes
+        </button>
         
         <button 
           class="preview-button" 
@@ -242,6 +246,13 @@
 
   .save-button:hover {
     background: var(--vscode-button-hoverBackground);
+  }
+
+  .save-button.disabled,
+  .save-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    filter: grayscale(0.4);
   }
 
   .preview-button {

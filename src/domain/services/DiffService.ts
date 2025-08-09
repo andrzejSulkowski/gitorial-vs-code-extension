@@ -63,7 +63,9 @@ export class DiffService {
         );
       }
 
-      const changedFiles = await gitAdapter.getCommitDiff(parentCommitHash);
+      // We want the files introduced/modified by the CURRENT step
+      // getCommitDiff(target) computes diff between target^ and target
+      const changedFiles = await gitAdapter.getCommitDiff(currentCommitHash);
 
       return changedFiles.map(file => {
         let changeType: DiffChangeType | undefined;

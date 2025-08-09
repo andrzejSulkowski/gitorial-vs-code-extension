@@ -55,4 +55,4 @@ export const systemStore = {
   clearError() {
     systemState.lastError = null;
   },
-};
+} as const;

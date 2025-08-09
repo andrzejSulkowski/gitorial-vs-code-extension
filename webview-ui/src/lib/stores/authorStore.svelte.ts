@@ -98,16 +98,16 @@ function createAuthorStore() {
     });
   }
 
-  function saveManifest() {
+  async function saveManifest() {
     if (!state.manifest) return;
-    
+    // Optimistically disable the button immediately
+    state.isDirty = false;
+    const manifestPayload: AuthorManifestData = JSON.parse(JSON.stringify(state.manifest));
     sendMessage({
       category: 'author',
       type: 'saveManifest',
-      payload: { manifest: state.manifest },
+      payload: { manifest: manifestPayload },
     });
-    
-    state.isDirty = false;
   }
 
   function addStep(step: ManifestStep, index?: number) {
@@ -232,20 +232,22 @@ function createAuthorStore() {
     state.publishStatus = 'publishing';
     state.publishError = null;
 
+    const manifestPayload: AuthorManifestData = JSON.parse(JSON.stringify(state.manifest));
     sendMessage({
       category: 'author',
       type: 'publishTutorial',
-      payload: { manifest: state.manifest, forceOverwrite },
+      payload: { manifest: manifestPayload, forceOverwrite },
     });
   }
 
   function previewTutorial() {
     if (!state.manifest) return;
 
+    const manifestPayload: AuthorManifestData = JSON.parse(JSON.stringify(state.manifest));
     sendMessage({
       category: 'author',
       type: 'previewTutorial',
-      payload: { manifest: state.manifest },
+      payload: { manifest: manifestPayload },
     });
   }
 

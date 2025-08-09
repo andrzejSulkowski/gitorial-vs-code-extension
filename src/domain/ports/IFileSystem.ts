@@ -56,6 +56,14 @@ export interface IFileSystem {
   readFile(path: string): Promise<string>;
 
   /**
+   * Writes the contents to a file, creating the file (and parent directories if necessary)
+   * when it does not exist, and overwriting when it does.
+   * @param path The absolute file path to write to
+   * @param contents The string contents to write
+   */
+  writeFile(path: string, contents: string): Promise<void>;
+
+  /**
    * Joins two paths.
    * @param path1 The first path.
    * @param path2 The second path.

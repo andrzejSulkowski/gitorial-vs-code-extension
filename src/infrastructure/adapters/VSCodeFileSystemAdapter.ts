@@ -33,6 +33,19 @@ export class VSCodeFileSystemAdapter implements IFileSystem {
     const content = await vscode.workspace.fs.readFile(vscode.Uri.file(path));
     return Buffer.from(content).toString('utf-8');
   }
+  async writeFile(path: string, contents: string): Promise<void> {
+    const uri = vscode.Uri.file(path);
+    const encoder = new TextEncoder();
+    const data = encoder.encode(contents);
+    // Ensure parent directory exists
+    try {
+      const parent = uri.with({ path: uri.path.substring(0, uri.path.lastIndexOf('/')) });
+      await vscode.workspace.fs.createDirectory(parent);
+    } catch {
+      // ignore
+    }
+    await vscode.workspace.fs.writeFile(uri, data);
+  }
   join(path1: string, path2: string): string {
     return vscode.Uri.joinPath(vscode.Uri.file(path1), path2).fsPath;
   }

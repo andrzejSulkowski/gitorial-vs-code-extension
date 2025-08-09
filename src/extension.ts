@@ -47,6 +47,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<{
   context: vscode.ExtensionContext;
   tutorialController: TutorialController;
   autoOpenState: AutoOpenState;
+  authorModeController: AuthorModeController;
 }> {
   console.log('📖 Gitorial extension active');
 
@@ -57,6 +58,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<{
     gitOperationsFactory,
     fileSystemAdapter,
     userInteractionAdapter,
+    authorModeController,
   } = await bootstrapApplication(context);
 
   // --- VS Code Specific Registrations (Infrastructure concern, performed here) ---
@@ -66,10 +68,16 @@ export async function activate(context: vscode.ExtensionContext): Promise<{
   // Author Mode Command Handler
   const authorModeCommandHandler = new AuthorModeCommandHandler(
     systemController,
+    authorModeController,
   );
 
+  console.log('📖 Registering regular commands...');
   commandHandler.register(context);
+  
+  console.log('📖 Registering Author Mode commands...');
   authorModeCommandHandler.register(context);
+  
+  console.log('📖 Registering URI handler...');
   uriHandler.register(context);
 
   await checkAndHandleAutoOpenState(tutorialController, autoOpenState);
@@ -81,6 +89,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<{
     context,
     tutorialController,
     autoOpenState,
+    authorModeController,
   };
 }
 
@@ -165,6 +174,7 @@ async function bootstrapApplication(context: vscode.ExtensionContext) {
   // Author Mode Controller
   const authorModeController = new AuthorModeController(
     systemController,
+    gitOperationsFactory,
   );
 
   const tutorialMessageHandler: IWebviewTutorialMessageHandler = {
@@ -176,6 +186,7 @@ async function bootstrapApplication(context: vscode.ExtensionContext) {
   const authorMessageHandler: IWebviewAuthorMessageHandler = {
     handleWebviewMessage: msg => authorModeController.handleWebviewMessage(msg),
   };
+  
   const webviewMessageHandler = new WebviewMessageHandler(
     tutorialMessageHandler,
     systemMessageHandler,
@@ -209,10 +220,8 @@ async function bootstrapApplication(context: vscode.ExtensionContext) {
     gitOperationsFactory,
     fileSystemAdapter,
     userInteractionAdapter,
-    activeTutorialStateRepository,
-    tutorialRepository,
-    workspaceId,
-  };
+    authorModeController,
+  } as const;
 }
 
 /**

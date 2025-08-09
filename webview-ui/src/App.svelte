@@ -16,14 +16,14 @@
     return () => window.removeEventListener('message', handleMessage);
   });
 
-  const isLoading = systemStore.isLoading;
-  const isAuthorMode = systemStore.isAuthorMode;
+  // IMPORTANT: Do not cache these in local consts; read directly from systemStore
+  // so the template stays reactive with Svelte 5 runes
 </script>
 
 <main>
-  {#if isLoading}
+  {#if systemStore.isLoading}
     <div class="loading-indicator">Loading...</div>
-  {:else if isAuthorMode}
+  {:else if systemStore.isAuthorMode}
     <AuthorMode />
   {:else}
     <Tutorial />

@@ -5,9 +5,6 @@ import * as fs from 'node:fs/promises';
 import { IntegrationTestUtils, TestRepository } from './test-utils';
 import { INTEGRATION_TEST_CONFIG } from './test-config';
 
-// This test verifies that changing order/title in manifest and publishing
-// reflects in the gitorial branch commit messages and chronological order.
-
 suite('Integration: Author Mode - Change Order/Title', () => {
   let testRepo: TestRepository;
   let _extensionContext: vscode.Extension<any>;
@@ -34,8 +31,9 @@ suite('Integration: Author Mode - Change Order/Title', () => {
 
     const repoPath = testRepo.path;
 
-    // Seed a minimal gitorial history: three commits with prefixes
+    // Create minimal commits for testing
     await IntegrationTestUtils.execGit(repoPath, ['checkout', '-B', 'main']);
+
     await fs.writeFile(path.join(repoPath, 'README.md'), '# Intro');
     await IntegrationTestUtils.execGit(repoPath, ['add', '-A']);
     await IntegrationTestUtils.execGit(repoPath, ['commit', '-m', 'readme: introduction']);
@@ -48,23 +46,23 @@ suite('Integration: Author Mode - Change Order/Title', () => {
     await IntegrationTestUtils.execGit(repoPath, ['add', '-A']);
     await IntegrationTestUtils.execGit(repoPath, ['commit', '-m', 'action: second']);
 
-    // Create gitorial branch pointing to latest
+    // Create gitorial branch
     await IntegrationTestUtils.execGit(repoPath, ['checkout', '-B', 'gitorial']);
 
-    // Open workspace tutorial to establish state
+    // Open workspace tutorial
     IntegrationTestUtils.mockOpenDialog([vscode.Uri.file(repoPath)]);
     await IntegrationTestUtils.executeCommand('gitorial.openTutorial');
 
-    // Build manifest representing a reordering and title change
+    // Get commit hashes for manifest
     const log = await IntegrationTestUtils.execGit(repoPath, ['log', '--pretty=%H %s']);
     const hashes = log
       .split('\n')
       .filter(Boolean)
       .map(line => line.split(' ')[0]);
 
-    // hashes is newest->oldest; map to commits
-    const [latest, middle, oldest] = hashes; // action: second, section: first, readme: introduction
+    const [latest, middle, oldest] = hashes;
 
+    // Create manifest with reordered steps
     const manifest = {
       authoringBranch: 'main',
       publishBranch: 'gitorial',
@@ -75,7 +73,7 @@ suite('Integration: Author Mode - Change Order/Title', () => {
       ],
     };
 
-    // Write manifest to .gitorial/manifest.json
+    // Write manifest
     const manifestDir = path.join(repoPath, '.gitorial');
     await fs.mkdir(manifestDir, { recursive: true });
     await fs.writeFile(
@@ -84,10 +82,10 @@ suite('Integration: Author Mode - Change Order/Title', () => {
       'utf-8',
     );
 
-    // Trigger publish command
+    // Publish tutorial
     await IntegrationTestUtils.executeCommand('gitorial.publishTutorial');
 
-    // Verify gitorial commit messages reflect manifest order and titles (oldest->newest in log --reverse)
+    // Verify gitorial commit messages match manifest order
     const publishedLog = await IntegrationTestUtils.execGit(repoPath, [
       'log',
       'gitorial',
@@ -96,12 +94,10 @@ suite('Integration: Author Mode - Change Order/Title', () => {
     ]);
     const messages = publishedLog.split('\n').filter(Boolean);
 
-    // Expect messages per manifest order
     assert.ok(messages.length >= 3, 'Should have at least 3 commits after publish');
-    // First three messages should match exactly
-    assert.strictEqual(messages[0], 'readme: Intro Updated');
-    assert.strictEqual(messages[1], 'action: Second Renamed');
-    assert.strictEqual(messages[2], 'section: First Renamed');
+    assert.strictEqual(messages[0], 'readme: Intro Updated', 'First commit should be readme with updated title');
+    assert.strictEqual(messages[1], 'action: Second Renamed', 'Second commit should be action with renamed title');
+    assert.strictEqual(messages[2], 'section: First Renamed', 'Third commit should be section with renamed title');
   });
 });
 

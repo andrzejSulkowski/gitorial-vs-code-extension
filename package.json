@@ -133,6 +133,7 @@
   "dependencies": {
     "@gitorial/shared-types": "workspace:*",
     "markdown-it": "^14.1.0",
+    "neverthrow": "^6.1.0",
     "simple-git": "^3.28.0",
     "ws": "^8.18.0"
   },

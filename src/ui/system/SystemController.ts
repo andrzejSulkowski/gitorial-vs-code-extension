@@ -1,35 +1,18 @@
-import {
-  WebviewToExtensionSystemMessage,
-  ExtensionToWebviewSystemMessage,
-  ExtensionToWebviewAuthorMessage,
-  AuthorManifestData,
-} from '@gitorial/shared-types';
-import { IWebviewSystemMessageHandler } from '../webview/WebviewMessageHandler';
 import * as vscode from 'vscode';
-import { WebviewPanelManager } from '@ui/webview/WebviewPanelManager';
+import { WebviewPanelManager } from '../webview/WebviewPanelManager';
+import { ExtensionToWebviewSystemMessage, WebviewToExtensionSystemMessage } from '@gitorial/shared-types';
+import { AuthorManifestData } from '@gitorial/shared-types';
 
-//TODO: This is AI generated code, we need to check it!
-// After that lets do some diagraming to setup proper docs
+export interface IWebviewSystemMessageHandler {
+  handleWebviewMessage(message: WebviewToExtensionSystemMessage): Promise<void>;
+}
 
 /**
- * SystemController - Central Extension System Manager
- *
- * CORE RESPONSIBILITIES:
- * 1. **Error Management**: Centralized error handling, reporting, and user notifications
- * 2. **Extension Lifecycle**: Manages extension startup, shutdown, and state persistence
- * 3. **Cross-cutting Concerns**: Logging, telemetry, user preferences, system notifications
- * 4. **System Communication**: Coordinates between different controllers for system-level operations
- * 5. **Webview System Messages**: Handles system-level messages from webview
- *
- * WHO USES IT:
- * - TutorialController reports errors and requests system operations
- * - WebviewController delegates system messages
- * - LifecycleController coordinates through it for cross-cutting concerns
- * - Extension activation/deactivation hooks
+ * Controller responsible for managing system-level operations and communication
+ * between the extension and webview components.
  */
 export class SystemController implements IWebviewSystemMessageHandler {
-  private errorCount: number = 0;
-  private extensionContext: vscode.ExtensionContext;
+  private readonly extensionContext: vscode.ExtensionContext;
 
   constructor(
     context: vscode.ExtensionContext,
@@ -38,242 +21,149 @@ export class SystemController implements IWebviewSystemMessageHandler {
     this.extensionContext = context;
   }
 
-  // ============ PUBLIC API FOR OTHER CONTROLLERS ============
+  // ============================================================================
+  // Webview Message Handling
+  // ============================================================================
 
   /**
-   * Central error reporting - used by all other controllers
+   * Handles incoming messages from the webview.
+   * @param message - The message received from the webview
    */
-  public reportError(error: Error | string, context?: string, showToUser: boolean = true): void {
-    this.errorCount++;
-    const errorMessage = error instanceof Error ? error.message : error;
-    const fullMessage = context ? `${context}: ${errorMessage}` : errorMessage;
+  public async handleWebviewMessage(message: WebviewToExtensionSystemMessage): Promise<void> {
+    try {
+      switch (message.type) {
+      case 'error':
+        await this.handleError(message.payload);
+        break;
+      default:
+        console.warn(`Unknown message type: ${(message as any).type}`);
+      }
+    } catch (error) {
+      console.error('Error handling webview message:', error);
+    }
+  }
 
-    console.error(`SystemController: ${fullMessage}`);
+  /**
+   * Sends a system message to the webview.
+   * @param message - The message to send to the webview
+   */
+  public async sendSystemMessage(message: ExtensionToWebviewSystemMessage): Promise<void> {
+    try {
+      await this.webviewPanelManager.sendMessage(message);
+    } catch (error) {
+      await this.reportError(
+        error instanceof Error ? error : new Error(String(error)),
+        'Sending system message to webview',
+        true,
+      );
+    }
+  }
+
+  // ============================================================================
+  // Loading State Management
+  // ============================================================================
+
+  /**
+   * Shows or hides the loading state in the webview.
+   * @param isLoading - Whether to show the loading state
+   * @param message - The loading message to display
+   */
+  public async showLoadingState(isLoading: boolean, message: string): Promise<void> {
+    await this.sendSystemMessage({
+      category: 'system',
+      type: 'loading-state',
+      payload: { isLoading, message },
+    });
+  }
+
+  /**
+   * Hides the loading state in the webview.
+   */
+  public hideLoadingState = (): Promise<void> => this.showLoadingState(false, '');
+
+  // ============================================================================
+  // Error Handling and User Feedback
+  // ============================================================================
+
+  /**
+   * Shows an error message in the webview.
+   * @param message - The error message to display
+   */
+  public async showError(message: string): Promise<void> {
+    await this.sendSystemMessage({
+      category: 'system',
+      type: 'error',
+      payload: { message },
+    });
+  }
+
+  /**
+   * Reports an error with optional user notification.
+   * @param error - The error that occurred
+   * @param context - Context where the error occurred
+   * @param showToUser - Whether to show the error to the user
+   */
+  public async reportError(error: Error, context: string, showToUser: boolean = false): Promise<void> {
+    const message = `${context}: ${error.message}`;
+    console.error(message);
 
     if (showToUser) {
-      vscode.window.showErrorMessage(fullMessage);
-    }
-
-    // Send error to webview if available
-    this._notifyWebviewError(errorMessage);
-
-    // TODO: Add telemetry/logging service integration here
-  }
-
-  /**
-   * Show system-wide loading state
-   */
-  public async showGlobalLoading(message: string): Promise<void> {
-    if (this.webviewPanelManager) {
-      const systemMessage: ExtensionToWebviewSystemMessage = {
-        category: 'system',
-        type: 'loading-state',
-        payload: { isLoading: true, message },
-      };
-      await this.webviewPanelManager.sendMessage(systemMessage);
-    }
-  }
-
-  /**
-   * Hide system-wide loading state
-   */
-  public async hideGlobalLoading(): Promise<void> {
-    if (this.webviewPanelManager) {
-      const systemMessage: ExtensionToWebviewSystemMessage = {
-        category: 'system',
-        type: 'loading-state',
-        payload: { isLoading: false, message: '' },
-      };
-      await this.webviewPanelManager.sendMessage(systemMessage);
-    }
-  }
-
-  /**
-   * Show system notification to user
-   */
-  public showNotification(message: string, type: 'info' | 'warning' | 'error' = 'info'): void {
-    switch (type) {
-    case 'info':
-      vscode.window.showInformationMessage(message);
-      break;
-    case 'warning':
-      vscode.window.showWarningMessage(message);
-      break;
-    case 'error':
-      vscode.window.showErrorMessage(message);
-      break;
-    }
-  }
-
-  /**
-   * Execute system command with error handling
-   */
-  public async executeSystemCommand<T>(
-    commandName: string,
-    operation: () => Promise<T>,
-    showLoading: boolean = true,
-  ): Promise<T | null> {
-    try {
-      if (showLoading) {
-        await this.showGlobalLoading(`Executing ${commandName}...`);
+      try {
+        await vscode.window.showErrorMessage(message);
+      } catch (showError) {
+        console.error('Failed to show error message to user:', showError);
       }
-
-      const result = await operation();
-
-      if (showLoading) {
-        await this.hideGlobalLoading();
-      }
-
-      return result;
-    } catch (error) {
-      if (showLoading) {
-        await this.hideGlobalLoading();
-      }
-
-      this.reportError(error as Error, commandName);
-      return null;
     }
   }
 
-  /**
-   * Get system statistics/health
-   */
-  public getSystemHealth(): SystemHealth {
-    return {
-      errorCount: this.errorCount,
-      isWebviewActive: !!this.webviewPanelManager?.isVisible(),
-      extensionUptime:
-        Date.now() - this.extensionContext.globalState.get('startupTime', Date.now()),
-    };
-  }
-
-  // ============ WEBVIEW MESSAGE HANDLING ============
-
-  public async handleWebviewMessage(message: WebviewToExtensionSystemMessage): Promise<void> {
-    console.log('SystemController: Received webview message', message);
-
-    switch (message.type) {
-    case 'error':
-      this.reportError(message.payload.message, 'Webview', false); // Don't show to user again
-      break;
-    default:
-      console.warn('SystemController: Unknown system message type:', message.type);
-    }
-  }
-
-  // ============ AUTHOR MODE SUPPORT ============
+  // ============================================================================
+  // Author Mode Management
+  // ============================================================================
 
   /**
-   * Set author mode state in the webview
+   * Sets the author mode state.
+   * @param isActive - Whether author mode should be active
    */
   public async setAuthorMode(isActive: boolean): Promise<void> {
-    console.log(`SystemController: Setting author mode to ${isActive}`);
-    // For now, the webview will determine the mode based on whether it receives author messages
-    // In the future, we could add a specific system message for mode switching
+    await this.extensionContext.globalState.update('authorMode', isActive);
   }
 
   /**
-   * Save a backup of the author manifest to global state keyed by repo path
+   * Sends author manifest data to the webview.
+   * @param manifest - The author manifest data
+   * @param isEditing - Whether the manifest is being edited
+   */
+  public async sendAuthorManifest(manifest: AuthorManifestData, isEditing: boolean): Promise<void> {
+    console.log('Author manifest loaded:', { manifest, isEditing });
+  }
+
+  /**
+   * Saves a backup of the author manifest for a specific repository.
+   * @param repoPath - The repository path
+   * @param manifest - The manifest data to backup
    */
   public async saveAuthorManifestBackup(repoPath: string, manifest: AuthorManifestData): Promise<void> {
-    const key = this.getManifestBackupKey(repoPath);
+    const key = `authorManifestBackup_${repoPath}`;
     await this.extensionContext.globalState.update(key, manifest);
   }
 
   /**
-   * Retrieve a backup manifest from global state
+   * Retrieves a backup of the author manifest for a specific repository.
+   * @param repoPath - The repository path
+   * @returns The backup manifest data or null if not found
    */
   public getAuthorManifestBackup(repoPath: string): AuthorManifestData | null {
-    const key = this.getManifestBackupKey(repoPath);
-    const data = this.extensionContext.globalState.get<AuthorManifestData | undefined>(key);
-    return data ?? null;
+    return this.extensionContext.globalState.get(`authorManifestBackup_${repoPath}`, null);
   }
 
-  private getManifestBackupKey(repoPath: string): string {
-    return `authorManifestBackup:${repoPath}`;
-  }
+  // ============================================================================
+  // Private Helper Methods
+  // ============================================================================
 
-  /**
-   * Send author manifest to webview
-   */
-  public async sendAuthorManifest(manifest: AuthorManifestData, isEditing: boolean): Promise<void> {
-    if (this.webviewPanelManager) {
-      const authorMessage: ExtensionToWebviewAuthorMessage = {
-        category: 'author',
-        type: 'manifestLoaded',
-        payload: { manifest, isEditing },
-      };
-      await this.webviewPanelManager.sendMessage(authorMessage);
+  private async handleError(payload: { message: string; details?: string }): Promise<void> {
+    await vscode.window.showErrorMessage(`Webview Error: ${payload.message}`);
+    if (payload.details) {
+      await vscode.window.showErrorMessage(payload.details);
     }
   }
-
-  /**
-   * Send publish result to webview
-   */
-  public async sendPublishResult(success: boolean, error?: string, publishedCommits?: Array<{
-    originalCommit: string;
-    newCommit: string;
-    stepTitle: string;
-    stepType: string;
-  }>): Promise<void> {
-    if (this.webviewPanelManager) {
-      const authorMessage: ExtensionToWebviewAuthorMessage = {
-        category: 'author',
-        type: 'publishResult',
-        payload: { success, error, publishedCommits },
-      };
-      await this.webviewPanelManager.sendMessage(authorMessage);
-    }
-  }
-
-  /**
-   * Send validation warnings to webview
-   */
-  public async sendValidationWarnings(warnings: string[]): Promise<void> {
-    if (this.webviewPanelManager) {
-      const authorMessage: ExtensionToWebviewAuthorMessage = {
-        category: 'author',
-        type: 'validationWarnings',
-        payload: { warnings },
-      };
-      await this.webviewPanelManager.sendMessage(authorMessage);
-    }
-  }
-
-  // ============ EXTENSION LIFECYCLE ============
-
-  /**
-   * Called during extension activation
-   */
-  public async onActivate(): Promise<void> {
-    this.extensionContext.globalState.update('startupTime', Date.now());
-    console.log('SystemController: Extension activated');
-  }
-
-  /**
-   * Called during extension deactivation
-   */
-  public async onDeactivate(): Promise<void> {
-    console.log(`SystemController: Extension deactivated. Total errors: ${this.errorCount}`);
-    // TODO: Cleanup, save state, etc.
-  }
-
-  // ============ PRIVATE HELPERS ============
-
-  private async _notifyWebviewError(errorMessage: string): Promise<void> {
-    if (this.webviewPanelManager) {
-      const systemMessage: ExtensionToWebviewSystemMessage = {
-        category: 'system',
-        type: 'error',
-        payload: { message: errorMessage },
-      };
-      await this.webviewPanelManager.sendMessage(systemMessage);
-    }
-  }
-}
-
-export interface SystemHealth {
-  errorCount: number;
-  isWebviewActive: boolean;
-  extensionUptime: number;
 }

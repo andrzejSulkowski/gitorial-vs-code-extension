@@ -12,15 +12,11 @@ export class EditorManager {
   }
 
   public async openFiles(filePaths: string[], tutorialRoot: string): Promise<void> {
-    if (!filePaths || filePaths.length === 0) {
-      return;
-    }
+    if (!filePaths?.length) return;
 
-    // Convert relative paths to absolute URIs
-    const uris = filePaths.map(relativePath => {
-      const absolutePath = this.fs.join(tutorialRoot, relativePath);
-      return vscode.Uri.file(absolutePath);
-    });
+    const uris = filePaths.map(relativePath => 
+      vscode.Uri.file(this.fs.join(tutorialRoot, relativePath))
+    );
 
     await this.openAndFocusTabs(uris);
   }
@@ -28,32 +24,19 @@ export class EditorManager {
   public async focusEditorGroup(
     column: vscode.ViewColumn.One | vscode.ViewColumn.Two,
   ): Promise<void> {
-    switch (column) {
-    case vscode.ViewColumn.One:
-      await vscode.commands.executeCommand('workbench.action.focusFirstEditorGroup');
-      break;
-    case vscode.ViewColumn.Two:
-      await vscode.commands.executeCommand('workbench.action.focusSecondEditorGroup');
-      break;
-    }
+    const command = column === vscode.ViewColumn.One
+      ? 'workbench.action.focusFirstEditorGroup'
+      : 'workbench.action.focusSecondEditorGroup';
+    await vscode.commands.executeCommand(command);
   }
 
   public getOpenTabPaths(tutorialPath: string): string[] {
-    const openTutorialTabs: string[] = [];
-    for (const tabGroup of vscode.window.tabGroups.all) {
-      for (const tab of tabGroup.tabs) {
-        if (tab.input instanceof vscode.TabInputText) {
-          const tabFsPath = tab.input.uri.fsPath;
-          // Normalize paths to ensure consistent comparison, especially on Windows
-          const normalizedTabFsPath = path.normalize(tabFsPath);
-          const normalizedTutorialLocalPath = path.normalize(tutorialPath);
-          if (normalizedTabFsPath.startsWith(normalizedTutorialLocalPath)) {
-            openTutorialTabs.push(tabFsPath);
-          }
-        }
-      }
-    }
-    return openTutorialTabs;
+    const normalizedTutorialPath = path.normalize(tutorialPath);
+    return vscode.window.tabGroups.all
+      .flatMap(group => group.tabs)
+      .filter(tab => tab.input instanceof vscode.TabInputText)
+      .map(tab => (tab.input as vscode.TabInputText).uri.fsPath)
+      .filter(tabPath => path.normalize(tabPath).startsWith(normalizedTutorialPath));
   }
 
   public async updateSidePanelFiles(
@@ -61,13 +44,10 @@ export class EditorManager {
     changedFilePaths: string[],
     tutorialPath: string,
   ): Promise<void> {
-    if (!changedFilePaths || !tutorialPath) {
+    if (!changedFilePaths?.length || !tutorialPath) {
       console.warn('EditorManager: Cannot update side panel files, missing parameters.');
       return;
     }
-
-    const excludedExtensions = ['.md', '.toml', '.lock'];
-    const excludedFileNames = ['.gitignore'];
 
     if (step.type === 'section') {
       const groupTwoTabs = this.getTabsInGroup(vscode.ViewColumn.Two);
@@ -78,65 +58,51 @@ export class EditorManager {
       return;
     }
 
-    const targetUris: vscode.Uri[] = [];
-    for (const relativePath of changedFilePaths) {
-      const fileName = path.basename(relativePath);
-      const fileExtension = path.extname(relativePath).toLowerCase();
+    const excludedExtensions = ['.md', '.toml', '.lock'];
+    const excludedFileNames = ['.gitignore'];
 
-      if (excludedFileNames.includes(fileName) || excludedExtensions.includes(fileExtension)) {
-        console.log(`EditorManager: Skipping excluded file: ${relativePath}`);
-        continue;
-      }
-
-      const absolutePath = this.fs.join(tutorialPath, relativePath);
-      if (await this.fs.pathExists(absolutePath)) {
-        targetUris.push(vscode.Uri.file(absolutePath));
-      } else {
-        console.warn(`EditorManager: File path from changed files does not exist: ${absolutePath}`);
-      }
-    }
+    const targetUris = changedFilePaths
+      .filter(relativePath => {
+        const fileName = path.basename(relativePath);
+        const fileExtension = path.extname(relativePath).toLowerCase();
+        return !excludedFileNames.includes(fileName) && !excludedExtensions.includes(fileExtension);
+      })
+      .map(relativePath => this.fs.join(tutorialPath, relativePath))
+      .filter(async (absolutePath) => await this.fs.pathExists(absolutePath))
+      .map(absolutePath => vscode.Uri.file(absolutePath));
 
     const currentTabsInGroupTwo = this.getTabsInGroup(vscode.ViewColumn.Two);
     const targetUriStrings = targetUris.map(u => u.toString());
 
-    const tabsToClose: vscode.Tab[] = [];
-    for (const tab of currentTabsInGroupTwo) {
+    const tabsToClose = currentTabsInGroupTwo.filter(tab => {
       const input = tab.input as any;
-      if (input && input.original && input.modified) {
-        tabsToClose.push(tab);
-        continue;
-      }
+      if (input?.original && input?.modified) return true;
+      
       const tabUri = input?.uri as vscode.Uri;
-      if (tabUri) {
-        if (!(await this.fs.pathExists(tabUri.fsPath))) {
-          tabsToClose.push(tab);
-          continue;
-        }
-        if (!targetUriStrings.includes(tabUri.toString())) {
-          tabsToClose.push(tab);
-          continue;
-        }
-      }
-    }
+      if (!tabUri) return false;
+      
+      return !(await this.fs.pathExists(tabUri.fsPath)) || 
+             !targetUriStrings.includes(tabUri.toString());
+    });
 
-    const urisToActuallyOpen = targetUris.filter(
-      uri =>
-        !currentTabsInGroupTwo.find(tab => (tab.input as any)?.uri?.toString() === uri.toString()),
+    const urisToActuallyOpen = targetUris.filter(uri =>
+      !currentTabsInGroupTwo.find(tab => 
+        (tab.input as any)?.uri?.toString() === uri.toString()
+      )
     );
+
     if (urisToActuallyOpen.length > 0) {
       for (let i = 0; i < urisToActuallyOpen.length; i++) {
-        const uriToOpen = urisToActuallyOpen[i];
         try {
-          // Focus the last document that is opened in the loop
           const shouldPreserveFocus = i < urisToActuallyOpen.length - 1;
-          await vscode.window.showTextDocument(uriToOpen, {
+          await vscode.window.showTextDocument(urisToActuallyOpen[i], {
             viewColumn: vscode.ViewColumn.Two,
             preview: false,
             preserveFocus: shouldPreserveFocus,
           });
         } catch (error) {
           console.error(
-            `EditorManager: Error opening file ${uriToOpen.fsPath} in group two:`,
+            `EditorManager: Error opening file ${urisToActuallyOpen[i].fsPath} in group two:`,
             error,
           );
         }
@@ -151,21 +117,15 @@ export class EditorManager {
       }
     }
 
-    const finalTabsInGroupTwo = this.getTabsInGroup(vscode.ViewColumn.Two);
-    if (finalTabsInGroupTwo.length > 0) {
+    if (this.getTabsInGroup(vscode.ViewColumn.Two).length > 0) {
       await this.focusEditorGroup(vscode.ViewColumn.Two);
     }
 
     console.log('EditorManager: Side panel files updated for step:', step.title);
   }
 
-  /**
-   * Opens the specified URIs as editor tabs and attempts to focus the last one.
-   */
   public async openAndFocusTabs(uris: vscode.Uri[]): Promise<void> {
-    if (!uris || uris.length === 0) {
-      return;
-    }
+    if (!uris?.length) return;
 
     for (let i = 0; i < uris.length; i++) {
       try {
@@ -179,24 +139,19 @@ export class EditorManager {
         console.error(`EditorManager: Error opening document ${uris[i].fsPath}:`, error);
       }
     }
-    // After loop, if uris were opened, the last one should have focus. Ensure group is focused.
+
     if (uris.length > 0) {
       await this.focusEditorGroup(vscode.ViewColumn.Two);
     }
   }
 
-  /**
-   * Closes all diff tabs in the specified editor group.
-   */
   public async closeDiffTabs(viewColumn: vscode.ViewColumn): Promise<void> {
-    const groupTabs = this.getTabsInGroup(viewColumn);
-    const diffTabsToClose: vscode.Tab[] = [];
-    for (const tab of groupTabs) {
-      const input = tab.input as any;
-      if (input && input.original && input.modified) {
-        diffTabsToClose.push(tab);
-      }
-    }
+    const diffTabsToClose = this.getTabsInGroup(viewColumn)
+      .filter(tab => {
+        const input = tab.input as any;
+        return input?.original && input?.modified;
+      });
+
     if (diffTabsToClose.length > 0) {
       try {
         await vscode.window.tabGroups.close(diffTabsToClose, false);
@@ -207,19 +162,13 @@ export class EditorManager {
     }
   }
 
-  /**
-   * Closes all tabs in the specified editor group that are not diff views.
-   */
   public async closeNonDiffTabsInGroup(viewColumn: vscode.ViewColumn): Promise<void> {
-    const groupTabs = this.getTabsInGroup(viewColumn);
-    const regularFileTabsToClose: vscode.Tab[] = [];
-    for (const tab of groupTabs) {
-      const input = tab.input as any;
-      if (!(input && input.original && input.modified)) {
-        // Not a diff view
-        regularFileTabsToClose.push(tab);
-      }
-    }
+    const regularFileTabsToClose = this.getTabsInGroup(viewColumn)
+      .filter(tab => {
+        const input = tab.input as any;
+        return !(input?.original && input?.modified);
+      });
+
     if (regularFileTabsToClose.length > 0) {
       try {
         await vscode.window.tabGroups.close(regularFileTabsToClose, false);
@@ -230,9 +179,6 @@ export class EditorManager {
     }
   }
 
-  /**
-   * Gets all tabs in the specified editor group.
-   */
   public getTabsInGroup(viewColumn: vscode.ViewColumn): readonly vscode.Tab[] {
     const tabGroup = vscode.window.tabGroups.all.find(group => group.viewColumn === viewColumn);
     return tabGroup ? tabGroup.tabs : [];

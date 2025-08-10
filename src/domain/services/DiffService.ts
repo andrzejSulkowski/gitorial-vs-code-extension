@@ -56,26 +56,19 @@ export class DiffService {
     const currentCommitIdx = commitHashHistory.findIndex(h => h === currentCommitHash);
     const parentCommitHash = commitHashHistory.at(currentCommitIdx + 1);
 
-    try {
-      if (!parentCommitHash) {
-        throw new Error(
-          'The current commit is at the HEAD of the branch.\nThere is no parent commit',
-        );
-      }
+    if (!parentCommitHash) {
+      console.warn('The current commit is at the HEAD of the branch. There is no parent commit');
+      return [];
+    }
 
-      // We want the files introduced/modified by the CURRENT step
-      // getCommitDiff(target) computes diff between target^ and target
+    try {
       const changedFiles = await gitAdapter.getCommitDiff(currentCommitHash);
 
       return changedFiles.map(file => {
-        let changeType: DiffChangeType | undefined;
-        if (file.isNew) {
-          changeType = DiffChangeType.ADDED;
-        } else if (file.isDeleted) {
-          changeType = DiffChangeType.DELETED;
-        } else if (file.isModified) {
-          changeType = DiffChangeType.MODIFIED;
-        }
+        const changeType = file.isNew ? DiffChangeType.ADDED
+          : file.isDeleted ? DiffChangeType.DELETED
+          : DiffChangeType.MODIFIED;
+
         return new DiffModel(
           file.relativeFilePath,
           file.absoluteFilePath,
@@ -99,18 +92,15 @@ export class DiffService {
       console.warn('TutorialService: Current step not found by ID for showing solution.');
       return;
     }
-    const currentStep = tutorial.activeStep;
-    const nextStep = tutorial.steps[currentStepIdx + 1];
 
+    const nextStep = tutorial.steps[currentStepIdx + 1];
     if (!nextStep) {
       console.warn('TutorialService: At the last step, no next step to show solution from.');
       return;
     }
 
     try {
-      const commitDiffPayloads: DiffFilePayload[] = await gitAdapter.getCommitDiff(
-        nextStep.commitHash,
-      );
+      const commitDiffPayloads = await gitAdapter.getCommitDiff(nextStep.commitHash);
 
       if (commitDiffPayloads.length === 0) {
         return;
@@ -121,43 +111,26 @@ export class DiffService {
           return false;
         }
 
-        // Include files with educational content
-        if (payload.originalContent && this.hasEducationalContent(payload.originalContent)) {
-          return true;
-        }
-
-        // Include files explicitly marked as educational (see Option 2)
-        if (payload.modifiedContent && this.hasEducationalContent(payload.modifiedContent)) {
-          return true;
-        }
-
-        // Files new in nextStep (payload.isNew = true) didn't exist in currentStep, so no prior educational content.
-        // Files modified/deleted whose originalContent (currentStep state) didn't have educational content are also excluded.
-        return false;
+        return (payload.originalContent && this.hasEducationalContent(payload.originalContent)) ||
+               (payload.modifiedContent && this.hasEducationalContent(payload.modifiedContent));
       });
 
       if (filteredDiffPayloads.length === 0) {
         console.log(
-          `TutorialService: No files with 'TODO:' in current step (after filtering) found in solution diff for step '${currentStep.title}'.`,
+          `TutorialService: No files with 'TODO:' in current step (after filtering) found in solution diff for step '${tutorial.activeStep.title}'.`,
         );
         return;
       }
 
-      const filesToDisplay: DiffFile[] = [];
-
-      for (const payload of filteredDiffPayloads) {
+      const filesToDisplay: DiffFile[] = filteredDiffPayloads.map(payload => {
         const absoluteFilePath = this.fs.join(tutorial.localPath, payload.relativeFilePath);
 
-        filesToDisplay.push({
+        return {
           leftContentProvider: async () => {
             try {
-              // Read the user's current working directory state
-              if (await this.fs.pathExists(absoluteFilePath)) {
-                return await this.fs.readFile(absoluteFilePath);
-              } else {
-                // File doesn't exist in working directory, show empty content
-                return '';
-              }
+              return await this.fs.pathExists(absoluteFilePath)
+                ? await this.fs.readFile(absoluteFilePath)
+                : '';
             } catch (error) {
               console.error(`Error reading current file ${absoluteFilePath}:`, error);
               return `// Error reading current file: ${error}`;
@@ -168,8 +141,8 @@ export class DiffService {
           leftCommitId: 'working-dir',
           rightCommitId: nextStep.commitHash,
           titleCommitId: nextStep.commitHash.slice(0, 7),
-        });
-      }
+        };
+      });
 
       await this.diffView.displayDiff(filesToDisplay, preferredFocusFile);
     } catch (error) {

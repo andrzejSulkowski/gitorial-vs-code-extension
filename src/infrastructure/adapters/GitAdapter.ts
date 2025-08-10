@@ -265,18 +265,25 @@ export class GitAdapter implements IGitOperations, IGitChanges {
     await this.git.checkout(commitHash);
   }
   public async listRemote(args: TaskOptions): Promise<string> {
-    return await this.git.listRemote(args);
+    return this.git.listRemote(args);
   }
 
   /**
    * Checkout a specific commit and clean the working directory
    */
   public async checkoutAndClean(commitHash: string): Promise<void> {
-    // Ensure no in-progress merge/rebase/cherry-pick blocks operations
-    try { await this.git.raw(['merge', '--abort']); } catch {}
-    try { await this.git.raw(['cherry-pick', '--abort']); } catch {}
-    try { await this.git.raw(['rebase', '--abort']); } catch {}
-    try { await this.git.reset(['--merge']); } catch {}
+    // Abort any in-progress operations
+    const abortCommands = [['merge', '--abort'], ['cherry-pick', '--abort'], ['rebase', '--abort']];
+    for (const cmd of abortCommands) {
+      try {
+        await this.git.raw(cmd);
+      } catch {}
+    }
+    
+    try {
+      await this.git.reset(['--merge']);
+    } catch {}
+    
     try {
       await this.git.checkout(commitHash);
     } catch (error: any) {
@@ -287,7 +294,6 @@ export class GitAdapter implements IGitOperations, IGitChanges {
       }
     }
 
-    // Clean up untracked files
     await this.cleanWorkingDirectory();
   }
 
@@ -295,39 +301,20 @@ export class GitAdapter implements IGitOperations, IGitChanges {
    * Get file content from a specific commit
    */
   public async getFileContent(commitHash: string, filePath: string): Promise<string> {
-    try {
-      return await this.git.show([`${commitHash}:${filePath}`]);
-    } catch (error) {
-      console.error(`Error getting content for ${filePath} from commit ${commitHash}:`, error);
-      throw error;
-    }
+    return await this.git.show([`${commitHash}:${filePath}`]);
   }
 
-  /**
-   * Get changed files between current commit and its parent
-   */
-  public async getChangedFiles(): Promise<string[]> {
-    const currentHash = await this.getCurrentCommitHash();
-    const parentHash = await this.git.revparse(['HEAD^']);
-    const diff = await this.git.diff([parentHash, currentHash, '--name-only']);
 
-    return diff
-      .split('\n')
-      .filter(file => file.trim().length > 0)
-      .filter(file => !file.toLowerCase().endsWith('readme.md'));
-  }
 
   /**
    * Get commit history
    */
   public async getCommitHistory(): Promise<readonly (DefaultLogFields & ListLogLine)[]> {
-    const log = await this.git.log(['gitorial']);
-    return log.all;
+    return (await this.git.log(['gitorial'])).all;
   }
 
   public async getCommits(branch?: string): Promise<Array<DefaultLogFields & ListLogLine>> {
-    const log = await this.git.log(branch ? [branch] : []);
-    return log.all as Array<DefaultLogFields & ListLogLine>; // Type assertion, ensure compatibility
+    return (await this.git.log(branch ? [branch] : [])).all as Array<DefaultLogFields & ListLogLine>;
   }
 
   /**
@@ -347,112 +334,57 @@ export class GitAdapter implements IGitOperations, IGitChanges {
    * Get current commit hash
    */
   public async getCurrentCommitHash(): Promise<string> {
-    return await this.git.revparse(['HEAD']);
+    return this.git.revparse(['HEAD']);
+  }
+
+  /**
+   * Get current commit message
+   */
+  public async getCurrentCommitMessage(): Promise<string> {
+    return (await this.git.log(['-1', '--pretty=%B'])).all[0]?.message || '';
   }
 
   /**
    * Get repository information
    */
   public async getRepoInfo(): Promise<{ remotes: RemoteWithRefs[]; branches: BranchSummary }> {
-    const [remotes, branches] = await Promise.all([this.git.getRemotes(true), this.git.branch()]);
-    return { remotes, branches };
+    return Promise.all([this.git.getRemotes(true), this.git.branch()]).then(([remotes, branches]) => ({ remotes, branches }));
   }
 
   /**
    * Clean the working directory by removing untracked files
    */
   public async cleanWorkingDirectory(): Promise<void> {
-    try {
-      // Use raw Git clean to bypass simple-git clean parsing
-      await this.git.raw(['clean', '-f', '-d']);
-    } catch (error) {
-      console.error('Error cleaning working directory:', error);
-      throw error;
-    }
+    // Use raw Git clean to bypass simple-git clean parsing
+    await this.git.raw(['clean', '-f', '-d']);
   }
 
-  public getAbsolutePath(relativePath: string): string {
-    return path.join(this.repoPath, relativePath);
-  }
+  public getAbsolutePath = (relativePath: string): string => path.join(this.repoPath, relativePath);
 
   public async getRepoName(): Promise<string> {
     return path.basename(this.repoPath);
   }
 
-  public async getRemoteUrl(): Promise<string | null> {
-    const remotes = await this.git.getRemotes(true);
-    const originRemote = remotes.find(remote => remote.name === 'origin');
 
-    if (originRemote && originRemote.refs && originRemote.refs.fetch) {
-      return originRemote.refs.fetch;
-    } else {
-      // Fallback or attempt to find another remote if 'origin' is not standard
-      const remoteDetails = await this.git.remote(['-v']);
-      if (typeof remoteDetails === 'string' && remoteDetails.includes('origin')) {
-        const lines = remoteDetails.split('\n');
-        const originFetchLine = lines.find(
-          line => line.startsWith('origin') && line.endsWith('(fetch)'),
-        );
-        if (originFetchLine) {
-          // Example line: 'origin\thttps://github.com/owner/repo.git (fetch)'
-          // Split on tab to separate remote name from URL, then split URL on space to remove '(fetch)'
-          return originFetchLine.split('\t')[1].split(' ')[0];
-        }
-      }
-      return null;
-    }
-  }
 
   public async isGitRepository(): Promise<boolean> {
     return this.git.checkIsRepo(CheckRepoActions.IS_REPO_ROOT);
   }
 
   public async getChangesInCommit(commitHash: string): Promise<string[]> {
-    if (!commitHash) {
-      console.warn('GitAdapter: getChangesInCommit called with no commitHash.');
-      return [];
-    }
+    if (!commitHash) return [];
+    
     try {
-      // Diff against the parent. If it's the initial commit, it has no parent.
-      // simple-git might throw an error for `HEAD^` on initial commit, or an empty diff might result.
-      // Using `git.show` with `--name-only --pretty=format:` is also an option for listing files in a commit,
-      // but `diff` is more direct for changes *introduced* by the commit.
       const diffOutput = await this.git.diff([
         `${commitHash}^`,
         commitHash,
         '--name-only',
         '--diff-filter=AM',
-      ]); // Filter for Added or Modified files only
-      if (diffOutput) {
-        return diffOutput.split('\n').filter(line => line.trim().length > 0);
-      }
+      ]);
+      return diffOutput ? diffOutput.split('\n').filter(line => line.trim().length > 0) : [];
+    } catch {
+      // For initial commit or other errors, return empty array
       return [];
-    } catch (error: any) {
-      // A common error here is if the commitHash is the very first commit (no parent ^).
-      // In such cases, all files in that commit are effectively "changes".
-      if (
-        error.message &&
-        (error.message.includes('unknown revision or path not in the working tree') ||
-          error.message.includes('bad revision ')) &&
-        error.message.includes(`${commitHash}^`)
-      ) {
-        console.log(
-          `GitAdapter: Likely initial commit (${commitHash}). Listing all files in the commit instead of diffing against parent.`,
-        );
-        const showOutput = await this.git.show([
-          commitHash,
-          '--name-only',
-          '--pretty=format:',
-          '--no-abbrev',
-        ]);
-        if (showOutput) {
-          // The output of show --name-only --pretty=format: is just a list of files, one per line, often with an extra newline at the end.
-          return showOutput.split('\n').filter(line => line.trim().length > 0);
-        }
-        return [];
-      }
-      console.error(`GitAdapter: Error getting changes in commit ${commitHash}:`, error);
-      throw error;
     }
   }
 
@@ -464,92 +396,52 @@ export class GitAdapter implements IGitOperations, IGitChanges {
   public async synthesizeGitorialBranch(steps: Array<{ commit: string; message: string }>): Promise<void> {
     if (steps.length === 0) return;
 
-    // Build a clean, linear history on an orphan branch, then replace 'gitorial'
-    const tmpBranch = 'gitorial_tmp';
     try {
-      // Create orphan branch
-      await this.git.checkout(['--orphan', tmpBranch]);
+      await this.ensureGitorialBranch();
+    } catch {
+      await this.git.checkout(['-B', 'gitorial']);
+    }
 
-      // Remove tracked/untracked files from working tree
-      await this.git.raw(['rm', '-rf', '.']).catch(() => {});
-      await this.git.clean(['-fd']).catch(() => {});
+    await this.git.reset(['--hard', steps[0].commit]);
 
-      // Seed first step by checking out its tree and committing with curated message
-      const first = steps[0];
-      // Populate working tree with files from the first commit
-      await this.git.raw(['checkout', first.commit, '--', '.']);
-      await this.git.add(['-A']);
-      await this.git.commit(first.message, undefined, { '--allow-empty': null });
-
-      // Replay remaining steps via cherry-pick with auto-resolution
-      for (let i = 1; i < steps.length; i++) {
-        const step = steps[i];
-        try {
-          await this.git.raw(['cherry-pick', '--no-commit', '-X', 'theirs', step.commit]);
-        } catch (_err) {
-          try {
-            await this.git.raw(['checkout', '--theirs', '.']);
-            await this.git.add(['-A']);
-          } catch {}
+    for (let i = 0; i < steps.length; i++) {
+      const step = steps[i];
+      
+      if (i === 0) {
+        if (step.message !== await this.getCurrentCommitMessage()) {
+          await this.git.commit(['--amend', '-m', step.message], { '--no-edit': null });
         }
-        try {
-          await this.git.commit(step.message, undefined, { '--allow-empty': null });
-        } catch (commitErr) {
-          await this.git.raw(['cherry-pick', '--abort']).catch(() => {});
-          throw commitErr;
+      } else {
+        const commitContent = await this.git.show([step.commit, '--name-only']);
+        if (commitContent) {
+          await this.git.commit(['-m', step.message], { '--allow-empty': null });
         }
       }
-
-      // Force-replace/point 'gitorial' to the new linear history
-      await this.git.branch(['-D', 'gitorial']).catch(() => {});
-      await this.git.checkout(['-B', 'gitorial']); // rename current HEAD to 'gitorial'
-      // Clean up tmp branch if it still exists
-      await this.git.branch(['-D', tmpBranch]).catch(() => {});
-    } catch (error) {
-      // Try to abort any in-progress state on failure
-      await this.git.raw(['cherry-pick', '--abort']).catch(() => {});
-      throw error;
     }
   }
 
   private parseNameStatus(
     diffOutput: string,
   ): Array<{ status: string; path: string; oldPath?: string }> {
-    const files: Array<{ status: string; path: string; oldPath?: string }> = [];
-    if (!diffOutput) {
-      return files;
-    }
+    if (!diffOutput) return [];
 
-    const lines = diffOutput.trim().split('\n');
-    for (const line of lines) {
-      if (line.trim() === '') {
-        continue;
-      }
-      // Lines are typically "S\tpath" or "SXXX\tpath" for A, M, D, T
-      // or "SXXX\told_path\tnew_path" for R, C (where S is the status char like R or C)
-      const parts = line.split('\t');
-      const rawStatus = parts[0].trim(); // e.g., "A", "M", "D", "R100", "C075"
-      const statusChar = rawStatus[0]; // "A", "M", "D", "R", "C"
-
-      if (statusChar === 'R' || statusChar === 'C') {
-        if (parts.length === 3) {
-          // R_old_new or C_old_new
-          files.push({ status: statusChar, oldPath: parts[1].trim(), path: parts[2].trim() });
+    return diffOutput.trim().split('\n')
+      .filter(line => line.trim())
+      .map(line => {
+        const parts = line.split('\t');
+        const statusChar = parts[0].trim()[0];
+        
+        if (statusChar === 'R' || statusChar === 'C') {
+          return parts.length === 3 
+            ? { status: statusChar, oldPath: parts[1].trim(), path: parts[2].trim() }
+            : null;
         } else {
-          console.warn(
-            `GitAdapter.parseNameStatus: Unexpected format for Renamed/Copied line: '${line}'`,
-          );
+          return parts.length === 2
+            ? { status: statusChar, path: parts[1].trim() }
+            : null;
         }
-      } else {
-        // A, M, D, T
-        if (parts.length === 2) {
-          files.push({ status: statusChar, path: parts[1].trim() });
-        } else {
-          console.warn(`GitAdapter.parseNameStatus: Unexpected format for line: '${line}'`);
-        }
-      }
-    }
-    return files;
+      })
+      .filter((file): file is NonNullable<typeof file> => file !== null);
   }
 
   private static _isGitorialBranchNamePattern(branchName: string): boolean {
@@ -573,11 +465,8 @@ export class GitAdapter implements IGitOperations, IGitChanges {
 
     try {
       parentCommitHash = await this.git.revparse([`${targetCommitHash}^`]);
-    } catch (error) {
+    } catch {
       isInitialCommit = true;
-      console.log(
-        `GitAdapter.getCommitDiff: Could not find parent for ${targetCommitHash}. Assuming initial commit. \nError: ${error}`,
-      );
     }
 
     let changedFilesRawOutput: string;
@@ -593,12 +482,7 @@ export class GitAdapter implements IGitOperations, IGitChanges {
       ]);
     } else {
       // For non-initial commits, use git diff --name-status against the parent.
-      if (!parentCommitHash) {
-        console.error(
-          `GitAdapter.getCommitDiff: parentCommitHash is null for non-initial commit ${targetCommitHash}. This should not happen.`,
-        );
-        return [];
-      }
+      if (!parentCommitHash) return [];
       changedFilesRawOutput = await this.git.raw([
         'diff',
         '--name-status',
@@ -656,6 +540,175 @@ export class GitAdapter implements IGitOperations, IGitChanges {
       });
     }
     return payloads;
+  }
+
+  // Author Mode Methods Implementation
+
+  /**
+   * Get the current branch name
+   */
+  public async getCurrentBranch(): Promise<string> {
+    const branchSummary = await this.git.branch();
+    return branchSummary.current;
+  }
+
+  /**
+   * Check if a branch exists (locally or remotely)
+   */
+  public async branchExists(branchName: string): Promise<boolean> {
+    try {
+      const branchSummary = await this.git.branch(['-a']);
+      return branchSummary.all.some(branch =>
+        branch === branchName || branch === `remotes/origin/${branchName}`,
+      );
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Create a new branch from a base branch
+   */
+  public async createBranch(branchName: string, baseBranch?: string): Promise<void> {
+    const targetBranch = baseBranch || await this.getCurrentBranch();
+    await this.git.checkout(['-b', branchName, targetBranch]);
+  }
+
+  /**
+   * Checkout a branch
+   */
+  public async checkoutBranch(branchName: string): Promise<void> {
+    await this.git.checkout(branchName);
+  }
+
+  /**
+   * Delete a branch
+   */
+  public async deleteBranch(branchName: string, force: boolean = false): Promise<void> {
+    if (force) {
+      await this.git.branch(['-D', branchName]);
+    } else {
+      await this.git.branch(['-d', branchName]);
+    }
+  }
+
+  /**
+   * Get commit information
+   */
+  public async getCommitInfo(commitHash: string): Promise<{
+    hash: string;
+    message: string;
+    author: string;
+    date: Date;
+  } | null> {
+    try {
+      const log = await this.git.log({
+        from: commitHash,
+        to: commitHash,
+        maxCount: 1,
+      });
+
+      if (log.latest) {
+        return {
+          hash: log.latest.hash,
+          message: log.latest.message,
+          author: log.latest.author_name,
+          date: new Date(log.latest.date),
+        };
+      }
+      return null;
+    } catch (error) {
+      console.error(`GitAdapter.getCommitInfo: Error getting commit info for '${commitHash}':`, error);
+      return null;
+    }
+  }
+
+  /**
+   * Cherry-pick a commit with optional custom message
+   */
+  public async cherryPick(commitHash: string, customMessage?: string): Promise<void> {
+    if (customMessage) {
+      await this.git.raw(['cherry-pick', '-m', '1', '--edit', commitHash]);
+    } else {
+      await this.git.raw(['cherry-pick', commitHash]);
+    }
+  }
+
+  /**
+   * Create a new commit with the current staged changes
+   */
+  public async createCommit(message: string): Promise<string> {
+    const result = await this.git.commit(message);
+    return result.commit;
+  }
+
+  /**
+   * Get the commit message for a specific commit
+   */
+  public async getCommitMessage(commitHash: string): Promise<string> {
+    const result = await this.git.show([commitHash, '--format=%B', '--no-patch']);
+    return result.trim();
+  }
+
+  /**
+   * Stage all changes in the working directory
+   */
+  public async stageAllChanges(): Promise<void> {
+    await this.git.add('.');
+  }
+
+  /**
+   * Stage specific files
+   */
+  public async stageFiles(filePaths: string[]): Promise<void> {
+    if (filePaths.length === 0) return;
+    await this.git.add(filePaths);
+  }
+
+  /**
+   * Get the status of the working directory
+   */
+  public async getWorkingDirectoryStatus(): Promise<{
+    staged: string[];
+    unstaged: string[];
+    untracked: string[];
+  }> {
+    const status = await this.git.status();
+    return {
+      staged: status.staged,
+      unstaged: status.modified.concat(status.deleted),
+      untracked: status.not_added,
+    };
+  }
+
+  /**
+   * Reset the working directory to match the last commit
+   */
+  public async resetWorkingDirectory(hard: boolean = false): Promise<void> {
+    if (hard) {
+      await this.git.reset(['--hard', 'HEAD']);
+    } else {
+      await this.git.reset(['--soft', 'HEAD']);
+    }
+  }
+
+  /**
+   * Push a branch to the remote repository
+   */
+  public async pushBranch(branchName: string, force: boolean = false): Promise<void> {
+    if (force) {
+      await this.git.push(['origin', branchName, '--force']);
+    } else {
+      await this.git.push(['origin', branchName]);
+    }
+  }
+
+  /**
+   * Pull the latest changes from the remote repository
+   */
+  public async pullLatest(branchName?: string): Promise<void> {
+    const targetBranch = branchName || await this.getCurrentBranch();
+    await this.git.pull(['origin', targetBranch]);
   }
 }
 

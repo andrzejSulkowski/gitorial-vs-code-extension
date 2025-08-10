@@ -209,9 +209,6 @@ export class Controller {
   }
 
   private async _handleContentChange(tutorial: Readonly<TutorialViewModel>): Promise<void> {
-    const htmlContent =
-      tutorial.steps[tutorial.currentStep.index].htmlContent ?? '<p></p>';
-
     const message: ExtensionToWebviewTutorialMessage = {
       category: 'tutorial',
       type: 'data-updated',

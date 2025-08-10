@@ -14,6 +14,9 @@ importers:
       markdown-it:
         specifier: ^14.1.0
         version: 14.1.0
+      neverthrow:
+        specifier: ^6.1.0
+        version: 6.2.2
       simple-git:
         specifier: ^3.28.0
         version: 3.28.0
@@ -2150,6 +2153,9 @@ packages:
 
   natural-compare@1.4.0:
     resolution: {integrity: sha512-OWND8ei3VtNC9h7V60qff3SVobHr996CTwgxubgyQYEpg290h9J0buyECNNJexkFm5sOajh5G116RYA1c8ZMSw==}
+
+  neverthrow@6.2.2:
+    resolution: {integrity: sha512-POR1FACqdK9jH0S2kRPzaZEvzT11wsOxLW520PQV/+vKi9dQe+hXq19EiOvYx7lSRaF5VB9lYGsPInynrnN05w==}
 
   node-abi@3.75.0:
     resolution: {integrity: sha512-OhYaY5sDsIka7H7AtijtI9jwGYLyl29eQn/W623DiN/MIv5sUqc4g7BIDThX+gb7di9f6xK02nkp8sdfFWZLTg==}
@@ -5243,6 +5249,8 @@ snapshots:
     optional: true
 
   natural-compare@1.4.0: {}
+
+  neverthrow@6.2.2: {}
 
   node-abi@3.75.0:
     dependencies:

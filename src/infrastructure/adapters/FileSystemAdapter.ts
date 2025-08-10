@@ -14,6 +14,7 @@ export class FileSystemAdapter {
   join(path1: string, path2: string): string {
     return path.join(path1, path2);
   }
+
   async isDirectory(path: string): Promise<boolean> {
     const stats = await fs.stat(path);
     return stats.isDirectory();
@@ -26,10 +27,8 @@ export class FileSystemAdapter {
   async readFile(filePath: string): Promise<string> {
     try {
       const absolutePath = path.resolve(filePath);
-      const data = await fs.readFile(absolutePath, 'utf-8');
-      return data;
+      return await fs.readFile(absolutePath, 'utf-8');
     } catch (error) {
-      // Log the error or handle it as per application's error handling strategy
       console.error(`Error reading file ${filePath}:`, error);
       throw new Error(`Could not read file: ${filePath}`);
     }
@@ -37,8 +36,7 @@ export class FileSystemAdapter {
 
   async pathExists(filePath: string): Promise<boolean> {
     try {
-      const absolutePath = path.resolve(filePath);
-      await fs.access(absolutePath);
+      await fs.access(path.resolve(filePath));
       return true;
     } catch {
       return false;
@@ -47,8 +45,7 @@ export class FileSystemAdapter {
 
   async ensureDir(dirPath: string): Promise<void> {
     try {
-      const absolutePath = path.resolve(dirPath);
-      await fs.mkdir(absolutePath, { recursive: true });
+      await fs.mkdir(path.resolve(dirPath), { recursive: true });
     } catch (error) {
       console.error(`Error ensuring directory ${dirPath}:`, error);
       throw new Error(`Could not create directory: ${dirPath}`);

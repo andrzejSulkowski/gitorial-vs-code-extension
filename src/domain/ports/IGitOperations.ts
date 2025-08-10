@@ -295,70 +295,109 @@ export interface IGitOperations {
    */
   synthesizeGitorialBranch(steps: Array<{ commit: string; message: string }>): Promise<void>;
 
-  // TODO: Author mode methods - implement later
-  // /**
-  //  * Get the current branch name
-  //  * @returns The name of the current branch
-  //  */
-  // getCurrentBranch(): Promise<string>;
+  /**
+   * Get the current branch name
+   * @returns The name of the current branch
+   */
+  getCurrentBranch(): Promise<string>;
 
-  // /**
-  //  * Check if a branch exists (locally or remotely)
-  //  * @param branchName The name of the branch to check
-  //  * @returns True if the branch exists, false otherwise
-  //  */
-  // branchExists(branchName: string): Promise<boolean>;
+  /**
+   * Check if a branch exists (locally or remotely)
+   * @param branchName The name of the branch to check
+   * @returns True if the branch exists, false otherwise
+   */
+  branchExists(branchName: string): Promise<boolean>;
 
-  // /**
-  //  * Create a new branch from a base branch
-  //  * @param branchName The name of the new branch
-  //  * @param baseBranch The base branch to create from (optional, defaults to current)
-  //  */
-  // createBranch(branchName: string, baseBranch?: string): Promise<void>;
+  /**
+   * Create a new branch from a base branch
+   * @param branchName The name of the new branch
+   * @param baseBranch The base branch to create from (optional, defaults to current)
+   */
+  createBranch(branchName: string, baseBranch?: string): Promise<void>;
 
-  // /**
-  //  * Checkout a branch
-  //  * @param branchName The name of the branch to checkout
-  //  */
-  // checkoutBranch(branchName: string): Promise<void>;
+  /**
+   * Checkout a branch
+   * @param branchName The name of the branch to checkout
+   */
+  checkoutBranch(branchName: string): Promise<void>;
 
-  // /**
-  //  * Delete a branch
-  //  * @param branchName The name of the branch to delete
-  //  * @param force Whether to force delete (optional)
-  //  */
-  // deleteBranch(branchName: string, force?: boolean): Promise<void>;
+  /**
+   * Delete a branch
+   * @param branchName The name of the branch to delete
+   * @param force Whether to force delete (optional)
+   */
+  deleteBranch(branchName: string, force?: boolean): Promise<void>;
 
-  // /**
-  //  * Get commit information
-  //  * @param commitHash The commit hash to get info for
-  //  * @returns Commit information including hash, message, author, and date
-  //  */
-  // getCommitInfo(commitHash: string): Promise<{
-  //   hash: string;
-  //   message: string;
-  //   author: string;
-  //   date: Date;
-  // } | null>;
+  /**
+   * Get commit information
+   * @param commitHash The commit hash to get info for
+   * @returns Commit information including hash, message, author, and date
+   */
+  getCommitInfo(commitHash: string): Promise<{
+    hash: string;
+    message: string;
+    author: string;
+    date: Date;
+  } | null>;
 
-  // /**
-  //  * Cherry-pick a commit with optional custom message
-  //  * @param commitHash The commit hash to cherry-pick
-  //  * @param customMessage Optional custom commit message
-  //  */
-  // cherryPick(commitHash: string, customMessage?: string): Promise<void>;
+  /**
+   * Cherry-pick a commit with optional custom message
+   * @param commitHash The commit hash to cherry-pick
+   * @param customMessage Optional custom commit message
+   */
+  cherryPick(commitHash: string, customMessage?: string): Promise<void>;
 
-  // /**
-  //  * Create a new commit with the current staged changes
-  //  * @param message The commit message
-  //  * @returns The hash of the new commit
-  //  */
-  // createCommit(message: string): Promise<string>;
+  /**
+   * Create a new commit with the current staged changes
+   * @param message The commit message
+   * @returns The hash of the new commit
+   */
+  createCommit(message: string): Promise<string>;
 
-  // /**
-  //  * Get the commit message for a specific commit
-  //  * @param commitHash The commit hash
-  //  * @returns The commit message
-  //  */
-  // getCommitMessage(commitHash: string): Promise<string>;
+  /**
+   * Get the commit message for a specific commit
+   * @param commitHash The commit hash
+   * @returns The commit message
+   */
+  getCommitMessage(commitHash: string): Promise<string>;
+
+  /**
+   * Stage all changes in the working directory
+   */
+  stageAllChanges(): Promise<void>;
+
+  /**
+   * Stage specific files
+   * @param filePaths Array of file paths to stage
+   */
+  stageFiles(filePaths: string[]): Promise<void>;
+
+  /**
+   * Get the status of the working directory
+   * @returns Object containing staged, unstaged, and untracked files
+   */
+  getWorkingDirectoryStatus(): Promise<{
+    staged: string[];
+    unstaged: string[];
+    untracked: string[];
+  }>;
+
+  /**
+   * Reset the working directory to match the last commit
+   * @param hard Whether to perform a hard reset (discard all changes)
+   */
+  resetWorkingDirectory(hard?: boolean): Promise<void>;
+
+  /**
+   * Push a branch to the remote repository
+   * @param branchName The name of the branch to push
+   * @param force Whether to force push (optional)
+   */
+  pushBranch(branchName: string, force?: boolean): Promise<void>;
+
+  /**
+   * Pull the latest changes from the remote repository
+   * @param branchName The name of the branch to pull from (optional, defaults to current)
+   */
+  pullLatest(branchName?: string): Promise<void>;
 }

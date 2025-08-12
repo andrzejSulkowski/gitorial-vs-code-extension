@@ -8,7 +8,7 @@
   "icon": "images/gitorial-icon.png",
   "repository": {
     "type": "git",
-    "url": "https://github.com/andrzejSulkowski/gitorial-vs-code-plugin"
+    "url": "https://github.com/gitorial-sdk/gitorial-vscode.git"
   },
   "type": "commonjs",
   "engines": {
@@ -53,9 +53,9 @@
     "Other"
   ],
   "license": "MIT",
-  "homepage": "https://github.com/andrzejSulkowski/gitorial-vs-code-plugin#readme",
+  "homepage": "https://github.com/gitorial-sdk/gitorial-vscode#readme",
   "bugs": {
-    "url": "https://github.com/andrzejSulkowski/gitorial-vs-code-plugin/issues"
+    "url": "https://github.com/gitorial-sdk/gitorial-vscode/issues"
   },
   "keywords": [
     "git",

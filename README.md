@@ -82,7 +82,7 @@ For information on creating Gitorial-compatible tutorials, please refer to the o
 
 ### Manual Installation
 
-1. Download the latest `.vsix` file from the [releases page](https://github.com/andrzejSulkowski/gitorial-vs-code-plugin/releases)
+1. Download the latest `.vsix` file from the [releases page](https://github.com/gitorial-sdk/gitorial-vscode.git/releases)
 2. In VS Code, run `Extensions: Install from VSIX...` from the command palette
 3. Select the downloaded `.vsix` file
 
@@ -94,7 +94,7 @@ For comprehensive information on setting up the development environment, underst
 
 ```bash
 # Clone the repository
-git clone https://github.com/andrzejSulkowski/gitorial-vs-code-plugin.git
+git clone https://github.com/gitorial-sdk/gitorial-vscode.git
 cd gitorial-vs-code-plugin/project
 
 # Install dependencies
@@ -127,8 +127,8 @@ See [DEVELOPMENT.md](./DEVELOPMENT.md) for the developer documentation.
 
 ### Getting Help
 
-- 🐛 [Report bugs](https://github.com/andrzejSulkowski/gitorial-vs-code-plugin/issues)
-- 💡 [Request features](https://github.com/andrzejSulkowski/gitorial-vs-code-plugin/issues)
+- 🐛 [Report bugs](https://github.com/gitorial-sdk/gitorial-vscode.git/issues)
+- 💡 [Request features](https://github.com/gitorial-sdk/gitorial-vscode.git/issues)
 - 📖 [View documentation](https://github.com/gitorial-sdk)
 
 ## Contributing

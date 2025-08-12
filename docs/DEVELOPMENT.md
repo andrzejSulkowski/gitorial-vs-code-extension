@@ -6,7 +6,7 @@ Quick guide for developers contributing to the Gitorial VS Code extension.
 
 ```bash
 # 1. Setup
-git clone https://github.com/andrzejSulkowski/gitorial-vs-code-extension.git
+git clone https://github.com/gitorial-sdk/gitorial-vscode.git
 cd gitorial-vs-code-extension
 pnpm install
 
@@ -193,7 +193,7 @@ The extension automatically opens files containing these keywords:
 - 📖 [VS Code Extension API](https://code.visualstudio.com/api)
 - 🏗️ [Clean Architecture](https://blog.cleancoder.com/uncle-bob/2012/08/13/the-clean-architecture.html)
 - 🎯 [Svelte Documentation](https://svelte.dev/docs)
-- 💬 [Project Issues](https://github.com/andrzejSulkowski/gitorial-vs-code-plugin/issues)
+- 💬 [Project Issues](https://github.com/gitorial-sdk/gitorial-vscode.git/issues)
 
 ---
 

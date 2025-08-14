@@ -1,0 +1,91 @@
+<rule>
+name: neverthrow_error_handling
+description: Prefer neverthrow's Result/ResultAsync over throwing or returning null/undefined. Standardize explicit, typed error handling across the codebase.
+
+filters:
+  # Apply to TypeScript source files
+  - type: file_extension
+    pattern: "\.(ts|tsx)$"
+  # Flag common anti-patterns
+  - type: content
+    pattern: "throw\s+new\s+Error\s*\("
+  - type: content
+    pattern: "return\s+null\b"
+  - type: content
+    pattern: "return\s+undefined\b"
+
+actions:
+  - type: suggest
+    message: |
+      Use neverthrow's `Result`/`ResultAsync` instead of throwing or returning null/undefined.
+
+      Guidelines:
+      - Define explicit error types (string literal unions or domain error objects)
+      - Return `Result<T, E>` for sync functions, `ResultAsync<T, E>` for async
+      - Use `ok(value)` for success, `err(error)` for failure
+      - At external boundaries (e.g., VS Code command entrypoints), convert `Result` to user messages and avoid throwing
+      - Tests may use `._unsafeUnwrap()` / `._unsafeUnwrapErr()` sparingly
+
+      Examples:
+      - Sync function:
+        ```ts
+        import { Result, ok, err } from 'neverthrow';
+
+        type ParseError = 'ColonNotFound' | 'InvalidCommitType';
+        function parseCommit(msg: string): Result<{ type: string; title: string }, ParseError> {
+          const idx = msg.indexOf(':');
+          if (idx <= 0) return err('ColonNotFound');
+          const type = msg.slice(0, idx).trim().toLowerCase();
+          const title = msg.slice(idx + 1).trim();
+          if (!title) return err('InvalidCommitType');
+          return ok({ type, title });
+        }
+        ```
+
+      - Async function:
+        ```ts
+        import { ResultAsync, okAsync, errAsync } from 'neverthrow';
+
+        type CloneError = 'InvalidUrl' | 'GitFailure';
+        function cloneRepo(url: string): ResultAsync<string, CloneError> {
+          if (!isValid(url)) return errAsync('InvalidUrl');
+          return ResultAsync.fromPromise(doClone(url), _ => 'GitFailure' as const);
+        }
+        ```
+
+      - Converting at UI boundary:
+        ```ts
+        const result = await service.someUseCase();
+        if (result.isOk()) {
+          // proceed
+        } else {
+          vscode.window.showErrorMessage(result._unsafeUnwrapErr());
+        }
+        ```
+
+examples:
+  - input: |
+      function load(): Tutorial | null {
+        try {
+          return buildTutorial();
+        } catch (e) {
+          return null;
+        }
+      }
+    output: |
+      Suggestion: Return a `Result<Tutorial, E>` instead of null; use `ok`/`err` from neverthrow.
+
+  - input: |
+      async function run() {
+        if (!config) throw new Error('Missing config');
+        return await doWork();
+      }
+    output: |
+      Suggestion: Return `ResultAsync<_, 'MissingConfig' | ...>`; avoid throwing.
+
+metadata:
+  priority: high
+  version: 1.0
+  applies_to: ["domain", "ui", "infrastructure"]
+</rule>
+

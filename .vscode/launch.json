@@ -44,28 +44,6 @@
       }
     },
     {
-      "name": "Debug Single Test (No Timeout)",
-      "type": "node",
-      "request": "launch",
-      "program": "${workspaceFolder}/packages/gitorial-sync/node_modules/mocha/bin/mocha.js",
-      "args": [
-        "--config",
-        ".mocharc.integration.json",
-        "--timeout",
-        "0",
-        "--grep",
-        "should handle sync direction assignment"
-      ],
-      "cwd": "${workspaceFolder}/packages/gitorial-sync",
-      "runtimeArgs": ["--inspect-brk"],
-      "sourceMaps": true,
-      "console": "integratedTerminal",
-      "internalConsoleOptions": "neverOpen",
-      "env": {
-        "NODE_ENV": "test"
-      }
-    },
-    {
       "name": "Debug via pnpm test (Alternative)",
       "type": "node",
       "request": "launch",
@@ -77,9 +55,42 @@
       "env": {
         "NODE_OPTIONS": "--inspect-brk"
       }
+    },
+    {
+      "name": "Mocha: Current TS file (choose UI)",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "node",
+      "program": "${workspaceFolder}/node_modules/mocha/bin/_mocha",
+      "args": [
+        "--no-config",
+        "--require",
+        "ts-node/register",
+        "--ui",
+        "${input:mochaUi}",
+        "--timeout",
+        "999999",
+        "${file}"
+      ],
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "TS_NODE_PROJECT": "${workspaceFolder}/tsconfig.json",
+        "TS_NODE_COMPILER_OPTIONS": "{\"inlineSourceMap\":true,\"inlineSources\":true}"
+      },
+      "runtimeArgs": ["--nolazy"],
+      "sourceMaps": true,
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen"
     }
   ],
   "inputs": [
+    {
+      "id": "mochaUi",
+      "type": "pickString",
+      "description": "Mocha UI",
+      "options": ["bdd", "tdd"],
+      "default": "bdd"
+    },
     {
       "id": "testName",
       "description": "Test name pattern to run",

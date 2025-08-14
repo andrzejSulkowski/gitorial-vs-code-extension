@@ -1,0 +1,21 @@
+{
+  "name": "@gitorial/test-utils",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Shared testing utilities for Gitorial monorepo",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist/**/*"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "clean": "rm -rf dist"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "^5.8.2"
+  }
+}
+
+

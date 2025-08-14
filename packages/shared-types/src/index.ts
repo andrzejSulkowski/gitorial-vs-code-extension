@@ -2,6 +2,13 @@
 export * from './domain/TutorialId';
 export * from './domain/StepType';
 export * from './domain/StepData';
+export * from './domain/commit/ToDoComment';
+
+//Commit
+export * from './domain/commit';
+
+// Commit List
+export * from './domain/commit-list';
 
 // # UI
 

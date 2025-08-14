@@ -60,6 +60,30 @@ export default [
       indent: ['warn', 2],
       'no-trailing-spaces': 'warn',
       'eol-last': 'warn',
+
+      // Forbid deep imports into workspace packages; enforce public entrypoints
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: [
+                '@gitorial/shared-types/*',
+                '@gitorial/test-utils/*',
+                '@gitorial/*/src/**',
+                '@gitorial/*/dist/**',
+              ],
+              message:
+                'Do not deep import from monorepo packages. Use the package public API (e.g. "@gitorial/shared-types" or "@gitorial/test-utils").',
+            },
+            {
+              group: ['**/packages/**'],
+              message:
+                'Do not import workspace packages via relative paths. Use the package name instead (e.g. "@gitorial/shared-types").',
+            },
+          ],
+        },
+      ],
     },
   },
 ];

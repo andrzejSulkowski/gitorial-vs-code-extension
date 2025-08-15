@@ -5,11 +5,21 @@ import { WebViewPanel } from './WebviewPanel';
 export class WebviewPanelManager {
   private currentPanel: WebViewPanel | undefined;
   private disposables: vscode.Disposable[] = [];
+  private messageHandler: (message: any) => void;
 
   constructor(
     private readonly extensionUri: vscode.Uri,
-    private readonly messageHandler: (message: any) => void,
-  ) {}
+    messageHandler: (message: any) => void,
+  ) {
+    this.messageHandler = messageHandler;
+  }
+
+  public updateMessageHandler(messageHandler: (message: any) => void): void {
+    this.messageHandler = messageHandler;
+    if (this.currentPanel) {
+      this.currentPanel.onDidReceiveMessage = this.messageHandler;
+    }
+  }
 
   public async sendMessage(message: ExtensionToWebviewMessage): Promise<void> {
     this._ensurePanel();
@@ -39,7 +49,9 @@ export class WebviewPanelManager {
   }
 
   private _ensurePanel(): void {
-    if (this.currentPanel) return;
+    if (this.currentPanel) {
+      return;
+    }
 
     console.log('WebviewPanelManager: Creating new panel');
     this._disposeDisposables();
@@ -79,7 +91,9 @@ export class WebviewPanelManager {
   private _disposeDisposables(): void {
     while (this.disposables.length) {
       const d = this.disposables.pop();
-      if (d) d.dispose();
+      if (d) {
+        d.dispose();
+      }
     }
   }
 }

@@ -49,6 +49,26 @@ export class VSCodeFileSystemAdapter implements IFileSystem {
   join(path1: string, path2: string): string {
     return vscode.Uri.joinPath(vscode.Uri.file(path1), path2).fsPath;
   }
+
+  relative(fromPath: string, toPath: string): string {
+    const fromParts = fromPath.split('/').filter(Boolean);
+    const toParts = toPath.split('/').filter(Boolean);
+
+    let commonPrefixLength = 0;
+    for (let i = 0; i < Math.min(fromParts.length, toParts.length); i++) {
+      if (fromParts[i] === toParts[i]) {
+        commonPrefixLength++;
+      } else {
+        break;
+      }
+    }
+
+    const upLevels = fromParts.length - commonPrefixLength;
+    const relativeParts = toParts.slice(commonPrefixLength);
+
+    const upPath = '../'.repeat(upLevels);
+    return upPath + relativeParts.join('/');
+  }
   public async pathExists(path: string): Promise<boolean> {
     try {
       await vscode.workspace.fs.stat(vscode.Uri.file(path));

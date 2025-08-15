@@ -8,18 +8,18 @@ import { StepType, StepData } from '@gitorial/shared-types';
 
 export class TutorialBuilder {
   private static readonly VALID_STEP_TYPES: ReadonlyArray<StepType> = [
-    'section', 'template', 'solution', 'action', 'readme'
+    'section', 'template', 'solution', 'action', 'readme',
   ];
 
   private static readonly REPO_URL_PATTERNS = [
     {
       platform: 'github',
-      pattern: /github\.com[\/:]([^\/]+)\/([^\/\.]+)(\.git)?$/i
+      pattern: /github\.com[\/:]([^\/]+)\/([^\/\.]+)(\.git)?$/i,
     },
     {
       platform: 'gitlab',
-      pattern: /gitlab\.com[\/:]([^\/]+)\/([^\/\.]+)(\.git)?$/i
-    }
+      pattern: /gitlab\.com[\/:]([^\/]+)\/([^\/\.]+)(\.git)?$/i,
+    },
   ];
 
   public static async buildFromLocalPath(
@@ -82,11 +82,11 @@ export class TutorialBuilder {
 
   public static extractStepsFromCommits(commits: DomainCommit[], tutorialId: TutorialId): Step[] {
     const chronologicalCommits = [...commits].reverse();
-    
+
     return chronologicalCommits.map((commit, index) => {
       const message = commit.message.trim();
       const colonIndex = message.indexOf(':');
-      
+
       if (colonIndex <= 0) {
         throw new Error(`TutorialBuilder: Commit message "${message}" missing type prefix.`);
       }
@@ -94,7 +94,7 @@ export class TutorialBuilder {
       const parsedType = message.substring(0, colonIndex).toLowerCase();
       if (!this.VALID_STEP_TYPES.includes(parsedType as StepType)) {
         throw new Error(
-          `TutorialBuilder: Invalid step type "${parsedType}" in commit message: "${message}".`
+          `TutorialBuilder: Invalid step type "${parsedType}" in commit message: "${message}".`,
         );
       }
 

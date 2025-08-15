@@ -116,9 +116,14 @@ export class TutorialController implements IWebviewTutorialMessageHandler {
     const result = await promise;
     if (result.success) {
       const { tutorial, gitChanges } = result;
+
+      // Set git changes BEFORE any webview operations to prevent race conditions
       this._gitChanges = gitChanges;
+
       await this.editorController.prepareForTutorial();
       await this.editorController.display(tutorial, gitChanges);
+
+      // Now display in webview after git changes are set
       await this.webviewController.display(tutorial);
     } else {
       if (result.reason === 'error') {
@@ -254,5 +259,17 @@ export class TutorialController implements IWebviewTutorialMessageHandler {
    */
   public async navigateToPreviousStep(): Promise<void> {
     await this.navigationController.navigateToPreviousStep();
+  }
+
+  /**
+   * Force refresh the current tutorial - use after structural changes like republishing
+   */
+  public async forceRefreshCurrentTutorial(): Promise<void> {
+    console.log('TutorialController: Forcing refresh of current tutorial');
+    const tutorial = this.tutorialService.tutorial;
+    if (tutorial && this.webviewController.isVisible()) {
+      await this.webviewController.forceRefresh(tutorial);
+      console.log('TutorialController: Tutorial refresh completed');
+    }
   }
 }

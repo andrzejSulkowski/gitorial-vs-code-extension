@@ -61,14 +61,6 @@ function createAuthorStore() {
         state.isEditing = message.payload.isEditing;
         state.isLoading = false;
         state.isDirty = false;
-        
-        // Activate author mode in the system store when we receive a manifest
-        if (typeof window !== 'undefined') {
-          // Import systemStore dynamically to avoid circular dependencies
-          import('./systemStore.svelte').then(({ systemStore }) => {
-            systemStore.setAuthorMode(true);
-          });
-        }
         break;
 
       case 'publishResult':

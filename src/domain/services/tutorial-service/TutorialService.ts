@@ -41,7 +41,7 @@ export class TutorialService {
     options: LoadTutorialOptions = {},
   ): Promise<Tutorial | null> {
     this._gitOperations = this.gitOperationsFactory.fromPath(localPath);
-    
+
     try {
       await this._gitOperations.ensureGitorialBranch();
     } catch (error) {
@@ -70,7 +70,7 @@ export class TutorialService {
     try {
       this._gitOperations = await this.gitOperationsFactory.fromClone(repoUrl, targetPath);
       await this.stateManager.clearActiveTutorialState();
-      
+
       try {
         await this._gitOperations.ensureGitorialBranch();
       } catch (error) {
@@ -78,7 +78,7 @@ export class TutorialService {
         this._gitOperations = null;
         return null;
       }
-      
+
       const tutorial = await this.repository.findByPath(targetPath);
       if (!tutorial) {
         throw new Error(`TutorialService: Failed to find tutorial at path ${targetPath} despite successful clone and branch setup`);
@@ -93,8 +93,10 @@ export class TutorialService {
   }
 
   public async closeTutorial(): Promise<void> {
-    if (!this._tutorial) return;
-    
+    if (!this._tutorial) {
+      return;
+    }
+
     this._tutorial = null;
     this._gitOperations = null;
     await this.stateManager.clearActiveTutorialState();
@@ -164,19 +166,25 @@ export class TutorialService {
   }
 
   public async navigateToNextStep(): Promise<boolean> {
-    if (!this._tutorial || !this._gitOperations) return false;
+    if (!this._tutorial || !this._gitOperations) {
+      return false;
+    }
     return await this.navigationManager.navigateToNext(this._tutorial, this._gitOperations);
   }
 
   public async navigateToPreviousStep(): Promise<boolean> {
-    if (!this._tutorial || !this._gitOperations) return false;
+    if (!this._tutorial || !this._gitOperations) {
+      return false;
+    }
     return await this.navigationManager.navigateToPrevious(this._tutorial, this._gitOperations);
   }
 
   public async isTutorial() {}
 
   public getRestoredOpenTabFsPaths(): string[] | undefined {
-    if (!this._tutorial) return undefined;
+    if (!this._tutorial) {
+      return undefined;
+    }
     return this.stateManager.getRestoredOpenTabFsPaths(this._tutorial);
   }
 
@@ -198,7 +206,9 @@ export class TutorialService {
   }
 
   public async toggleSolution(show?: boolean): Promise<void> {
-    if (!this._tutorial) return;
+    if (!this._tutorial) {
+      return;
+    }
     await this.contentManager.toggleSolution(this._tutorial, show);
   }
 

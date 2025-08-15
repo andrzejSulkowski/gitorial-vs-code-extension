@@ -40,6 +40,10 @@ export const systemStore = {
     case 'error':
       systemState.lastError = message.payload.message;
       break;
+
+    case 'author-mode-changed':
+      systemState.isAuthorMode = message.payload.isActive;
+      break;
     }
   },
 

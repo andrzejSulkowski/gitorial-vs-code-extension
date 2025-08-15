@@ -70,4 +70,12 @@ export interface IFileSystem {
    * @returns The joined path.
    */
   join(path1: string, path2: string): string;
+
+  /**
+   * Calculates the relative path from one path to another.
+   * @param fromPath The starting path.
+   * @param toPath The target path.
+   * @returns The relative path from fromPath to toPath.
+   */
+  relative(fromPath: string, toPath: string): string;
 }

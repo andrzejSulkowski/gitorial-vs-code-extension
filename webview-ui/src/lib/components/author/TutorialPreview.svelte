@@ -51,11 +51,13 @@
     </div>
 
     <div class="preview-controls">
-      <div class="mode-toggle">
+      <div class="mode-toggle" role="radiogroup" aria-label="Preview mode">
         <button 
           class="mode-button"
           class:active={previewMode === 'formatted'}
           onclick={() => previewMode = 'formatted'}
+          role="radio"
+          aria-checked={previewMode === 'formatted'}
         >
           Formatted
         </button>
@@ -63,6 +65,8 @@
           class="mode-button"
           class:active={previewMode === 'raw'}
           onclick={() => previewMode = 'raw'}
+          role="radio"
+          aria-checked={previewMode === 'raw'}
         >
           Raw
         </button>

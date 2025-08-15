@@ -76,6 +76,7 @@
           class="preview-button" 
           class:active={showPreview}
           onclick={handleTogglePreview}
+          aria-pressed={showPreview}
         >
           {showPreview ? 'Hide Preview' : 'Show Preview'}
         </button>

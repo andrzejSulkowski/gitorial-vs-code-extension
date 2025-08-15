@@ -1,6 +1,6 @@
 import { Tutorial } from 'src/domain/models/Tutorial';
 import { DiffModel, DiffChangeType } from '../models/DiffModel';
-import { IGitChanges, DiffFilePayload } from '../../ui/ports/IGitChanges';
+import { IGitChanges } from '../../ui/ports/IGitChanges';
 import { IDiffDisplayer, DiffFile } from 'src/ui/ports/IDiffDisplayer';
 import { IFileSystem } from 'src/domain/ports/IFileSystem';
 
@@ -67,7 +67,7 @@ export class DiffService {
       return changedFiles.map(file => {
         const changeType = file.isNew ? DiffChangeType.ADDED
           : file.isDeleted ? DiffChangeType.DELETED
-          : DiffChangeType.MODIFIED;
+            : DiffChangeType.MODIFIED;
 
         return new DiffModel(
           file.relativeFilePath,

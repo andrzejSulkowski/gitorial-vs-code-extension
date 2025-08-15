@@ -54,6 +54,7 @@ async function main() {
     entryPoints: [
       'src/extension.ts', 
       'src/test/extension.test.ts',
+      'src/test/Tutorial.test.ts',
       'src/test/integration/test-config.ts',
       'src/test/integration/clone-workflow.integration.test.ts',
       'src/test/integration/core-workflows.integration.test.ts',

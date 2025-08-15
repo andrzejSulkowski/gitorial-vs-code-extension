@@ -11,6 +11,7 @@ import simpleGit, {
   TaskOptions,
 } from 'simple-git';
 import * as path from 'path'; //TODO: Remove this import and use IFileSystem instead
+import * as fs from 'fs';
 import { IGitOperations, DefaultLogFields, ListLogLine } from '../../domain/ports/IGitOperations';
 import { IGitChanges, DiffFilePayload } from 'src/ui/ports/IGitChanges';
 
@@ -272,29 +273,30 @@ export class GitAdapter implements IGitOperations, IGitChanges {
    * Checkout a specific commit and clean the working directory
    */
   public async checkoutAndClean(commitHash: string): Promise<void> {
-    // Abort any in-progress operations
-    const abortCommands = [['merge', '--abort'], ['cherry-pick', '--abort'], ['rebase', '--abort']];
-    for (const cmd of abortCommands) {
-      try {
-        await this.git.raw(cmd);
-      } catch {}
-    }
-    
-    try {
-      await this.git.reset(['--merge']);
-    } catch {}
-    
+    console.log(`GitAdapter: Checking out commit ${commitHash} and cleaning...`);
+
+    // Clean up any Git state issues first
+    await this.cleanupGitState();
+
     try {
       await this.git.checkout(commitHash);
+      console.log(`GitAdapter: Successfully checked out ${commitHash}`);
     } catch (error: any) {
-      if (error.message?.includes('Your local changes')) {
+      console.warn('GitAdapter: Initial checkout failed, trying force checkout:', error.message);
+      try {
         await this.git.checkout(['-f', commitHash]);
-      } else {
-        throw error;
+        console.log(`GitAdapter: Force checkout successful for ${commitHash}`);
+      } catch (forceError: any) {
+        console.error('GitAdapter: Force checkout also failed:', forceError.message);
+        throw forceError;
       }
     }
 
+    // Clean working directory
     await this.cleanWorkingDirectory();
+
+    // Ensure final clean state
+    await this.finalizeRepositoryState();
   }
 
   /**
@@ -359,6 +361,69 @@ export class GitAdapter implements IGitOperations, IGitChanges {
     await this.git.raw(['clean', '-f', '-d']);
   }
 
+  /**
+   * Clean up any ongoing Git operations that might be causing conflicts
+   */
+  private async cleanupGitState(): Promise<void> {
+    // Abort any in-progress operations
+    const abortCommands = [
+      ['merge', '--abort'],
+      ['cherry-pick', '--abort'],
+      ['rebase', '--abort'],
+      ['revert', '--abort'],
+    ];
+
+    for (const cmd of abortCommands) {
+      try {
+        await this.git.raw(cmd);
+        console.log(`GitAdapter: Aborted ${cmd[0]} operation`);
+      } catch {
+        // Operation might not be in progress, that's fine
+      }
+    }
+
+    // Reset any staged changes
+    try {
+      await this.git.reset(['--mixed', 'HEAD']);
+    } catch {
+      // HEAD might not exist yet, that's fine
+    }
+
+    // Clean working directory
+    try {
+      await this.cleanWorkingDirectory();
+    } catch {
+      // Directory might already be clean
+    }
+  }
+
+  /**
+   * Finalize the repository state to ensure VS Code's Git extension works correctly
+   */
+  private async finalizeRepositoryState(): Promise<void> {
+    try {
+      console.log('GitAdapter: Finalizing repository state for VS Code compatibility...');
+
+      // Ensure index is clean and matches HEAD
+      await this.git.reset(['--hard', 'HEAD']);
+
+      // Clean any untracked files
+      await this.cleanWorkingDirectory();
+
+      // Refresh Git status to ensure everything is clean
+      const status = await this.git.status();
+      console.log(`GitAdapter: Final repository state - Clean: ${status.isClean()}`);
+
+      // Force Git to recognize the current state by running a safe status check
+      await this.git.raw(['status', '--porcelain']);
+
+      console.log('GitAdapter: Repository state finalized successfully');
+    } catch (error) {
+      console.warn('GitAdapter: Warning during repository state finalization:', error);
+      // Don't throw here as this is cleanup - the main operation succeeded
+    }
+  }
+
   public getAbsolutePath = (relativePath: string): string => path.join(this.repoPath, relativePath);
 
   public async getRepoName(): Promise<string> {
@@ -372,8 +437,10 @@ export class GitAdapter implements IGitOperations, IGitChanges {
   }
 
   public async getChangesInCommit(commitHash: string): Promise<string[]> {
-    if (!commitHash) return [];
-    
+    if (!commitHash) {
+      return [];
+    }
+
     try {
       const diffOutput = await this.git.diff([
         `${commitHash}^`,
@@ -389,50 +456,159 @@ export class GitAdapter implements IGitOperations, IGitChanges {
   }
 
   /**
-   * Simplified synthesis: creates/force-updates local 'gitorial' branch by resetting to first step,
-   * then replaying commits with new messages. For now, we soft reset and commit messages only,
-   * not cherry-picking file contents (stub for full implementation).
+   * Creates/force-updates local 'gitorial' branch by recreating it with commits
+   * in the specified order. This approach completely rebuilds the branch to avoid
+   * any cherry-pick conflicts when commits are reordered.
    */
   public async synthesizeGitorialBranch(steps: Array<{ commit: string; message: string }>): Promise<void> {
-    if (steps.length === 0) return;
+    if (steps.length === 0) {
+      return;
+    }
+
+    console.log('GitAdapter: Starting gitorial branch synthesis with', steps.length, 'steps');
+
+    // Step 0: Clean up any existing Git operations state
+    console.log('GitAdapter: Cleaning up any existing Git state...');
+    await this.cleanupGitState();
+
+    // Step 1: Create a new orphan branch to start clean
+    const tempBranchName = `gitorial-temp-${Date.now()}`;
+    console.log(`GitAdapter: Creating temporary orphan branch: ${tempBranchName}`);
 
     try {
-      await this.ensureGitorialBranch();
-    } catch {
-      await this.git.checkout(['-B', 'gitorial']);
-    }
+      // Create orphan branch (no history)
+      await this.git.checkout(['--orphan', tempBranchName]);
 
-    await this.git.reset(['--hard', steps[0].commit]);
+      // Clean the working directory completely
+      await this.cleanWorkingDirectory();
 
-    for (let i = 0; i < steps.length; i++) {
-      const step = steps[i];
-      
-      if (i === 0) {
-        if (step.message !== await this.getCurrentCommitMessage()) {
-          await this.git.commit(['--amend', '-m', step.message], { '--no-edit': null });
-        }
-      } else {
-        const commitContent = await this.git.show([step.commit, '--name-only']);
-        if (commitContent) {
+      // Remove all files from Git's index
+      try {
+        await this.git.raw(['rm', '-rf', '--cached', '.']);
+      } catch {
+        // Index might be empty, that's fine
+      }
+
+      // Apply each step by extracting the complete file tree from each commit
+      for (let i = 0; i < steps.length; i++) {
+        const step = steps[i];
+        console.log(`GitAdapter: Processing step ${i + 1}/${steps.length}: ${step.commit}`);
+
+        try {
+          // Get all files from this commit
+          const fileList = await this.git.raw(['ls-tree', '-r', '--name-only', step.commit]);
+          const filePaths = fileList.trim().split('\n').filter(path => path.length > 0);
+
+          console.log(`GitAdapter: Found ${filePaths.length} files in commit ${step.commit}`);
+
+          // Extract each file and write it to the working directory
+          for (const filePath of filePaths) {
+            try {
+              const fileContent = await this.getFileContent(step.commit, filePath);
+              const absolutePath = path.join(this.repoPath, filePath);
+
+              // Ensure directory exists
+              const dir = path.dirname(absolutePath);
+              await fs.promises.mkdir(dir, { recursive: true });
+
+              // Write file content
+              await fs.promises.writeFile(absolutePath, fileContent);
+            } catch (fileError) {
+              // Skip files that can't be extracted (e.g., deleted files, binary files)
+              console.warn(`GitAdapter: Could not extract file ${filePath} from ${step.commit}:`, fileError);
+            }
+          }
+
+          // Stage all changes and commit
+          await this.git.add('.');
+          await this.git.commit(step.message);
+          console.log(`GitAdapter: Successfully created commit for step ${i + 1}: ${step.message}`);
+
+        } catch (error) {
+          console.error(`GitAdapter: Error processing step ${i + 1} (${step.commit}):`, error);
+
+          // Create empty commit to maintain step sequence
           await this.git.commit(['-m', step.message], { '--allow-empty': null });
+          console.log(`GitAdapter: Created empty commit as fallback for step ${i + 1}`);
         }
       }
+
+      // Step 2: Replace the gitorial branch with our new branch
+      console.log('GitAdapter: Replacing gitorial branch with synthesized branch');
+
+      // Check out a safe branch first
+      try {
+        await this.git.checkout('main');
+      } catch {
+        // If main doesn't exist, create it from the first step
+        await this.git.checkout(['-B', 'main', steps[0].commit]);
+      }
+
+      // Delete old gitorial branch if it exists
+      try {
+        await this.git.branch(['-D', 'gitorial']);
+      } catch {
+        // Branch might not exist, that's fine
+      }
+
+      // Rename our temp branch to gitorial
+      await this.git.branch(['-m', tempBranchName, 'gitorial']);
+
+      // Check out the new gitorial branch
+      await this.git.checkout('gitorial');
+
+      // Ensure the repository is in a clean state for VS Code
+      await this.finalizeRepositoryState();
+
+      console.log('GitAdapter: Successfully synthesized gitorial branch');
+
+    } catch (error) {
+      console.error('GitAdapter: Error during gitorial branch synthesis:', error);
+
+      // Clean up temp branch if it exists
+      try {
+        // First clean up any Git state issues
+        await this.cleanupGitState();
+
+        // Try to checkout a safe branch
+        try {
+          await this.git.checkout('main');
+        } catch {
+          // If main doesn't exist, checkout the first step
+          try {
+            await this.git.checkout(steps[0].commit);
+          } catch {
+            // Last resort - create a new branch
+            await this.git.checkout(['-B', 'recovery-branch']);
+          }
+        }
+
+        // Delete temp branch
+        await this.git.branch(['-D', tempBranchName]);
+      } catch (cleanupError) {
+        console.warn('GitAdapter: Error during cleanup:', cleanupError);
+      }
+
+      throw new Error(`Failed to synthesize gitorial branch: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
+
 
   private parseNameStatus(
     diffOutput: string,
   ): Array<{ status: string; path: string; oldPath?: string }> {
-    if (!diffOutput) return [];
+    if (!diffOutput) {
+      return [];
+    }
 
     return diffOutput.trim().split('\n')
       .filter(line => line.trim())
       .map(line => {
         const parts = line.split('\t');
         const statusChar = parts[0].trim()[0];
-        
+
         if (statusChar === 'R' || statusChar === 'C') {
-          return parts.length === 3 
+          return parts.length === 3
             ? { status: statusChar, oldPath: parts[1].trim(), path: parts[2].trim() }
             : null;
         } else {
@@ -482,7 +658,9 @@ export class GitAdapter implements IGitOperations, IGitChanges {
       ]);
     } else {
       // For non-initial commits, use git diff --name-status against the parent.
-      if (!parentCommitHash) return [];
+      if (!parentCommitHash) {
+        return [];
+      }
       changedFilesRawOutput = await this.git.raw([
         'diff',
         '--name-status',
@@ -661,7 +839,9 @@ export class GitAdapter implements IGitOperations, IGitChanges {
    * Stage specific files
    */
   public async stageFiles(filePaths: string[]): Promise<void> {
-    if (filePaths.length === 0) return;
+    if (filePaths.length === 0) {
+      return;
+    }
     await this.git.add(filePaths);
   }
 

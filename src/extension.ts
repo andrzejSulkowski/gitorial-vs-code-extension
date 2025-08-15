@@ -165,15 +165,60 @@ async function bootstrapApplication(context: vscode.ExtensionContext) {
   // Create a placeholder webview panel manager first
   let webviewPanelManager: WebviewPanelManager;
 
-  // --- UI Layer Controllers ---
-  const systemController = new SystemController(context, {} as WebviewPanelManager);
+  // Create webview panel manager first
+  webviewPanelManager = new WebviewPanelManager(context.extensionUri, () => {
+    // Placeholder message handler - will be updated after controllers are created
+    console.warn('WebviewPanelManager: Message received before controllers are ready');
+  });
 
-  // Author Mode Controller
+  // Create a temporary message handler that will be replaced later
+  const tempMessageHandler = new WebviewMessageHandler(
+    {
+      handleWebviewMessage: async () => {
+        console.warn('Tutorial message handler not ready yet');
+      },
+    },
+    {
+      handleWebviewMessage: async () => {
+        console.warn('System message handler not ready yet');
+      },
+    },
+    {
+      handleWebviewMessage: async () => {
+        console.warn('Author message handler not ready yet');
+      },
+    },
+  );
+
+  // Set the temporary message handler immediately
+  webviewPanelManager.updateMessageHandler(tempMessageHandler.handleMessage.bind(tempMessageHandler));
+
+  // Create controllers first
+  const systemController = new SystemController(context, webviewPanelManager);
   const authorModeController = new AuthorModeController(
     systemController,
     gitOperationsFactory,
+    activeTutorialStateRepository,
   );
 
+  const tutorialController = new TutorialController(
+    progressReportAdapter,
+    userInteractionAdapter,
+    fileSystemAdapter,
+    tutorialService,
+    autoOpenState,
+    tutorialDisplayService,
+    solutionWorkflow,
+    changeDetector,
+    gitChangesFactory,
+    markdownConverter,
+    webviewPanelManager,
+  );
+
+  // Set the tutorial controller reference in system controller
+  systemController.setTutorialController(tutorialController);
+
+  // Now create the message handlers after all controllers are created
   const tutorialMessageHandler: IWebviewTutorialMessageHandler = {
     handleWebviewMessage: msg => tutorialController.handleWebviewMessage(msg),
   };
@@ -189,26 +234,9 @@ async function bootstrapApplication(context: vscode.ExtensionContext) {
     systemMessageHandler,
     authorMessageHandler,
   );
-  webviewPanelManager = new WebviewPanelManager(context.extensionUri, msg =>
-    webviewMessageHandler.handleMessage(msg),
-  );
 
-  // Update the system controller with the real webview panel manager
-  (systemController as any).webviewPanelManager = webviewPanelManager;
-
-  const tutorialController = new TutorialController(
-    progressReportAdapter,
-    userInteractionAdapter,
-    fileSystemAdapter,
-    tutorialService,
-    autoOpenState,
-    tutorialDisplayService,
-    solutionWorkflow,
-    changeDetector,
-    gitChangesFactory,
-    markdownConverter,
-    webviewPanelManager,
-  );
+  // Update the webview panel manager with the real message handler
+  webviewPanelManager.updateMessageHandler(webviewMessageHandler.handleMessage.bind(webviewMessageHandler));
 
   return {
     tutorialController,

@@ -69,6 +69,16 @@
       default: return 'Ready to publish';
     }
   }
+
+  function handleViewPublishedBranch() {
+    // TODO: Implement view published branch functionality
+    console.log('View published branch clicked');
+  }
+
+  function handleCopyTutorialUrl() {
+    // TODO: Implement copy tutorial URL functionality
+    console.log('Copy tutorial URL clicked');
+  }
 </script>
 
 <div class="publish-panel">
@@ -86,17 +96,17 @@
       <h3>Publishing Configuration</h3>
       
       <div class="config-item">
-        <label>Source Branch:</label>
+        <span class="config-label">Source Branch:</span>
         <code class="branch-name">{manifest.authoringBranch}</code>
       </div>
       
       <div class="config-item">
-        <label>Target Branch:</label>
+        <span class="config-label">Target Branch:</span>
         <code class="branch-name">{manifest.publishBranch}</code>
       </div>
       
       <div class="config-item">
-        <label>Steps to Publish:</label>
+        <span class="config-label">Steps to Publish:</span>
         <span class="step-count">{manifest.steps.length} step{manifest.steps.length !== 1 ? 's' : ''}</span>
       </div>
     </div>
@@ -126,13 +136,15 @@
         <button 
           class="toggle-preview"
           onclick={togglePublishPreview}
+          aria-expanded={showPublishPreview}
+          aria-controls="publish-preview-content"
         >
           {showPublishPreview ? 'Hide' : 'Show'} Details
         </button>
       </div>
 
       {#if showPublishPreview}
-        <div class="preview-content">
+        <div class="preview-content" id="publish-preview-content">
           <p class="preview-description">
             The following commits will be cherry-picked to the <code>{manifest.publishBranch}</code> branch
             with formatted commit messages:
@@ -183,10 +195,10 @@
           Learners can now access the tutorial using the gitorial format.
         </p>
         <div class="success-actions">
-          <button class="action-button secondary">
+          <button class="action-button secondary" onclick={handleViewPublishedBranch}>
             View Published Branch
           </button>
-          <button class="action-button secondary">
+          <button class="action-button secondary" onclick={handleCopyTutorialUrl}>
             Copy Tutorial URL
           </button>
         </div>
@@ -326,7 +338,7 @@
     border-bottom: none;
   }
 
-  .config-item label {
+  .config-item .config-label {
     font-weight: 500;
     color: var(--vscode-foreground);
   }

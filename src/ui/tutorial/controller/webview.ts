@@ -129,6 +129,23 @@ export class Controller {
   }
 
   /**
+   * Force a complete tutorial refresh - bypasses change detection
+   * Use this after operations that fundamentally change the tutorial structure
+   */
+  public async forceRefresh(tutorial: Readonly<Tutorial>): Promise<void> {
+    console.log('WebviewController: Forcing complete tutorial refresh');
+    const vm = this.viewModelConverter.convert(tutorial);
+
+    // Reset internal state to force full update
+    this._resetState();
+    this.isInitialized = true;
+
+    // Send full tutorial data
+    await this._sendFullTutorialUpdate(vm);
+    this.tutorialViewModel = vm;
+  }
+
+  /**
    * Dispose of resources
    */
   public async dispose(): Promise<void> {

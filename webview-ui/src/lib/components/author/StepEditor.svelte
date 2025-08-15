@@ -160,8 +160,8 @@
 
 <svelte:window onkeydown={handleKeydown} />
 
-<div class="modal-backdrop" onclick={handleCancel}>
-  <div class="modal-content" onclick={(e) => e.stopPropagation()}>
+<div class="modal-backdrop" role="presentation">
+  <div class="modal-content" role="document">
     <div class="modal-header">
       <h2>{modalTitle}</h2>
       <button class="close-button" onclick={handleCancel}>×</button>
@@ -216,23 +216,26 @@
       </div>
 
       <!-- Step Type -->
-      <div class="form-group">
-        <label>Step Type</label>
-        <div class="step-type-grid">
+      <fieldset class="form-group">
+        <legend id="step-type-label">Step Type</legend>
+        <div class="step-type-grid" role="radiogroup" aria-labelledby="step-type-label">
           {#each stepTypes as stepType}
             <button
               type="button"
               class="step-type-option"
               class:selected={formData.type === stepType.value}
               onclick={() => handleTypeChange(stepType.value)}
+              role="radio"
+              aria-checked={formData.type === stepType.value}
+              aria-describedby="step-type-description-{stepType.value}"
             >
               <div class="step-type-icon">{stepType.icon}</div>
               <div class="step-type-label">{stepType.label}</div>
-              <div class="step-type-description">{stepType.description}</div>
+              <div class="step-type-description" id="step-type-description-{stepType.value}">{stepType.description}</div>
             </button>
           {/each}
         </div>
-      </div>
+      </fieldset>
 
       <!-- Step Title -->
       <div class="form-group">

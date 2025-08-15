@@ -13,12 +13,20 @@ export interface IWebviewSystemMessageHandler {
  */
 export class SystemController implements IWebviewSystemMessageHandler {
   private readonly extensionContext: vscode.ExtensionContext;
+  private tutorialController: any; // Will be set after TutorialController is created
 
   constructor(
     context: vscode.ExtensionContext,
     private readonly webviewPanelManager: WebviewPanelManager,
   ) {
     this.extensionContext = context;
+  }
+
+  /**
+   * Set the tutorial controller reference after it's created
+   */
+  public setTutorialController(tutorialController: any): void {
+    this.tutorialController = tutorialController;
   }
 
   // ============================================================================
@@ -81,6 +89,11 @@ export class SystemController implements IWebviewSystemMessageHandler {
    */
   public hideLoadingState = (): Promise<void> => this.showLoadingState(false, '');
 
+  /**
+   * Hides the global loading state.
+   */
+  public hideGlobalLoading = (): Promise<void> => this.showLoadingState(false, '');
+
   // ============================================================================
   // Error Handling and User Feedback
   // ============================================================================
@@ -121,11 +134,18 @@ export class SystemController implements IWebviewSystemMessageHandler {
   // ============================================================================
 
   /**
-   * Sets the author mode state.
+   * Sets the author mode state and notifies the webview.
    * @param isActive - Whether author mode should be active
    */
   public async setAuthorMode(isActive: boolean): Promise<void> {
     await this.extensionContext.globalState.update('authorMode', isActive);
+
+    // Send message to webview to update author mode state
+    await this.sendSystemMessage({
+      category: 'system',
+      type: 'author-mode-changed',
+      payload: { isActive },
+    });
   }
 
   /**
@@ -134,7 +154,22 @@ export class SystemController implements IWebviewSystemMessageHandler {
    * @param isEditing - Whether the manifest is being edited
    */
   public async sendAuthorManifest(manifest: AuthorManifestData, isEditing: boolean): Promise<void> {
-    console.log('Author manifest loaded:', { manifest, isEditing });
+    try {
+      await this.webviewPanelManager.sendMessage({
+        category: 'author',
+        type: 'manifestLoaded',
+        payload: {
+          manifest,
+          isEditing,
+        },
+      });
+    } catch (error) {
+      await this.reportError(
+        error instanceof Error ? error : new Error(String(error)),
+        'Sending author manifest to webview',
+        true,
+      );
+    }
   }
 
   /**
@@ -153,7 +188,76 @@ export class SystemController implements IWebviewSystemMessageHandler {
    * @returns The backup manifest data or null if not found
    */
   public getAuthorManifestBackup(repoPath: string): AuthorManifestData | null {
-    return this.extensionContext.globalState.get(`authorManifestBackup_${repoPath}`, null);
+    try {
+      return this.extensionContext.globalState.get(`authorManifestBackup_${repoPath}`, null);
+    } catch (error) {
+      console.error('Failed to retrieve author manifest backup:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Sends publish result information to the webview.
+   * @param success - Whether the publish operation was successful
+   * @param error - Error message if the publish failed
+   * @param publishedCommits - Information about published commits
+   */
+  public async sendPublishResult(
+    success: boolean,
+    error?: string,
+    publishedCommits?: Array<{ originalCommit: string; newCommit: string; stepTitle: string; stepType: string }>,
+  ): Promise<void> {
+    try {
+      await this.webviewPanelManager.sendMessage({
+        category: 'author',
+        type: 'publishResult',
+        payload: {
+          success,
+          error,
+          publishedCommits,
+        },
+      });
+    } catch (error) {
+      await this.reportError(
+        error instanceof Error ? error : new Error(String(error)),
+        'Sending publish result to webview',
+        true,
+      );
+    }
+  }
+
+  /**
+   * Sends validation warnings to the webview.
+   * @param warnings - Array of validation warning messages
+   */
+  public async sendValidationWarnings(warnings: string[]): Promise<void> {
+    try {
+      await this.webviewPanelManager.sendMessage({
+        category: 'author',
+        type: 'validationWarnings',
+        payload: {
+          warnings,
+        },
+      });
+    } catch (error) {
+      await this.reportError(
+        error instanceof Error ? error : new Error(String(error)),
+        'Sending validation warnings to webview',
+        true,
+      );
+    }
+  }
+
+  /**
+   * Force refresh the current tutorial after structural changes (like republishing)
+   */
+  public async forceRefreshTutorial(): Promise<void> {
+    if (this.tutorialController && this.tutorialController.forceRefreshCurrentTutorial) {
+      console.log('SystemController: Requesting tutorial refresh');
+      await this.tutorialController.forceRefreshCurrentTutorial();
+    } else {
+      console.warn('SystemController: Tutorial controller not available for refresh');
+    }
   }
 
   // ============================================================================

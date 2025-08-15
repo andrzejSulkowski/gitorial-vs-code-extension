@@ -1,10 +1,10 @@
 import type { TutorialId } from '../../domain/TutorialId';
-import type { TutorialStepViewModel } from './TutorialStepViewModel';
+import type { TutorialStep } from './TutorialStep';
 
-export interface TutorialViewModel {
+export interface Tutorial {
   id: TutorialId;
   title: string;
-  steps: TutorialStepViewModel[];
+  steps: TutorialStep[];
   currentStep: {
     id: string;
     index: number;

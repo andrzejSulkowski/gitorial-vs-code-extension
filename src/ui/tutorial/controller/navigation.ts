@@ -1,7 +1,7 @@
 import { TutorialService } from '@domain/services/tutorial-service';
 import { IUserInteraction } from '@domain/ports/IUserInteraction';
 import { Tutorial } from '@domain/models/Tutorial';
-import { WebviewToExtensionTutorialMessage } from '@gitorial/shared-types';
+import { UI } from '@gitorial/shared-types';
 
 /**
  * TUTORIAL NAVIGATION CONTROLLER
@@ -90,7 +90,7 @@ export class Controller {
   // === WEBVIEW MESSAGE HANDLING ===
 
   public async handleNavigationMessage(
-    message: WebviewToExtensionTutorialMessage,
+    message: UI.Messages.WebviewToExtensionTutorialMessage,
   ): Promise<boolean> {
     switch (message.type) {
     case 'next-step':

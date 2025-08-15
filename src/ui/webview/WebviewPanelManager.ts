@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { ExtensionToWebviewMessage } from '@gitorial/shared-types';
+import { UI } from '@gitorial/shared-types';
 import { WebViewPanel } from './WebviewPanel';
 
 /**
@@ -18,7 +18,7 @@ export class WebviewPanelManager {
    * Send message to webview panel, creating panel if needed
    * This is the main interface used by WebviewController
    */
-  public async sendMessage(message: ExtensionToWebviewMessage): Promise<void> {
+  public async sendMessage(message: UI.Messages.ExtensionToWebviewMessage): Promise<void> {
     this._ensurePanel();
     this.currentPanel!.sendMessage(message);
   }

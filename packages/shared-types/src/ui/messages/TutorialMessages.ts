@@ -2,11 +2,11 @@
  * Tutorial-related messages between Extension and Webview
  */
 
-import type { TutorialViewModel } from '../viewmodels/TutorialViewModel';
+import type { Tutorial } from '../viewmodels/Tutorial';
 
 // Extension → Webview Tutorial Messages
 export type ExtensionToWebviewTutorialMessage =
-  | { category: 'tutorial'; type: 'data-updated'; payload: TutorialViewModel }
+  | { category: 'tutorial'; type: 'data-updated'; payload: Tutorial }
   | {
       category: 'tutorial';
       type: 'step-changed';

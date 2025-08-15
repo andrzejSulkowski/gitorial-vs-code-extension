@@ -1,8 +1,8 @@
 import { ok, err } from 'neverthrow';
 import { Errors } from './errors';
-import { CommitListRule } from '../types';
+import { Rule } from '../types';
 
-export const ReadmeLastRule: CommitListRule<typeof Errors.ReadmeMustBeLast | typeof Errors.ReadmeMustBeOne> = {
+export const ReadmeLastRule: Rule<typeof Errors.ReadmeMustBeLast | typeof Errors.ReadmeMustBeOne> = {
   errorCodes: [Errors.ReadmeMustBeLast, Errors.ReadmeMustBeOne] as const,
   validate(commits) {
     const readmeIndices: number[] = [];

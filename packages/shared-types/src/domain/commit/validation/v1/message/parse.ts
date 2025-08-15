@@ -1,11 +1,11 @@
 import { err, ok, Result } from 'neverthrow';
 import { MessageErrors } from './errors';
-import { GitorialCommitType, isGitorialCommitType } from '../../../commit';
-import { ValidationError } from '../../types';
+import { isType, Type } from '../../../commit';
+import { Error } from '../../types';
 
-export type ParsedMessage = { type: GitorialCommitType; title: string };
+export type ParsedMessage = { type: Type; title: string };
 
-export const parseMessageV1 = (message: string): Result<ParsedMessage, ValidationError<keyof typeof MessageErrors>> => {
+export const parseMessageV1 = (message: string): Result<ParsedMessage, Error<keyof typeof MessageErrors>> => {
   const idx = message.indexOf(':');
   if (idx <= 0) {
     return err({ code: MessageErrors.ColonNotFound, message: 'commit message must contain a type and a title separated by a colon' });
@@ -15,10 +15,10 @@ export const parseMessageV1 = (message: string): Result<ParsedMessage, Validatio
   if (!title) {
     return err({ code: MessageErrors.EmptyTitle, message: 'commit title must not be empty' });
   }
-  if (!isGitorialCommitType(rawType)) {
+  if (!isType(rawType)) {
     return err({ code: MessageErrors.InvalidCommitType, message: 'unknown commit type' });
   }
-  return ok({ type: rawType as GitorialCommitType, title });
+  return ok({ type: rawType as Type, title });
 };
 
 

@@ -1,8 +1,8 @@
 import { ok, err } from 'neverthrow';
 import { Errors } from './errors';
-import { CommitListRule } from '../types';
+import { Rule } from '../types';
 
-export const TemplateRule: CommitListRule<
+export const TemplateRule: Rule<
   | typeof Errors.TemplateMustBeFollowedBySolution
   | typeof Errors.SolutionMustFollowTemplateOrAction
 > = {

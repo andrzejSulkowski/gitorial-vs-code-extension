@@ -4,7 +4,7 @@ import { WebviewPanelManager } from '@ui/webview/WebviewPanelManager';
 import { IFileSystem } from '@domain/ports/IFileSystem';
 import { TutorialService } from '@domain/services/tutorial-service';
 import { AutoOpenState } from '@infra/state/AutoOpenState';
-import { WebviewToExtensionTutorialMessage } from '@gitorial/shared-types';
+import { UI } from '@gitorial/shared-types';
 import { IWebviewTutorialMessageHandler } from '@ui/webview/WebviewMessageHandler';
 import * as Lifecycle from './lifecycle';
 import * as Navigation from './navigation';
@@ -225,7 +225,7 @@ export class TutorialController implements IWebviewTutorialMessageHandler {
   //
   //
 
-  public async handleWebviewMessage(message: WebviewToExtensionTutorialMessage) {
+  public async handleWebviewMessage(message: UI.Messages.WebviewToExtensionTutorialMessage) {
     if (!this._gitChanges) {
       console.error('TutorialController: No git changes available');
       this.userInteraction.showErrorMessage('No git changes available');

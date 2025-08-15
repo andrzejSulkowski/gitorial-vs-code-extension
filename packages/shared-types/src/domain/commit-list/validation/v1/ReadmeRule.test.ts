@@ -1,12 +1,12 @@
 import { expect } from 'chai';
 import { ReadmeLastRule } from './ReadmeRule';
 import { Errors } from './errors';
-import { GitorialCommit } from '../../../commit/commit';
+import { Base as TCommit } from '../../../commit/commit';
 import { c } from '@gitorial/test-utils';
 
 describe('V1 ReadmeLastRule', () => {
   it('passes when readme is last', () => {
-    const seq: GitorialCommit[] = [
+    const seq: TCommit[] = [
       c('section', 'Intro', ['README.md']),
       c('action', 'Init'),
       c('readme', 'End', ['README.md']),
@@ -16,7 +16,7 @@ describe('V1 ReadmeLastRule', () => {
   });
 
   it('fails when any readme is not last', () => {
-    const seq: GitorialCommit[] = [
+    const seq: TCommit[] = [
       c('section', 'Intro', ['README.md']),
       c('readme', 'Mid', ['README.md']),
       c('action', 'After'),
@@ -28,7 +28,7 @@ describe('V1 ReadmeLastRule', () => {
   });
 
   it('fails when readme is missing', () => {
-    const seq: GitorialCommit[] = [
+    const seq: TCommit[] = [
       c('section', 'Intro', ['README.md']),
       c('action', 'Next'),
     ];
@@ -39,7 +39,7 @@ describe('V1 ReadmeLastRule', () => {
   });
 
   it('fails when multiple readme commits exist', () => {
-    const seq: GitorialCommit[] = [
+    const seq: TCommit[] = [
       c('section', 'Intro', ['README.md']),
       c('readme', 'Mid', ['README.md']),
       c('readme', 'End', ['README.md']),

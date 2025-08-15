@@ -1,13 +1,13 @@
-import { GitorialCommit } from '../../commit';
+import { Base } from '../../commit';
 import { Result } from 'neverthrow';
 
-export type ListValidationError<TCode extends string = string> = {
+export type Error<TCode extends string = string> = {
     index: number;
     code: TCode;
     message: string;
 };
 
-export interface CommitListRule<TCode extends string> {
+export interface Rule<TCode extends string> {
     readonly errorCodes: readonly TCode[];
-    validate(commits: ReadonlyArray<GitorialCommit>): Result<void, ListValidationError<TCode>>;
+    validate(commits: ReadonlyArray<Base>): Result<void, Error<TCode>>;
 }

@@ -1,3 +1,3 @@
-import { GitorialCommit } from '../commit/commit';
+import { Base as CommitBase } from '../commit/commit';
 
-export type CommitList = Array<GitorialCommit>
+export type Base = Array<CommitBase>

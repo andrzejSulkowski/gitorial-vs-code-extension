@@ -1,4 +1,4 @@
-import type { ExtensionToWebviewSystemMessage } from '@gitorial/shared-types';
+import type { UI } from '@gitorial/shared-types';
 import { sendMessage } from '../utils/messaging';
 
 interface SystemState {
@@ -21,7 +21,7 @@ export const systemStore = {
     return systemState.lastError;
   },
 
-  handleMessage(message: ExtensionToWebviewSystemMessage) {
+  handleMessage(message: UI.Messages.ExtensionToWebviewSystemMessage) {
     console.log('SystemStore: Received message:', message);
     switch (message.type) {
     case 'loading-state':

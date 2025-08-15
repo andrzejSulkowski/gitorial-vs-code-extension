@@ -1,4 +1,4 @@
-import type { ExtensionToWebviewMessage } from '@gitorial/shared-types';
+import type { UI } from '@gitorial/shared-types';
 import { tutorialStore } from './tutorialStore.svelte';
 import { systemStore } from './systemStore.svelte';
 
@@ -6,7 +6,7 @@ export { sendMessage } from '../utils/messaging';
 
 export function createMessageRouter() {
   return {
-    handleMessage(message: ExtensionToWebviewMessage) {
+    handleMessage(message: UI.Messages.ExtensionToWebviewMessage) {
       if (message.category === 'tutorial') {
         tutorialStore.handleMessage(message);
       } else if (message.category === 'system') {

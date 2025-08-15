@@ -1,10 +1,5 @@
 import { Tutorial } from '@domain/models/Tutorial';
-import {
-  TutorialViewModel,
-  ExtensionToWebviewTutorialMessage,
-  ExtensionToWebviewSystemMessage,
-  WebviewToExtensionTutorialMessage,
-} from '@gitorial/shared-types';
+import { UI } from '@gitorial/shared-types';
 import { TutorialViewModelConverter } from '@domain/converters/TutorialViewModelConverter';
 import { WebviewPanelManager } from '@ui/webview/WebviewPanelManager';
 import { IWebviewTutorialMessageHandler } from '@ui/webview/WebviewMessageHandler';
@@ -33,7 +28,7 @@ interface ChangeAnalysis {
  * - Self-contained: Manages its own state and message creation logic
  */
 export class Controller {
-  private tutorialViewModel: TutorialViewModel | undefined;
+  private tutorialViewModel: UI.ViewModels.Tutorial | undefined;
   private isInitialized: boolean = false;
 
   constructor(
@@ -46,7 +41,7 @@ export class Controller {
    * Initialize webview with tutorial (first time only)
    * Always sends complete tutorial data
    */
-  public async initialize(tutorial: Readonly<TutorialViewModel>): Promise<void> {
+  public async initialize(tutorial: Readonly<UI.ViewModels.Tutorial>): Promise<void> {
     console.log(`WebviewController: Initializing with tutorial ${tutorial.id}`);
 
     this.tutorialViewModel = tutorial;
@@ -92,7 +87,7 @@ export class Controller {
    * Show loading state with optional message
    */
   public async showLoading(message: string = 'Loading tutorial...'): Promise<void> {
-    const systemMessage: ExtensionToWebviewSystemMessage = {
+    const systemMessage: UI.Messages.ExtensionToWebviewSystemMessage = {
       category: 'system',
       type: 'loading-state',
       payload: { isLoading: true, message },
@@ -105,7 +100,7 @@ export class Controller {
    * Hide loading state
    */
   public async hideLoading(): Promise<void> {
-    const systemMessage: ExtensionToWebviewSystemMessage = {
+    const systemMessage: UI.Messages.ExtensionToWebviewSystemMessage = {
       category: 'system',
       type: 'loading-state',
       payload: { isLoading: false, message: '' },
@@ -117,7 +112,7 @@ export class Controller {
   /**
    * Handle incoming webview messages
    */
-  public async handleWebviewMessage(message: WebviewToExtensionTutorialMessage): Promise<void> {
+  public async handleWebviewMessage(message: UI.Messages.WebviewToExtensionTutorialMessage): Promise<void> {
     this.webviewMessageHandler.handleWebviewMessage(message);
   }
 
@@ -142,7 +137,7 @@ export class Controller {
    * Analyzes what has changed between current and new state
    * Returns a ChangeAnalysis object indicating which aspects have changed.
    */
-  private _analyzeChanges(tutorial: Readonly<TutorialViewModel>): ChangeAnalysis {
+  private _analyzeChanges(tutorial: Readonly<UI.ViewModels.Tutorial>): ChangeAnalysis {
     const prev = this.tutorialViewModel;
     const curr = tutorial;
 
@@ -169,7 +164,7 @@ export class Controller {
   /**
    * Handle complete tutorial change (different tutorial loaded)
    */
-  private async _handleTutorialChange(tutorial: Readonly<TutorialViewModel>): Promise<void> {
+  private async _handleTutorialChange(tutorial: Readonly<UI.ViewModels.Tutorial>): Promise<void> {
     console.log(
       `WebviewController: Tutorial changed from ${this.tutorialViewModel?.id} to ${tutorial.id}`,
     );
@@ -179,13 +174,13 @@ export class Controller {
   /**
    * Handle step change within same tutorial
    */
-  private async _handleStepChange(tutorial: Readonly<TutorialViewModel>): Promise<void> {
+  private async _handleStepChange(tutorial: Readonly<UI.ViewModels.Tutorial>): Promise<void> {
     const htmlContent = tutorial.steps[tutorial.currentStep.index].htmlContent;
     if (!htmlContent) {
       throw new Error('Step change detected but no html content found');
     }
 
-    const message: ExtensionToWebviewTutorialMessage = {
+    const message: UI.Messages.ExtensionToWebviewTutorialMessage = {
       category: 'tutorial',
       type: 'step-changed',
       payload: { stepIndex: tutorial.currentStep.index, htmlContent },
@@ -197,11 +192,11 @@ export class Controller {
   /**
    * Handle solution state toggle
    */
-  private async _handleSolutionToggle(tutorial: Readonly<TutorialViewModel>): Promise<void> {
+  private async _handleSolutionToggle(tutorial: Readonly<UI.ViewModels.Tutorial>): Promise<void> {
     const isShowingSolution = tutorial.isShowingSolution;
     console.log(`WebviewController: Solution toggled to ${isShowingSolution}`);
 
-    const message: ExtensionToWebviewTutorialMessage = {
+    const message: UI.Messages.ExtensionToWebviewTutorialMessage = {
       category: 'tutorial',
       type: 'solution-toggled',
       payload: { isShowingSolution },
@@ -210,13 +205,13 @@ export class Controller {
     await this.webviewPanelManager.sendMessage(message);
   }
 
-  private async _handleContentChange(tutorial: Readonly<TutorialViewModel>): Promise<void> {
+  private async _handleContentChange(tutorial: Readonly<UI.ViewModels.Tutorial>): Promise<void> {
     const htmlContent = tutorial.steps[tutorial.currentStep.index].htmlContent;
     if (!htmlContent) {
       throw new Error('Content change detected but no html content found');
     }
 
-    const message: ExtensionToWebviewTutorialMessage = {
+    const message: UI.Messages.ExtensionToWebviewTutorialMessage = {
       category: 'tutorial',
       type: 'data-updated',
       payload: tutorial,
@@ -228,7 +223,7 @@ export class Controller {
   /**
    * Handle full tutorial update (complete data refresh)
    */
-  private async _handleFullUpdate(tutorial: Readonly<TutorialViewModel>): Promise<void> {
+  private async _handleFullUpdate(tutorial: Readonly<UI.ViewModels.Tutorial>): Promise<void> {
     await this._sendFullTutorialUpdate(tutorial);
     this.tutorialViewModel = tutorial;
   }
@@ -236,8 +231,8 @@ export class Controller {
   /**
    * Send complete tutorial data to webview
    */
-  private async _sendFullTutorialUpdate(tutorial: Readonly<TutorialViewModel>): Promise<void> {
-    const message: ExtensionToWebviewTutorialMessage = {
+  private async _sendFullTutorialUpdate(tutorial: Readonly<UI.ViewModels.Tutorial>): Promise<void> {
+    const message: UI.Messages.ExtensionToWebviewTutorialMessage = {
       category: 'tutorial',
       type: 'data-updated',
       payload: tutorial,
@@ -249,7 +244,7 @@ export class Controller {
   /**
    * Update internal state after successful operations
    */
-  private _updateInternalState(tutorial: Readonly<TutorialViewModel>): void {
+  private _updateInternalState(tutorial: Readonly<UI.ViewModels.Tutorial>): void {
     this.tutorialViewModel = tutorial;
   }
 

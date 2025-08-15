@@ -1,7 +1,7 @@
 import { TutorialViewModelConverter } from '@domain/converters/TutorialViewModelConverter';
 import { DiffService } from './DiffService';
 import { Tutorial } from '@domain/models/Tutorial';
-import { TutorialViewModel } from '@gitorial/shared-types';
+import { UI } from '@gitorial/shared-types';
 import { IGitChanges } from '@ui/ports/IGitChanges';
 import {
   TutorialChangeDetector,
@@ -9,7 +9,7 @@ import {
 } from '@domain/utils/TutorialChangeDetector';
 
 export type TutorialDisplayResult = {
-  viewModel: TutorialViewModel;
+  viewModel: UI.ViewModels.Tutorial;
   filesToDisplay: string[];
 };
 
@@ -45,8 +45,8 @@ export class TutorialDisplayService {
   }
 
   public async detectDisplayChanges(
-    current: TutorialViewModel,
-    previous: TutorialViewModel,
+    current: UI.ViewModels.Tutorial,
+    previous: UI.ViewModels.Tutorial,
   ): Promise<TutorialViewChangeType> {
     return this.changeDetector.detectChange(current, previous);
   }

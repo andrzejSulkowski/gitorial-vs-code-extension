@@ -1,4 +1,4 @@
-import { HTML } from '@gitorial/shared-types';
+import { UI } from '@gitorial/shared-types';
 import { Markdown } from '../../domain/models/Markdown';
 
 /**
@@ -10,5 +10,5 @@ export interface IMarkdownConverter {
    * @param markdown - The markdown source, e.g. "# Hello".
    * @returns a safe HTML string, e.g. "<h1>Hello</h1>".
    */
-  render(markdown: Markdown): HTML;
+  render(markdown: Markdown): UI.ViewModels.HTML;
 }

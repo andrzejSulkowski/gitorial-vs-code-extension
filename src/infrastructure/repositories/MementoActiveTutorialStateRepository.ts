@@ -3,7 +3,7 @@ import {
   StoredTutorialState,
 } from '../../domain/repositories/IActiveTutorialStateRepository';
 import { IStateStorage } from '../../domain/ports/IStateStorage';
-import { TutorialId } from '@gitorial/shared-types';
+import { Domain } from '@gitorial/shared-types';
 
 const ACTIVE_TUTORIAL_STATE_KEY = 'gitorial:activeTutorialInfo';
 
@@ -11,7 +11,7 @@ export class MementoActiveTutorialStateRepository implements IActiveTutorialStat
   constructor(private readonly workspaceState: IStateStorage) {}
 
   async saveActiveTutorial(
-    tutorialId: TutorialId,
+    tutorialId: Domain.TutorialId,
     currentStepId: string,
     openFileUris: string[],
   ): Promise<void> {

@@ -1,32 +1,32 @@
-import { GitorialCommit } from '../../commit';
+import { Base } from '../../commit';
 import { parseMessageV1 } from './message/parse';
-import { RulesByType } from './index';
+import { V1 } from './index';
 import { Result, err, ok } from 'neverthrow';
-import { ValidationError } from '../types';
+import { Error } from '../types';
 import { Errors } from './errors';
 
-export const CommitValidationV1 = {
+export const Validator = {
   parseMessage: parseMessageV1,
-  validateContent(commit: Readonly<GitorialCommit>) {
-    return RulesByType[commit.type].validate(commit);
+  validateContent(commit: Readonly<Base>) {
+    return V1.RulesByType[commit.type].validate(commit);
   },
   buildCommitFromMessage(
     message: string,
     changedFiles: ReadonlyArray<string>,
     toDoComments: ReadonlyArray<{ filePath: string; lines: ReadonlyArray<number> }>,
-  ): Result<GitorialCommit, ValidationError<keyof typeof Errors>> {
+  ): Result<Base, Error<keyof typeof Errors>> {
     const parsed = parseMessageV1(message);
     if (parsed.isErr()) {
       return err(parsed.error);
     }
     const { type, title } = parsed._unsafeUnwrap();
-    const commit: GitorialCommit = {
+    const commit: Base = {
       type,
       title,
       changedFiles: [...changedFiles],
       toDoComments: toDoComments.map(t => ({ filePath: t.filePath, lines: [...t.lines] })),
     };
-    const content = RulesByType[type].validate(commit);
+    const content = V1.RulesByType[type].validate(commit);
     if (content.isErr()) {
       return err(content.error);
     }

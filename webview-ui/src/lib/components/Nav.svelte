@@ -1,10 +1,10 @@
 <script lang="ts">
   import Button from './Button.svelte';
-  import type { StepType } from '@gitorial/shared-types';
+  import type { Domain } from '@gitorial/shared-types';
   import { tutorialStore } from '../stores/tutorialStore.svelte';
 
   interface Props {
-    stepType: StepType;
+    stepType: Domain.StepType;
     isShowingSolution: boolean;
     hasNext: boolean;
     hasPrev: boolean;

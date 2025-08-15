@@ -1,5 +1,5 @@
 import { Tutorial } from '../../domain/models/Tutorial';
-import { TutorialViewModel, TutorialStepViewModel } from '@gitorial/shared-types';
+import { UI } from '@gitorial/shared-types';
 import { EnrichedStep } from '../../domain/models/EnrichedStep';
 import { IMarkdownConverter } from '../../ui/ports/IMarkdownConverter';
 
@@ -12,11 +12,11 @@ export class TutorialViewModelConverter {
   /**
    * Converts a tutorial to its view model representation
    */
-  convert(tutorial: Readonly<Tutorial>): TutorialViewModel {
+  convert(tutorial: Readonly<Tutorial>): UI.ViewModels.Tutorial {
     const currentStepId = tutorial.activeStep.id;
     const currentStepIndex = tutorial.activeStep.index;
 
-    const stepsViewModel: TutorialStepViewModel[] = tutorial.steps.map(step => {
+    const stepsViewModel: UI.ViewModels.TutorialStep[] = tutorial.steps.map(step => {
       let stepHtmlContent: string | undefined = undefined;
       if (step.id === currentStepId && step instanceof EnrichedStep) {
         stepHtmlContent = this.markdownConverter.render(step.markdown);

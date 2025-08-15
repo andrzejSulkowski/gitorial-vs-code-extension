@@ -1,8 +1,8 @@
 import { err, ok } from 'neverthrow';
 import { Errors } from '../../../commit-list/validation/v1/errors';
-import { CommitRule } from '../types';
+import { Rule } from '../types';
 
-export const SectionContentRule: CommitRule<
+export const SectionContentRule: Rule<
   typeof Errors.SectionMustChangeReadmeOnly | typeof Errors.SectionMustChangeReadme
 > = {
   errorCodes: [Errors.SectionMustChangeReadmeOnly, Errors.SectionMustChangeReadme] as const,

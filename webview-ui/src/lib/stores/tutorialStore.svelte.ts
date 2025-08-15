@@ -1,13 +1,9 @@
-import type {
-  TutorialViewModel,
-  TutorialStepViewModel,
-  ExtensionToWebviewTutorialMessage,
-} from '@gitorial/shared-types';
+import type { UI } from '@gitorial/shared-types';
 import { sendMessage } from '../utils/messaging';
 
 interface TutorialState {
-  tutorial: TutorialViewModel | null;
-  currentStep: TutorialStepViewModel | null;
+  tutorial: UI.ViewModels.Tutorial | null;
+  currentStep: UI.ViewModels.TutorialStep | null;
   isLoading: boolean;
   error: string | null;
 }
@@ -35,7 +31,7 @@ export const tutorialStore = {
     return tutorialState.error;
   },
 
-  handleMessage(message: ExtensionToWebviewTutorialMessage) {
+  handleMessage(message: UI.Messages.ExtensionToWebviewTutorialMessage) {
     console.log('TutorialStore: Received message:', message);
     switch (message.type) {
     case 'data-updated':

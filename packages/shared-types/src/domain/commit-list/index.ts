@@ -1,3 +1,3 @@
+export * as Validation from './validation/types';
+export { V1 } from './validation/v1';
 export * from './commit-list';
-export * from './validation/v1';
-export * from './validation/types';

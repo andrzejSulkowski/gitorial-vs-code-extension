@@ -1,4 +1,4 @@
-import { TutorialViewModel } from '@gitorial/shared-types';
+import type { UI } from '@gitorial/shared-types';
 
 /**
  * Enum representing the type of change detected between tutorial states
@@ -18,8 +18,8 @@ export class TutorialChangeDetector {
    * Detects the type of change between two tutorial view models
    */
   detectChange(
-    newViewModel: TutorialViewModel,
-    oldViewModel: TutorialViewModel | null,
+    newViewModel: UI.ViewModels.Tutorial,
+    oldViewModel: UI.ViewModels.Tutorial | null,
   ): TutorialViewChangeType {
     if (!oldViewModel) {
       return TutorialViewChangeType.None;

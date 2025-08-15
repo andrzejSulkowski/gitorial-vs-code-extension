@@ -7,12 +7,7 @@ import * as vscode from 'vscode';
 import { Uri } from 'vscode';
 import path from 'node:path';
 import fs from 'fs';
-import {
-  TutorialViewModel,
-  ExtensionToWebviewTutorialMessage,
-  ExtensionToWebviewSystemMessage,
-  ExtensionToWebviewMessage,
-} from '@gitorial/shared-types';
+import { UI } from '@gitorial/shared-types';
 
 function getNonce() {
   let text = '';
@@ -54,8 +49,8 @@ export class WebViewPanel {
   /**
    * @deprecated Use sendMessage instead
    */
-  public updateTutorial(tutorial: TutorialViewModel): void {
-    const message: ExtensionToWebviewTutorialMessage = {
+  public updateTutorial(tutorial: UI.ViewModels.Tutorial): void {
+    const message: UI.Messages.ExtensionToWebviewTutorialMessage = {
       category: 'tutorial',
       type: 'data-updated',
       payload: tutorial,
@@ -63,21 +58,21 @@ export class WebViewPanel {
     this.panel.webview.postMessage(message);
   }
 
-  public async sendMessage(msg: ExtensionToWebviewMessage): Promise<void> {
+  public async sendMessage(msg: UI.Messages.ExtensionToWebviewMessage): Promise<void> {
     await this.panel.webview.postMessage(msg);
   }
 
   /**
    * @deprecated Use sendMessage instead
    */
-  public sendTutorialMessage(message: ExtensionToWebviewTutorialMessage): void {
+  public sendTutorialMessage(message: UI.Messages.ExtensionToWebviewTutorialMessage): void {
     this.panel.webview.postMessage(message);
   }
 
   /**
    * @deprecated Use sendMessage instead
    */
-  public sendSystemMessage(message: ExtensionToWebviewSystemMessage): void {
+  public sendSystemMessage(message: UI.Messages.ExtensionToWebviewSystemMessage): void {
     this.panel.webview.postMessage(message);
   }
 
@@ -175,7 +170,7 @@ export class WebViewPanel {
   }
 
   private _showLoadingState(): void {
-    const message: ExtensionToWebviewSystemMessage = {
+    const message: UI.Messages.ExtensionToWebviewSystemMessage = {
       category: 'system',
       type: 'loading-state',
       payload: { isLoading: true, message: 'Loading...' },
@@ -184,7 +179,7 @@ export class WebViewPanel {
   }
 
   private _hideLoadingState(): void {
-    const message: ExtensionToWebviewSystemMessage = {
+    const message: UI.Messages.ExtensionToWebviewSystemMessage = {
       category: 'system',
       type: 'loading-state',
       payload: { isLoading: false, message: 'Done!' },

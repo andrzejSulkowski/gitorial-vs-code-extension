@@ -1,7 +1,4 @@
-import {
-  WebviewToExtensionSystemMessage,
-  ExtensionToWebviewSystemMessage,
-} from '@gitorial/shared-types';
+import { UI } from '@gitorial/shared-types';
 import { IWebviewSystemMessageHandler } from '../webview/WebviewMessageHandler';
 import * as vscode from 'vscode';
 import { WebviewPanelManager } from '@ui/webview/WebviewPanelManager';
@@ -63,7 +60,7 @@ export class SystemController implements IWebviewSystemMessageHandler {
    */
   public async showGlobalLoading(message: string): Promise<void> {
     if (this.webviewPanelManager) {
-      const systemMessage: ExtensionToWebviewSystemMessage = {
+      const systemMessage: UI.Messages.ExtensionToWebviewSystemMessage = {
         category: 'system',
         type: 'loading-state',
         payload: { isLoading: true, message },
@@ -77,7 +74,7 @@ export class SystemController implements IWebviewSystemMessageHandler {
    */
   public async hideGlobalLoading(): Promise<void> {
     if (this.webviewPanelManager) {
-      const systemMessage: ExtensionToWebviewSystemMessage = {
+      const systemMessage: UI.Messages.ExtensionToWebviewSystemMessage = {
         category: 'system',
         type: 'loading-state',
         payload: { isLoading: false, message: '' },
@@ -147,7 +144,7 @@ export class SystemController implements IWebviewSystemMessageHandler {
 
   // ============ WEBVIEW MESSAGE HANDLING ============
 
-  public async handleWebviewMessage(message: WebviewToExtensionSystemMessage): Promise<void> {
+  public async handleWebviewMessage(message: UI.Messages.WebviewToExtensionSystemMessage): Promise<void> {
     console.log('SystemController: Received webview message', message);
 
     switch (message.type) {
@@ -181,7 +178,7 @@ export class SystemController implements IWebviewSystemMessageHandler {
 
   private async _notifyWebviewError(errorMessage: string): Promise<void> {
     if (this.webviewPanelManager) {
-      const systemMessage: ExtensionToWebviewSystemMessage = {
+      const systemMessage: UI.Messages.ExtensionToWebviewSystemMessage = {
         category: 'system',
         type: 'error',
         payload: { message: errorMessage },

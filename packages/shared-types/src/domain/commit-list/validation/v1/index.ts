@@ -3,9 +3,9 @@ import { ReadmeLastRule } from './ReadmeRule';
 import { ActionRule } from './ActionRule';
 import { SectionRule } from './SectionRule';
 import { Errors } from './errors';
-import { CommitListRule } from '../types';
+import { Rule } from '../types';
 
-export const Rules: CommitListRule<keyof typeof Errors>[] = [
+const Rules: Rule<keyof typeof Errors>[] = [
   TemplateRule,
   SectionRule,
   ActionRule,
@@ -16,3 +16,4 @@ export const V1 = {
   Rules,
   Errors,
 };
+

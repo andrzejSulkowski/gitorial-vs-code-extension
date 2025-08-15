@@ -1,7 +1,7 @@
 import MarkdownIt from 'markdown-it';
 import { IMarkdownConverter } from '../../ui/ports/IMarkdownConverter';
 import { Markdown } from '../../domain/models/Markdown';
-import { HTML } from '@gitorial/shared-types';
+import type { UI } from '@gitorial/shared-types';
 
 export class MarkdownItConverter implements IMarkdownConverter {
   private md: MarkdownIt;
@@ -10,8 +10,8 @@ export class MarkdownItConverter implements IMarkdownConverter {
     this.md = new MarkdownIt();
   }
 
-  render(markdown: Markdown): HTML {
-    return this.md.render(markdown) as HTML;
+  render(markdown: Markdown): UI.ViewModels.HTML {
+    return this.md.render(markdown) as UI.ViewModels.HTML;
   }
 }
 

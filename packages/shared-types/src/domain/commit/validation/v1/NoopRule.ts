@@ -1,7 +1,7 @@
 import { ok } from 'neverthrow';
-import { CommitRule } from '../types';
+import { Rule } from '../types';
 
-export const NoopRule: CommitRule<never> = {
+export const NoopRule: Rule<never> = {
   errorCodes: [] as const,
   validate() {
     return ok(void 0);

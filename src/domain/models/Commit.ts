@@ -1,32 +1,47 @@
-import * as SharedTypes from '@gitorial/shared-types';
 import { Result, err, ok } from 'neverthrow';
+import { Domain } from '@gitorial/shared-types';
 
-type CommitSchemaError = SharedTypes.ValidationError<string>;
+type TCommitError<T extends string> = Domain.Commit.Validation.Error<T>;
+type TCommit = Domain.Commit.Base;
+type TCommitType = Domain.Commit.Type;
+type TToDoComment = Domain.Commit.ToDoComment;
 
-export class GitorialCommit {
-  private data: SharedTypes.GitorialCommit;
-  private constructor(type: SharedTypes.GitorialCommitType, title: string, changedFiles: Array<string>, toDoComments: Array<SharedTypes.ToDoComment>){
-    this.data = { type, title, changedFiles, toDoComments: toDoComments };
+export class Commit {
+  private _data: TCommit;
+  private constructor(type: TCommitType, title: string, changedFiles: Array<string>, toDoComments: Array<TToDoComment>){
+    this._data = { type, title, changedFiles, toDoComments: toDoComments };
   }
 
-  public static new(message: string, changedFiles: Array<string>, toDoComments: Array<SharedTypes.ToDoComment>): Result<GitorialCommit, CommitSchemaError> {
-    return GitorialCommit.validate(message, changedFiles, toDoComments);
+  public static new(message: string, changedFiles: Array<string>, toDoComments: Array<TToDoComment>): Result<Commit, TCommitError<string>> {
+    return Commit.validate(message, changedFiles, toDoComments);
+  }
+
+  public static newWithType(type: TCommitType, title: string, changedFiles: Array<string>, toDoComments: Array<TToDoComment>): Result<Commit, TCommitError<string>> {
+    return ok(new Commit(type, title, changedFiles, toDoComments));
+  }
+
+  public static newFromObject(data: TCommit): Result<Commit, TCommitError<string>> {
+    return ok(new Commit(data.type, data.title, data.changedFiles, data.toDoComments));
   }
 
   private static validate(
     message: string,
     changedFiles: Array<string>,
-    toDoComments: Array<SharedTypes.ToDoComment>,
-  ): Result<GitorialCommit, CommitSchemaError> {
-    const built = SharedTypes.CommitValidationV1.buildCommitFromMessage(message, changedFiles, toDoComments);
+    toDoComments: Array<TToDoComment>,
+  ): Result<Commit, TCommitError<string>> {
+    const built = Domain.Commit.V1.Validator.buildCommitFromMessage(message, changedFiles, toDoComments);
     if (built.isErr()) {
       return err(built.error);
     }
     const { type, title } = built._unsafeUnwrap();
-    return ok(new GitorialCommit(type, title, changedFiles, toDoComments));
+    return ok(new Commit(type, title, changedFiles, toDoComments));
   }
 
   public toString(): string {
     return `${this.data.type}: ${this.data.title}`;
+  }
+
+  public get data(): Readonly<TCommit> {
+    return this._data;
   }
 }

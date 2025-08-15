@@ -6,7 +6,7 @@ import { TutorialDisplayService } from '@domain/services/TutorialDisplayService'
 import * as vscode from 'vscode';
 import { IGitChanges } from '@ui/ports/IGitChanges';
 import { TutorialSolutionWorkflow } from '../TutorialSolutionWorkflow';
-import { TutorialViewModel } from '@gitorial/shared-types';
+import { UI } from '@gitorial/shared-types';
 import {
   TutorialChangeDetector,
   TutorialViewChangeType,
@@ -66,7 +66,7 @@ import {
 
 export class Controller {
   private readonly editorManager: EditorManager;
-  private _lastViewModel: TutorialViewModel | null = null;
+  private _lastViewModel: UI.ViewModels.Tutorial | null = null;
 
   constructor(
     private readonly fs: IFileSystem,
@@ -106,7 +106,7 @@ export class Controller {
   private async _handleDisplayChanges(
     step: Step,
     tutorial: Readonly<Tutorial>,
-    viewModel: TutorialViewModel,
+    viewModel: UI.ViewModels.Tutorial,
     gitChanges: IGitChanges,
   ): Promise<void> {
     if (!this._lastViewModel) {

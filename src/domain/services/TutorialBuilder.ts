@@ -6,10 +6,9 @@
 import * as path from 'path';
 import { Tutorial, TutorialData } from '../models/Tutorial';
 import { GitService } from './GitService';
-import { TutorialId } from '@gitorial/shared-types';
+import { Domain } from '@gitorial/shared-types';
 import { DomainCommit } from '../ports/IGitOperations';
 import { Step } from '../models/Step';
-import { StepType, StepData } from '@gitorial/shared-types';
 
 /**
  * Constructs Tutorial domain objects from raw data (e.g., repository information,
@@ -69,9 +68,9 @@ export class TutorialBuilder {
   /**
    * Generate a tutorial ID from a repository URL
    */
-  public static generateTutorialId(owner: string, repo: string): TutorialId {
+  public static generateTutorialId(owner: string, repo: string): Domain.TutorialId {
     const identifier = `${owner}/${repo}`;
-    return identifier as TutorialId;
+    return identifier as Domain.TutorialId;
   }
 
   /**
@@ -138,10 +137,10 @@ export class TutorialBuilder {
   /**
    * Converts raw commit data (from IGitOperations) into Step domain models.
    */
-  public static extractStepsFromCommits(commits: DomainCommit[], tutorialId: TutorialId): Step[] {
+  public static extractStepsFromCommits(commits: DomainCommit[], tutorialId: Domain.TutorialId): Step[] {
     const chronologicalCommits = [...commits].reverse();
     const steps: Step[] = [];
-    const validTypes: ReadonlyArray<StepType> = ['section', 'template', 'solution', 'action'];
+    const validTypes: ReadonlyArray<Domain.StepType> = ['section', 'template', 'solution', 'action'];
 
     let relevantCommits = chronologicalCommits;
     if (
@@ -154,13 +153,13 @@ export class TutorialBuilder {
     relevantCommits.forEach((commit, index) => {
       const message = commit.message.trim();
       const colonIndex = message.indexOf(':');
-      let stepType: StepType;
+      let stepType: Domain.StepType;
       let stepTitle = message;
 
       if (colonIndex > 0) {
         const parsedType = message.substring(0, colonIndex).toLowerCase();
-        if (validTypes.includes(parsedType as StepType)) {
-          stepType = parsedType as StepType;
+        if (validTypes.includes(parsedType as Domain.StepType)) {
+          stepType = parsedType as Domain.StepType;
           stepTitle = message.substring(colonIndex + 1).trim();
         } else {
           throw new Error(
@@ -171,11 +170,11 @@ export class TutorialBuilder {
         throw new Error(`TutorialBuilder: Commit message "${message}" missing type prefix.`);
       }
 
-      const stepData: StepData = {
+      const stepData: Domain.StepData = {
         id: `${tutorialId}-step-${index + 1}-${commit.hash.substring(0, 7)}`,
         title: stepTitle || 'Unnamed Step',
         commitHash: commit.hash,
-        type: stepType,
+        type: stepType as Domain.StepType,
         index: index,
       };
       steps.push(new Step(stepData));

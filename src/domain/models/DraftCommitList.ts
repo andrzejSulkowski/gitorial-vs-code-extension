@@ -1,6 +1,12 @@
-import * as Shared from '@gitorial/shared-types';
-import { CommitList } from './CommitList';
 import { Result, err, ok } from 'neverthrow';
+import { Domain } from '@gitorial/shared-types';
+import { CommitList } from './CommitList';
+import { Commit } from './Commit';
+
+type TCommitListRule<T extends string> = Domain.CommitList.Validation.Rule<T>
+type TListValidationError<T extends string> = Domain.CommitList.Validation.Error<T>
+type TCommit = Domain.Commit.Base;
+type TCommitError<T extends string> = Domain.Commit.Validation.Error<T>;
 
 /**
  * Mutable builder for a sequence of {@link Shared.GitorialCommit} that can be
@@ -17,8 +23,8 @@ import { Result, err, ok } from 'neverthrow';
  * @typeParam TCode - Union of error code strings produced by the supplied rules.
  */
 export class DraftCommitList<TCode extends string = string> {
-  private working: ReadonlyArray<Shared.GitorialCommit>;
-  private readonly rules: ReadonlyArray<Shared.CommitListRule<TCode>>;
+  private working: ReadonlyArray<TCommit>;
+  private readonly rules: ReadonlyArray<TCommitListRule<TCode>>;
 
   /**
    * Begin a draft from an existing validated {@link CommitList}.
@@ -29,9 +35,10 @@ export class DraftCommitList<TCode extends string = string> {
    */
   static beginFrom<T extends string>(
     list: CommitList<T>,
-    rules: ReadonlyArray<Shared.CommitListRule<T>>,
+    rules: ReadonlyArray<TCommitListRule<T>>,
   ) {
-    return new DraftCommitList<T>(list.toArray(), rules);
+    const commits = list.toArray().map(c => c.data);
+    return new DraftCommitList<T>(commits, rules);
   }
 
   /**
@@ -40,13 +47,13 @@ export class DraftCommitList<TCode extends string = string> {
    * @param rules - Rules to validate with during {@link finalize}
    * @returns A new empty {@link DraftCommitList}
    */
-  static beginEmpty<T extends string>(rules: ReadonlyArray<Shared.CommitListRule<T>>) {
+  static beginEmpty<T extends string>(rules: ReadonlyArray<TCommitListRule<T>>) {
     return new DraftCommitList<T>([], rules);
   }
 
   private constructor(
-    working: ReadonlyArray<Shared.GitorialCommit>,
-    rules: ReadonlyArray<Shared.CommitListRule<TCode>>,
+    working: ReadonlyArray<TCommit>,
+    rules: ReadonlyArray<TCommitListRule<TCode>>,
   ) {
     this.working = working;
     this.rules = rules;
@@ -61,9 +68,19 @@ export class DraftCommitList<TCode extends string = string> {
    * @returns Result.Ok with {@link CommitList} on success; Result.Err with the first
    *          {@link Shared.ValidationError} on failure.
    */
-  finalize(rules?: ReadonlyArray<Shared.CommitListRule<TCode>>): Result<CommitList<TCode>, Shared.ValidationError<TCode>> {
+  finalize(rules?: ReadonlyArray<TCommitListRule<TCode>>): Result<CommitList<TCode>, TListValidationError<TCode> | TCommitError<TCode>> {
     const active = rules ?? this.rules;
-    return CommitList.new<TCode>(this.working, active);
+    let checkedCommits: Array<Commit> = [];
+    for (const [index, c] of this.working.entries()) {
+      const checked = Commit.newWithType(c.type, c.title, c.changedFiles, c.toDoComments);
+      if (checked.isErr()) {
+        const { code, message } = checked.error;
+        return err({ index, code: code as TCode, message });
+      }
+      checkedCommits.push(checked.value);
+    }
+
+    return CommitList.new<TCode>(checkedCommits, active);
   }
 
   /**
@@ -76,7 +93,7 @@ export class DraftCommitList<TCode extends string = string> {
    * @param commit - Commit to append
    * @returns `this` for fluent chaining
    */
-  appendCommit(commit: Shared.GitorialCommit) {
+  appendCommit(commit: TCommit) {
     if (this.working[this.working.length - 1].type === 'readme') {
       this.working = [
         ...this.working.slice(0, this.working.length - 1),
@@ -96,7 +113,7 @@ export class DraftCommitList<TCode extends string = string> {
    * @param commit - Commit to insert
    * @returns Result.Ok on success; Result.Err with code "IndexOutOfBounds" if index is invalid
    */
-  insertAt(index: number, commit: Shared.GitorialCommit): Result<void, Shared.ValidationError<TCode>> {
+  insertAt(index: number, commit: TCommit): Result<void, TListValidationError<TCode>> {
     if (index < 0 || index > this.working.length) {
       return err({ index, code: 'IndexOutOfBounds' as TCode, message: 'Insert index out of bounds' });
     }
@@ -110,7 +127,7 @@ export class DraftCommitList<TCode extends string = string> {
    * @param index - Zero-based position to remove (0 ≤ index < length)
    * @returns Result.Ok on success; Result.Err with code "IndexOutOfBounds" if index is invalid
    */
-  removeAt(index: number): Result<void, Shared.ValidationError<TCode>> {
+  removeAt(index: number): Result<void, TListValidationError<TCode>> {
     if (index < 0 || index >= this.working.length) {
       return err({ index, code: 'IndexOutOfBounds' as TCode, message: 'Remove index out of bounds' });
     }

@@ -1,14 +1,15 @@
 import { ToDoComment } from './ToDoComment';
 
-export const GitorialCommitTypes = ['section','template','solution','action','readme'] as const;
-export type GitorialCommitType = typeof GitorialCommitTypes[number];
+//StepType.ts defines the same types besides the readme type TODO: duplicate code -> fix
+export const Types = ['section','template','solution','action','readme'] as const;
+export type Type = typeof Types[number];
 
-export const isGitorialCommitType = (value: string): value is GitorialCommitType =>
-  (GitorialCommitTypes as readonly string[]).includes(value);
+export const isType = (value: string): value is Type =>
+  (Types as readonly string[]).includes(value);
 
 
-export type GitorialCommit<TMeta = {}> = {
-    type: GitorialCommitType;
+export type Base<TMeta = {}> = {
+    type: Type;
     title: string;
     changedFiles: Array<string>;
     toDoComments: Array<ToDoComment>;

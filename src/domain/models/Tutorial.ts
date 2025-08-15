@@ -9,12 +9,12 @@
 // Business logic related to a tutorial (e.g., progression) should be in domain services.
 
 import { Step } from './Step';
-import { TutorialId } from '@gitorial/shared-types';
+import { Domain } from '@gitorial/shared-types';
 import { EnrichedStep } from './EnrichedStep';
 import { Markdown } from './Markdown';
 
 export interface TutorialData {
-  id: TutorialId;
+  id: Domain.TutorialId;
   title: string;
   steps: Step[];
   activeStepIndex: number;
@@ -28,7 +28,8 @@ export interface TutorialData {
  * Domain model for a Tutorial
  */
 export class Tutorial {
-  public readonly id: TutorialId;
+  public readonly id: Domain.TutorialId;
+  // keeping property type for now using Domain.TutorialId
   public readonly title: string;
   public readonly steps: Array<Step | EnrichedStep>;
   private _activeStepIndex: number;

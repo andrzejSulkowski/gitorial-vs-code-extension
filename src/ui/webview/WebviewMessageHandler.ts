@@ -3,22 +3,18 @@
 - Maps UI actions to domain services
 */
 
-import {
-  WebviewToExtensionMessage,
-  WebviewToExtensionSystemMessage,
-  WebviewToExtensionTutorialMessage,
-} from '@gitorial/shared-types';
+import { UI } from '@gitorial/shared-types';
 
 /**
  * UI-level interface for handling webview commands.
  * This belongs in UI layer, not domain layer.
  */
 export interface IWebviewTutorialMessageHandler {
-  handleWebviewMessage(message: WebviewToExtensionTutorialMessage): void;
+  handleWebviewMessage(message: UI.Messages.WebviewToExtensionTutorialMessage): void;
 }
 
 export interface IWebviewSystemMessageHandler {
-  handleWebviewMessage(message: WebviewToExtensionSystemMessage): void;
+  handleWebviewMessage(message: UI.Messages.WebviewToExtensionSystemMessage): void;
 }
 
 /**
@@ -34,7 +30,7 @@ export class WebviewMessageHandler {
    * Handles messages received from the webview panel.
    * @param message The message object received from the webview.
    */
-  public handleMessage(message: WebviewToExtensionMessage): void {
+  public handleMessage(message: UI.Messages.WebviewToExtensionMessage): void {
     switch (message.category) {
     case 'tutorial': {
       this.tutorialMessageHandler.handleWebviewMessage(message);

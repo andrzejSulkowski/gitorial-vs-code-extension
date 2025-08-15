@@ -1,11 +1,12 @@
 import { SectionContentRule } from './SectionContentRule';
 import { NoopRule } from './NoopRule';
 import { Errors } from './errors';
-import { GitorialCommitType } from '../../commit';
-import { CommitRule } from '../types';
+import { Type } from '../../commit';
+import { Rule } from '../types';
+import { Validator } from './Validator';
 
 
-export const RulesByType: Record<GitorialCommitType, CommitRule<keyof typeof Errors>> = {
+const RulesByType: Record<Type, Rule<keyof typeof Errors>> = {
   section: SectionContentRule,
   template: NoopRule,
   solution: NoopRule,
@@ -13,6 +14,9 @@ export const RulesByType: Record<GitorialCommitType, CommitRule<keyof typeof Err
   readme: NoopRule,
 };
 
-export * from './Validator';
-export * from './errors';
 
+export const V1 = {
+  RulesByType,
+  Errors,
+  Validator,
+};

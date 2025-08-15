@@ -1,6 +1,6 @@
 import type { StepType } from '../../domain/StepType';
 
-export interface TutorialStepViewModel {
+export interface TutorialStep {
   id: string;
   title: string;
   commitHash: string;

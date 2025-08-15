@@ -68,13 +68,11 @@ export default [
           patterns: [
             {
               group: [
-                '@gitorial/shared-types/*',
-                '@gitorial/test-utils/*',
                 '@gitorial/*/src/**',
                 '@gitorial/*/dist/**',
               ],
               message:
-                'Do not deep import from monorepo packages. Use the package public API (e.g. "@gitorial/shared-types" or "@gitorial/test-utils").',
+                'Do not deep import from monorepo packages (src/dist). Use the package public subpaths (e.g. "@gitorial/shared-types/commit").',
             },
             {
               group: ['**/packages/**'],

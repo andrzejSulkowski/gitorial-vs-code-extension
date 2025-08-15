@@ -5,9 +5,22 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "files": [
-    "dist/**/*",
-    "src/**/*"
+    "dist/**/*"
   ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./ui/messages": {
+      "types": "./dist/ui/messages/index.d.ts",
+      "default": "./dist/ui/messages/index.js"
+    },
+    "./ui/viewmodels": {
+      "types": "./dist/ui/viewmodels/index.d.ts",
+      "default": "./dist/ui/viewmodels/index.js"
+    }
+  },
   "scripts": {
     "build": "tsc",
     "build:watch": "tsc --watch",

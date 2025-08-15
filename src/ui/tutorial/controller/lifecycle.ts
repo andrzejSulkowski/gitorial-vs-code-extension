@@ -5,7 +5,7 @@ import { IUserInteraction } from '@domain/ports/IUserInteraction';
 import { TutorialService } from '@domain/services/tutorial-service';
 import * as vscode from 'vscode';
 import { AutoOpenState } from '@infra/state/AutoOpenState';
-import { asTutorialId } from '@gitorial/shared-types';
+import { Domain } from '@gitorial/shared-types';
 import { IGitChanges } from '@ui/ports/IGitChanges';
 import { IGitChangesFactory } from '@ui/ports/IGitChangesFactory';
 
@@ -308,7 +308,7 @@ export class Controller {
 
   private async _saveAutoOpenState(tutorialId: string, commitHash?: string): Promise<void> {
     await this.autoOpenState.set({
-      tutorialId: asTutorialId(tutorialId),
+      tutorialId: Domain.asTutorialId(tutorialId),
       timestamp: Date.now(),
       commitHash,
     });

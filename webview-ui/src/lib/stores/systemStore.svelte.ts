@@ -1,4 +1,4 @@
-import type { ExtensionToWebviewSystemMessage } from '@gitorial/shared-types';
+import type { ExtensionToWebviewSystemMessageAll } from '@gitorial/shared-types';
 import { sendMessage } from '../utils/messaging';
 
 interface SystemState {
@@ -15,6 +15,9 @@ const initialState: SystemState = {
 
 let systemState = $state<SystemState>(initialState);
 
+// Pending confirm promises keyed by id
+const pendingConfirms = new Map<string, (confirmed: boolean) => void>();
+
 export const systemStore = {
   get isLoading() {
     return systemState.isLoading;
@@ -30,7 +33,7 @@ export const systemStore = {
     systemState.isAuthorMode = isActive;
   },
 
-  handleMessage(message: ExtensionToWebviewSystemMessage) {
+  handleMessage(message: ExtensionToWebviewSystemMessageAll) {
     console.log('SystemStore: Received message:', message);
     switch (message.type) {
     case 'loading-state':
@@ -43,6 +46,15 @@ export const systemStore = {
 
     case 'author-mode-changed':
       systemState.isAuthorMode = message.payload.isActive;
+      break;
+    case 'confirmResult':
+      const id = (message as any).payload.id as string;
+      const confirmed = (message as any).payload.confirmed as boolean;
+      const resolver = pendingConfirms.get(id);
+      if (resolver) {
+        resolver(confirmed);
+        pendingConfirms.delete(id);
+      }
       break;
     }
   },
@@ -60,3 +72,8 @@ export const systemStore = {
     systemState.lastError = null;
   },
 } as const;
+
+// Expose a helper used by utils/messaging to wait for confirm result
+export function resolveConfirmPromise(id: string, resolver: (confirmed: boolean) => void) {
+  pendingConfirms.set(id, resolver);
+}

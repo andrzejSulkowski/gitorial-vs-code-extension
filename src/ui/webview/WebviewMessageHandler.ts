@@ -5,7 +5,7 @@
 
 import {
   WebviewToExtensionMessage,
-  WebviewToExtensionSystemMessage,
+  WebviewToExtensionSystemMessageAll,
   WebviewToExtensionTutorialMessage,
   WebviewToExtensionAuthorMessage,
 } from '@gitorial/shared-types';
@@ -19,7 +19,7 @@ export interface IWebviewTutorialMessageHandler {
 }
 
 export interface IWebviewSystemMessageHandler {
-  handleWebviewMessage(message: WebviewToExtensionSystemMessage): void;
+  handleWebviewMessage(message: WebviewToExtensionSystemMessageAll): void;
 }
 
 export interface IWebviewAuthorMessageHandler {

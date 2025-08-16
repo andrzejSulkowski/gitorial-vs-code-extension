@@ -1,10 +1,15 @@
-import type { 
-  AuthorManifestData, 
+import type {
+  AuthorManifestData,
   ManifestStep,
-  ExtensionToWebviewAuthorMessage,
-  WebviewToExtensionAuthorMessage 
 } from '@gitorial/shared-types';
 import { sendMessage } from '../utils/messaging';
+
+interface StepEditingState {
+  isEditing: boolean;
+  editingStepIndex: number | null;
+  originalStep: ManifestStep | null;
+  hasUnsavedChanges: boolean;
+}
 
 type AuthorModeState = {
   manifest: AuthorManifestData | null;
@@ -15,6 +20,7 @@ type AuthorModeState = {
   isDirty: boolean;
   publishStatus: 'idle' | 'publishing' | 'success' | 'error';
   publishError: string | null;
+  editingState: StepEditingState;
 };
 
 function createAuthorStore() {
@@ -27,6 +33,12 @@ function createAuthorStore() {
     isDirty: false,
     publishStatus: 'idle',
     publishError: null,
+    editingState: {
+      isEditing: false,
+      editingStepIndex: null,
+      originalStep: null,
+      hasUnsavedChanges: false,
+    },
   });
 
   // Derived state
@@ -53,8 +65,17 @@ function createAuthorStore() {
     state.selectedStepIndex < stepCount - 1
   );
 
+  // Step editing derived state
+  let isEditingAnyStep = $derived(state.editingState.isEditing);
+  
+  let currentEditingStep = $derived(
+    state.manifest && state.editingState.editingStepIndex !== null
+      ? state.manifest.steps[state.editingState.editingStepIndex]
+      : null
+  );
+
   // Actions
-  function handleMessage(message: ExtensionToWebviewAuthorMessage) {
+  function handleMessage(message: any /* ExtensionToWebviewAuthorMessage */) {
     switch (message.type) {
       case 'manifestLoaded':
         state.manifest = message.payload.manifest;
@@ -77,6 +98,60 @@ function createAuthorStore() {
 
       case 'commitInfo':
         // Handle commit validation result if needed
+        break;
+
+      case 'editingStarted':
+        // Editing has started successfully on the extension side
+        if (state.editingState.editingStepIndex === message.payload.stepIndex) {
+          // Update editing state to reflect successful start
+          state.editingState.hasUnsavedChanges = false;
+        }
+        // Mark editing mode active
+        state.editingState.isEditing = true;
+        break;
+
+      case 'editingFileSaved':
+        // A file was saved in the workspace while editing the step - enable save action
+        if (state.editingState.editingStepIndex === message.payload.stepIndex) {
+          state.editingState.hasUnsavedChanges = true;
+        }
+        break;
+
+      case 'editingSaved':
+        // Editing has been saved and manifest updated
+        state.manifest = message.payload.updatedManifest;
+        state.isDirty = true; // Mark as dirty since manifest changed
+        
+        // Clear editing state
+        state.editingState = {
+          isEditing: false,
+          editingStepIndex: null,
+          originalStep: null,
+          hasUnsavedChanges: false,
+        };
+        break;
+
+      case 'editingCancelled':
+        // Editing was cancelled on the extension side
+        state.editingState = {
+          isEditing: false,
+          editingStepIndex: null,
+          originalStep: null,
+          hasUnsavedChanges: false,
+        };
+        break;
+
+      case 'editingError':
+        // Error occurred during editing
+        console.error('Step editing error:', message.payload.error);
+        
+        // Clear editing state on error
+        state.editingState = {
+          isEditing: false,
+          editingStepIndex: null,
+          originalStep: null,
+          hasUnsavedChanges: false,
+        };
         break;
     }
   }
@@ -259,6 +334,66 @@ function createAuthorStore() {
     });
   }
 
+  // Step editing actions
+  function startEditingStep(stepIndex: number) {
+    if (!state.manifest || stepIndex < 0 || stepIndex >= state.manifest.steps.length) return;
+    if (state.editingState.isEditing) return; // Prevent concurrent editing
+    
+    const step = state.manifest.steps[stepIndex];
+    state.editingState = {
+      isEditing: true,
+      editingStepIndex: stepIndex,
+      originalStep: JSON.parse(JSON.stringify(step)), // Deep copy
+      hasUnsavedChanges: false,
+    };
+
+    // Send message to extension to start editing
+    sendMessage({
+      category: 'author',
+      type: 'startEditingStep',
+      payload: { stepIndex },
+    });
+  }
+
+  function cancelEditing() {
+    if (!state.editingState.isEditing) return;
+
+    const stepIndex = state.editingState.editingStepIndex;
+    
+    // Reset editing state
+    state.editingState = {
+      isEditing: false,
+      editingStepIndex: null,
+      originalStep: null,
+      hasUnsavedChanges: false,
+    };
+
+    // Send message to extension to cancel editing
+    if (stepIndex !== null) {
+      sendMessage({
+        category: 'author',
+        type: 'cancelStepEditing',
+        payload: { stepIndex },
+      });
+    }
+  }
+
+  function saveStepChanges() {
+    if (!state.editingState.isEditing || state.editingState.editingStepIndex === null) return;
+
+    const stepIndex = state.editingState.editingStepIndex;
+    
+    // Send message to extension to save changes
+    sendMessage({
+      category: 'author',
+      type: 'saveStepChanges',
+      payload: { stepIndex },
+    });
+
+    // Keep editing state until we get confirmation from extension
+    // The extension will send back a message to update the manifest
+  }
+
   return {
     // State
     get manifest() { return state.manifest; },
@@ -269,6 +404,7 @@ function createAuthorStore() {
     get isDirty() { return state.isDirty; },
     get publishStatus() { return state.publishStatus; },
     get publishError() { return state.publishError; },
+    get editingState() { return state.editingState; },
     
     // Derived state
     get currentStep() { return currentStep; },
@@ -277,6 +413,8 @@ function createAuthorStore() {
     get canRemoveStep() { return canRemoveStep; },
     get canMoveStepUp() { return canMoveStepUp; },
     get canMoveStepDown() { return canMoveStepDown; },
+    get isEditingAnyStep() { return isEditingAnyStep; },
+    get currentEditingStep() { return currentEditingStep; },
     
     // Actions
     handleMessage,
@@ -293,6 +431,9 @@ function createAuthorStore() {
     previewTutorial,
     validateCommit,
     exitAuthorMode,
+    startEditingStep,
+    cancelEditing,
+    saveStepChanges,
   };
 }
 

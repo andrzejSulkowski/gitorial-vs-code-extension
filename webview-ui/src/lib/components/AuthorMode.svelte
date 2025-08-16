@@ -1,15 +1,18 @@
 <script lang="ts">
   import StepList from './author/StepList.svelte';
   import StepEditor from './author/StepEditor.svelte';
+  import StepEditingPanel from './author/StepEditingPanel.svelte';
   import TutorialPreview from './author/TutorialPreview.svelte';
   import PublishPanel from './author/PublishPanel.svelte';
   import { authorStore } from '../stores/authorStore.svelte';
+  import { requestConfirm } from '../utils/messaging';
 
   let manifest = $derived(authorStore.manifest);
   let isLoading = $derived(authorStore.isLoading);
   let selectedStepIndex = $derived(authorStore.selectedStepIndex);
   let isDirty = $derived(authorStore.isDirty);
   let publishStatus = $derived(authorStore.publishStatus);
+  let editingState = $derived(authorStore.editingState);
 
   let showStepEditor = $state(false);
   let showPreview = $state(false);
@@ -21,6 +24,45 @@
   function handleEditStep(index: number) {
     authorStore.selectStep(index);
     showStepEditor = true;
+  }
+
+  async function handleEditStepCode(index: number) {
+    if (!manifest) return;
+    
+    // Validation: Warn if editing early steps with many subsequent steps
+    const subsequentStepsCount = manifest.steps.length - index - 1;
+    const isEarlyStep = index < manifest.steps.length / 2;
+    
+    if (isEarlyStep && subsequentStepsCount > 3) {
+        const confirmed = await requestConfirm(
+          `⚠️ Editing Warning\n\n` +
+          `You're about to edit step ${index + 1} of ${manifest.steps.length}, ` +
+          `which has ${subsequentStepsCount} subsequent steps.\n\n` +
+          `Changing this step will require rebuilding all ${subsequentStepsCount} steps that come after it. ` +
+          `This process may take some time.\n\n` +
+          `Do you want to continue?`
+        );
+
+        if (!confirmed) {
+          return;
+        }
+    }
+    
+    // Validation: Confirm if there are unsaved changes
+    if (isDirty) {
+        const confirmed = await requestConfirm(
+          `💾 Unsaved Changes\n\n` +
+          `You have unsaved changes in your manifest. ` +
+          `It's recommended to save your changes before editing step code.\n\n` +
+          `Do you want to continue without saving?`
+        );
+
+        if (!confirmed) {
+          return;
+        }
+    }
+    
+    authorStore.startEditingStep(index);
   }
 
   function handleCloseEditor() {
@@ -41,6 +83,14 @@
   function handleExit() {
     authorStore.exitAuthorMode();
   }
+
+  function handleSaveStepChanges() {
+    authorStore.saveStepChanges();
+  }
+
+  function handleCancelStepEditing() {
+    authorStore.cancelEditing();
+  }
 </script>
 
 {#if isLoading}
@@ -53,21 +103,34 @@
     <!-- Header -->
     <header class="author-header">
       <div class="header-title">
-        <h1>Author Mode</h1>
+        <h1>
+          Author Mode
+          {#if editingState?.isEditing}
+            <span class="editing-badge">
+              <span class="editing-pulse"></span>
+              EDITING
+            </span>
+          {/if}
+        </h1>
         <div class="branch-info">
           <span class="authoring-branch">{manifest.authoringBranch}</span>
           <span class="arrow">→</span>
           <span class="publish-branch">{manifest.publishBranch}</span>
+          {#if editingState?.isEditing && editingState.editingStepIndex !== null}
+            <span class="editing-step-info">
+              (Editing Step {editingState.editingStepIndex + 1})
+            </span>
+          {/if}
         </div>
       </div>
       
       <div class="header-actions">
         <button 
           class="save-button" 
-          class:disabled={!isDirty}
+          class:disabled={!isDirty || editingState?.isEditing}
           onclick={handleSave}
-          disabled={!isDirty}
-          title={!isDirty ? 'No changes to save' : 'Save pending changes'}
+          disabled={!isDirty || editingState?.isEditing}
+          title={editingState?.isEditing ? 'Cannot save while editing a step' : (!isDirty ? 'No changes to save' : 'Save pending changes')}
         >
           Save Changes
         </button>
@@ -75,13 +138,22 @@
         <button 
           class="preview-button" 
           class:active={showPreview}
+          class:disabled={editingState?.isEditing}
           onclick={handleTogglePreview}
+          disabled={editingState?.isEditing}
           aria-pressed={showPreview}
+          title={editingState?.isEditing ? 'Cannot preview while editing' : (showPreview ? 'Hide Preview' : 'Show Preview')}
         >
           {showPreview ? 'Hide Preview' : 'Show Preview'}
         </button>
         
-        <button class="exit-button" onclick={handleExit}>
+        <button 
+          class="exit-button" 
+          class:disabled={editingState?.isEditing}
+          onclick={handleExit}
+          disabled={editingState?.isEditing}
+          title={editingState?.isEditing ? 'Cannot exit while editing a step' : 'Exit Author Mode'}
+        >
           Exit Author Mode
         </button>
       </div>
@@ -93,7 +165,15 @@
       <div class="left-panel">
         <div class="panel-header">
           <h2>Tutorial Steps</h2>
-          <button class="add-step-button" onclick={handleAddStep}>
+          <button 
+            class="add-step-button" 
+            class:disabled={editingState?.isEditing}
+            onclick={handleAddStep}
+            disabled={editingState?.isEditing}
+            title={editingState?.isEditing 
+              ? 'Cannot add steps while editing. Save or cancel your current editing session first.' 
+              : 'Add a new tutorial step. You can define the step type, title, and associated commit.'}
+          >
             + Add Step
           </button>
         </div>
@@ -103,14 +183,23 @@
           {selectedStepIndex}
           onSelectStep={authorStore.selectStep}
           onEditStep={handleEditStep}
+          onEditStepCode={handleEditStepCode}
           onRemoveStep={authorStore.removeStep}
           onReorderStep={authorStore.reorderStep}
+          isEditingStep={editingState?.editingStepIndex ?? null}
         />
       </div>
 
-      <!-- Right Panel: Preview or Publish -->
+      <!-- Right Panel: Editing, Preview, or Publish -->
       <div class="right-panel">
-        {#if showPreview}
+        {#if editingState?.isEditing}
+          <StepEditingPanel
+            currentEditingStep={authorStore.currentEditingStep}
+            editingStepIndex={editingState.editingStepIndex}
+            onSaveChanges={handleSaveStepChanges}
+            onCancelEditing={handleCancelStepEditing}
+          />
+        {:else if showPreview}
           <TutorialPreview {manifest} />
         {:else}
           <PublishPanel 
@@ -196,6 +285,41 @@
     margin: 0 0 0.25rem 0;
     font-size: 1.25rem;
     color: var(--vscode-foreground);
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .editing-badge {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    background: var(--vscode-button-background);
+    color: var(--vscode-button-foreground);
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.375rem;
+    font-size: 0.625rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+  }
+
+  .editing-pulse {
+    width: 6px;
+    height: 6px;
+    background: currentColor;
+    border-radius: 50%;
+    animation: editing-pulse 1.5s infinite;
+  }
+
+  @keyframes editing-pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.3; transform: scale(1.3); }
+  }
+
+  .editing-step-info {
+    color: var(--vscode-button-background);
+    font-weight: 500;
+    font-style: italic;
   }
 
   .branch-info {
@@ -250,7 +374,13 @@
   }
 
   .save-button.disabled,
-  .save-button:disabled {
+  .save-button:disabled,
+  .preview-button.disabled,
+  .preview-button:disabled,
+  .exit-button.disabled,
+  .exit-button:disabled,
+  .add-step-button.disabled,
+  .add-step-button:disabled {
     opacity: 0.5;
     cursor: not-allowed;
     filter: grayscale(0.4);

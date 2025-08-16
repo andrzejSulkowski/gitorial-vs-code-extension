@@ -1,10 +1,10 @@
 import * as vscode from 'vscode';
 import { WebviewPanelManager } from '../webview/WebviewPanelManager';
-import { ExtensionToWebviewSystemMessage, WebviewToExtensionSystemMessage } from '@gitorial/shared-types';
-import { AuthorManifestData } from '@gitorial/shared-types';
+import { ExtensionToWebviewSystemMessageAll, WebviewToExtensionSystemMessageAll } from '@gitorial/shared-types';
+import { AuthorManifestData, ManifestStep } from '@gitorial/shared-types';
 
 export interface IWebviewSystemMessageHandler {
-  handleWebviewMessage(message: WebviewToExtensionSystemMessage): Promise<void>;
+  handleWebviewMessage(message: WebviewToExtensionSystemMessageAll): Promise<void>;
 }
 
 /**
@@ -37,11 +37,31 @@ export class SystemController implements IWebviewSystemMessageHandler {
    * Handles incoming messages from the webview.
    * @param message - The message received from the webview
    */
-  public async handleWebviewMessage(message: WebviewToExtensionSystemMessage): Promise<void> {
+  public async handleWebviewMessage(message: WebviewToExtensionSystemMessageAll): Promise<void> {
     try {
-      switch (message.type) {
+  switch (message.type) {
       case 'error':
         await this.handleError(message.payload);
+        break;
+      case 'requestConfirm':
+        // Show a native confirm dialog and return result
+        try {
+          const result = await vscode.window.showWarningMessage(
+            message.payload.message,
+            { modal: true },
+            'Yes',
+            'No',
+          );
+
+          const confirmed = result === 'Yes';
+          await this.sendSystemMessage({
+            category: 'system',
+            type: 'confirmResult',
+            payload: { id: message.payload.id, confirmed },
+          } as any);
+        } catch (e) {
+          console.warn('SystemController: Failed to show confirm dialog', e);
+        }
         break;
       default:
         console.warn(`Unknown message type: ${(message as any).type}`);
@@ -55,7 +75,7 @@ export class SystemController implements IWebviewSystemMessageHandler {
    * Sends a system message to the webview.
    * @param message - The message to send to the webview
    */
-  public async sendSystemMessage(message: ExtensionToWebviewSystemMessage): Promise<void> {
+  public async sendSystemMessage(message: ExtensionToWebviewSystemMessageAll): Promise<void> {
     try {
       await this.webviewPanelManager.sendMessage(message);
     } catch (error) {
@@ -243,6 +263,121 @@ export class SystemController implements IWebviewSystemMessageHandler {
       await this.reportError(
         error instanceof Error ? error : new Error(String(error)),
         'Sending validation warnings to webview',
+        true,
+      );
+    }
+  }
+
+  /**
+   * Sends step editing started notification to the webview.
+   * @param stepIndex - The index of the step being edited
+   * @param step - The step data
+   */
+  public async sendEditingStarted(stepIndex: number, step: ManifestStep): Promise<void> {
+    try {
+      await this.webviewPanelManager.sendMessage({
+        category: 'author',
+        type: 'editingStarted',
+        payload: {
+          stepIndex,
+          step,
+        },
+      });
+    } catch (error) {
+      await this.reportError(
+        error instanceof Error ? error : new Error(String(error)),
+        'Sending editing started notification to webview',
+        true,
+      );
+    }
+  }
+
+  /**
+   * Notify the webview that a file was saved while editing a step.
+   * @param stepIndex - The index of the step being edited
+   */
+  public async sendEditingFileSaved(stepIndex: number): Promise<void> {
+    try {
+      // Cast to any because webview message union in some places is narrower; this is a safe runtime message
+      await this.webviewPanelManager.sendMessage({
+        category: 'author',
+        type: 'editingFileSaved',
+        payload: { stepIndex },
+      } as any);
+    } catch (error) {
+      await this.reportError(
+        error instanceof Error ? error : new Error(String(error)),
+        'Sending editing file-saved notification to webview',
+        true,
+      );
+    }
+  }
+
+  /**
+   * Sends step editing saved notification to the webview.
+   * @param stepIndex - The index of the step that was saved
+   * @param updatedManifest - The updated manifest with new step data
+   */
+  public async sendEditingSaved(stepIndex: number, updatedManifest: AuthorManifestData): Promise<void> {
+    try {
+      await this.webviewPanelManager.sendMessage({
+        category: 'author',
+        type: 'editingSaved',
+        payload: {
+          stepIndex,
+          updatedManifest,
+        },
+      });
+    } catch (error) {
+      await this.reportError(
+        error instanceof Error ? error : new Error(String(error)),
+        'Sending editing saved notification to webview',
+        true,
+      );
+    }
+  }
+
+  /**
+   * Sends step editing cancelled notification to the webview.
+   * @param stepIndex - The index of the step that was cancelled
+   */
+  public async sendEditingCancelled(stepIndex: number): Promise<void> {
+    try {
+      await this.webviewPanelManager.sendMessage({
+        category: 'author',
+        type: 'editingCancelled',
+        payload: {
+          stepIndex,
+        },
+      });
+    } catch (error) {
+      await this.reportError(
+        error instanceof Error ? error : new Error(String(error)),
+        'Sending editing cancelled notification to webview',
+        true,
+      );
+    }
+  }
+
+  /**
+   * Sends step editing error notification to the webview.
+   * @param stepIndex - The index of the step where the error occurred
+   * @param error - The error message
+   */
+  public async sendEditingError(stepIndex: number, error: string): Promise<void> {
+    try {
+      await this.webviewPanelManager.sendMessage({
+        category: 'author',
+        type: 'editingError',
+        payload: {
+          stepIndex,
+          error,
+        },
+      });
+    } catch (error) {
+      await this.reportError(
+        error instanceof Error ? error : new Error(String(error)),
+        'Sending editing error notification to webview',
         true,
       );
     }

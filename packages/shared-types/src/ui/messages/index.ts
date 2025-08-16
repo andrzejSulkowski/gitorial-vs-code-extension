@@ -8,7 +8,9 @@ import type {
 } from './TutorialMessages';
 import type {
   ExtensionToWebviewSystemMessage,
+  ExtensionToWebviewSystemMessageAll,
   WebviewToExtensionSystemMessage,
+  WebviewToExtensionSystemMessageAll,
 } from './SystemMessages';
 import type {
   ExtensionToWebviewAuthorMessage,
@@ -22,7 +24,7 @@ import type {
  */
 export type ExtensionToWebviewMessage =
   | ExtensionToWebviewTutorialMessage
-  | ExtensionToWebviewSystemMessage
+  | ExtensionToWebviewSystemMessageAll
   | ExtensionToWebviewAuthorMessage;
 
 /**
@@ -32,7 +34,7 @@ export type ExtensionToWebviewMessage =
  */
 export type WebviewToExtensionMessage =
   | WebviewToExtensionTutorialMessage
-  | WebviewToExtensionSystemMessage
+  | WebviewToExtensionSystemMessageAll
   | WebviewToExtensionAuthorMessage;
 
 /**
@@ -46,7 +48,7 @@ export function isTutorialMessage(
 
 export function isSystemMessage(
   message: WebviewToExtensionMessage,
-): message is WebviewToExtensionSystemMessage {
+): message is WebviewToExtensionSystemMessageAll {
   return message.category === 'system';
 }
 
@@ -67,7 +69,7 @@ export function isOutgoingTutorialMessage(
 
 export function isOutgoingSystemMessage(
   message: ExtensionToWebviewMessage,
-): message is ExtensionToWebviewSystemMessage {
+): message is ExtensionToWebviewSystemMessageAll {
   return message.category === 'system';
 }
 

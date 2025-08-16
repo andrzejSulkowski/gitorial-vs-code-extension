@@ -492,14 +492,14 @@ export class GitAdapter implements IGitOperations, IGitChanges {
       // Apply each step by extracting the complete file tree from each commit
       for (let i = 0; i < steps.length; i++) {
         const step = steps[i];
-        console.log(`GitAdapter: Processing step ${i + 1}/${steps.length}: ${step.commit}`);
+        console.log(`🔍 GitAdapter: Processing step ${i + 1}/${steps.length}: commit="${step.commit}", message="${step.message}"`);
 
         try {
           // Get all files from this commit
           const fileList = await this.git.raw(['ls-tree', '-r', '--name-only', step.commit]);
           const filePaths = fileList.trim().split('\n').filter(path => path.length > 0);
 
-          console.log(`GitAdapter: Found ${filePaths.length} files in commit ${step.commit}`);
+          console.log(`🔍 GitAdapter: Found ${filePaths.length} files in commit ${step.commit}`);
 
           // Extract each file and write it to the working directory
           for (const filePath of filePaths) {
@@ -521,14 +521,15 @@ export class GitAdapter implements IGitOperations, IGitChanges {
 
           // Stage all changes and commit
           await this.git.add('.');
+          console.log(`🔍 GitAdapter: About to commit with message: "${step.message}"`);
           await this.git.commit(step.message);
-          console.log(`GitAdapter: Successfully created commit for step ${i + 1}: ${step.message}`);
+          console.log(`🔍 GitAdapter: Successfully created commit for step ${i + 1}: ${step.message}`);
 
         } catch (error) {
           console.error(`GitAdapter: Error processing step ${i + 1} (${step.commit}):`, error);
 
           // Create empty commit to maintain step sequence
-          await this.git.commit(['-m', step.message], { '--allow-empty': null });
+          await this.git.commit(step.message, { '--allow-empty': null });
           console.log(`GitAdapter: Created empty commit as fallback for step ${i + 1}`);
         }
       }
@@ -889,6 +890,138 @@ export class GitAdapter implements IGitOperations, IGitChanges {
   public async pullLatest(branchName?: string): Promise<void> {
     const targetBranch = branchName || await this.getCurrentBranch();
     await this.git.pull(['origin', targetBranch]);
+  }
+
+  // ============================================================================
+  // Step Editing Git Operations (Task 3.1)
+  // ============================================================================
+
+  /**
+   * Convenience method: Stage all changes in the working directory
+   * Alias for stageAllChanges()
+   */
+  public async addAll(): Promise<void> {
+    await this.stageAllChanges();
+  }
+
+  /**
+   * Convenience method: Create a new commit with staged changes
+   * Alias for createCommit()
+   * @param message The commit message
+   * @returns The hash of the new commit
+   */
+  public async commit(message: string): Promise<string> {
+    return await this.createCommit(message);
+  }
+
+  /**
+   * Convenience method: Reset working directory with options
+   * Alias for resetWorkingDirectory() with raw git options
+   * @param options Git reset options (e.g., ['--hard', 'HEAD'])
+   */
+  public async reset(options: string[]): Promise<void> {
+    await this.git.reset(options);
+  }
+
+  /**
+   * Capture current changes in the working directory
+   * @returns Object containing modified, added, and deleted files with their content
+   */
+  public async captureCurrentChanges(): Promise<{
+    modified: string[];
+    added: string[];
+    deleted: string[];
+    fileContents: Map<string, string>;
+  }> {
+    const status = await this.git.status();
+    const fileContents = new Map<string, string>();
+
+    // Get content for modified and added files
+    const changedFiles = [...status.modified, ...status.not_added];
+    for (const filePath of changedFiles) {
+      try {
+        const absolutePath = path.join(this.repoPath, filePath);
+        if (fs.existsSync(absolutePath)) {
+          const content = fs.readFileSync(absolutePath, 'utf-8');
+          fileContents.set(filePath, content);
+        }
+      } catch (error) {
+        console.warn(`GitAdapter: Could not read file content for ${filePath}:`, error);
+      }
+    }
+
+    return {
+      modified: status.modified,
+      added: status.not_added,
+      deleted: status.deleted,
+      fileContents,
+    };
+  }
+
+  /**
+   * Create a commit for step editing with all current changes
+   * @param message The commit message
+   * @returns The hash of the new commit
+   */
+  public async createStepCommit(message: string): Promise<string> {
+    // Stage all changes
+    await this.addAll();
+    
+    // Create the commit
+    return await this.commit(message);
+  }
+
+  /**
+   * Get list of files that were changed in a specific commit
+   * @param commitHash The commit hash to analyze
+   * @returns Object containing file paths and change types
+   */
+  public async getStepFilesChanged(commitHash: string): Promise<{
+    added: string[];
+    modified: string[];
+    deleted: string[];
+  }> {
+    try {
+      // Get diff with file status
+      const diffOutput = await this.git.raw([
+        'diff',
+        '--name-status',
+        `${commitHash}^`,
+        commitHash
+      ]);
+
+      const added: string[] = [];
+      const modified: string[] = [];
+      const deleted: string[] = [];
+
+      if (diffOutput) {
+        const lines = diffOutput.split('\n').filter(line => line.trim());
+        for (const line of lines) {
+          const [status, filePath] = line.split('\t');
+          if (filePath) {
+            switch (status) {
+              case 'A':
+                added.push(filePath);
+                break;
+              case 'M':
+                modified.push(filePath);
+                break;
+              case 'D':
+                deleted.push(filePath);
+                break;
+              default:
+                // Handle other statuses (R for rename, C for copy, etc.)
+                modified.push(filePath);
+            }
+          }
+        }
+      }
+
+      return { added, modified, deleted };
+    } catch (error) {
+      console.warn(`GitAdapter: Could not get file changes for commit ${commitHash}:`, error);
+      return { added: [], modified: [], deleted: [] };
+    }
   }
 }
 

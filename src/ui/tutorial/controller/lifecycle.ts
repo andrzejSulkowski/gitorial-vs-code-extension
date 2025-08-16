@@ -8,6 +8,7 @@ import { AutoOpenState } from '@infra/state/AutoOpenState';
 import { asTutorialId } from '@gitorial/shared-types';
 import { IGitChanges } from '@ui/ports/IGitChanges';
 import { IGitChangesFactory } from '@ui/ports/IGitChangesFactory';
+import { GitignoreManager } from '../../../utils/gitignore/GitignoreManager';
 
 /**
  * SIMPLIFIED TUTORIAL LIFECYCLE CONTROLLER
@@ -37,6 +38,8 @@ export type LifecylceResult =
 const DEFAULT_CLONE_REPO_URL = 'https://github.com/shawntabrizi/rust-state-machine' as const;
 
 export class Controller {
+  private readonly gitignoreManager: GitignoreManager;
+
   constructor(
     private readonly progressReporter: IProgressReporter,
     private readonly fs: IFileSystem,
@@ -44,7 +47,9 @@ export class Controller {
     private readonly autoOpenState: AutoOpenState,
     private readonly userInteraction: IUserInteraction,
     private readonly gitChangesFactory: IGitChangesFactory,
-  ) {}
+  ) {
+    this.gitignoreManager = new GitignoreManager(this.fs);
+  }
 
   // === PUBLIC API ===
 
@@ -75,6 +80,9 @@ export class Controller {
     if (!tutorial) {
       return { success: false, reason: 'error', error: 'Clone failed' };
     } // Clone failed (error already shown to user)
+
+    // Ensure appropriate .gitignore exists for the project language
+    await this._ensureProjectGitignore(tutorial.localPath);
 
     const gitChanges = this.gitChangesFactory.createFromPath(tutorial.localPath);
 
@@ -130,6 +138,9 @@ export class Controller {
         error: `failed to load tutorial from path (${path})`,
       };
     }
+
+    // Ensure appropriate .gitignore exists for the project language
+    await this._ensureProjectGitignore(tutorial.localPath);
 
     // Handle workspace switching if needed - but avoid it for subdirectories
     if (!this._isCurrentWorkspace(path) && !this._isWithinCurrentWorkspace(path)) {
@@ -188,6 +199,23 @@ export class Controller {
     const isAvailable = await this._ensureTargetDirectoryAvailable(parentDir, repoName);
 
     return isAvailable ? targetPath : null;
+  }
+
+  /**
+   * Ensures appropriate .gitignore exists for the project based on detected language
+   * @param projectPath Path to the cloned project directory
+   */
+  private async _ensureProjectGitignore(projectPath: string): Promise<void> {
+    try {
+      const wasUpdated = await this.gitignoreManager.ensureGitignore(projectPath);
+      if (wasUpdated) {
+        const language = await this.gitignoreManager.detectProjectLanguage(projectPath);
+        console.log(`LifecycleController: Created/updated .gitignore for ${language} project at ${projectPath}`);
+      }
+    } catch (error) {
+      // Don't fail the clone operation if gitignore management fails
+      console.warn('LifecycleController: Failed to manage .gitignore:', error);
+    }
   }
 
   private async _handleSuccessfulClone(

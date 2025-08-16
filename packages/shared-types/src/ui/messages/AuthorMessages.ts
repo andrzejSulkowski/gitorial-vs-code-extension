@@ -47,6 +47,44 @@ export type ExtensionToWebviewAuthorMessage =
           date: string;
         } | null;
       };
+    }
+  | {
+      category: 'author';
+      type: 'editingStarted';
+      payload: {
+        stepIndex: number;
+        step: ManifestStep;
+      };
+    }
+  | {
+      category: 'author';
+      type: 'editingFileSaved';
+      payload: {
+        stepIndex: number;
+      };
+    }
+  | {
+      category: 'author';
+      type: 'editingSaved';
+      payload: {
+        stepIndex: number;
+        updatedManifest: AuthorManifestData;
+      };
+    }
+  | {
+      category: 'author';
+      type: 'editingCancelled';
+      payload: {
+        stepIndex: number;
+      };
+    }
+  | {
+      category: 'author';
+      type: 'editingError';
+      payload: {
+        stepIndex: number;
+        error: string;
+      };
     };
 
 // Webview → Extension Messages
@@ -122,4 +160,25 @@ export type WebviewToExtensionAuthorMessage =
       category: 'author';
       type: 'exitAuthorMode';
       payload: {};
+    }
+  | {
+      category: 'author';
+      type: 'startEditingStep';
+      payload: {
+        stepIndex: number;
+      };
+    }
+  | {
+      category: 'author';
+      type: 'saveStepChanges';
+      payload: {
+        stepIndex: number;
+      };
+    }
+  | {
+      category: 'author';
+      type: 'cancelStepEditing';
+      payload: {
+        stepIndex: number;
+      };
     };

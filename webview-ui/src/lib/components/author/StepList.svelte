@@ -1,20 +1,25 @@
 <script lang="ts">
   import type { ManifestStep } from '@gitorial/shared-types';
+  import { requestConfirm } from '../../utils/messaging';
 
   let { 
     steps, 
     selectedStepIndex, 
     onSelectStep, 
     onEditStep, 
+    onEditStepCode,
     onRemoveStep, 
-    onReorderStep 
+    onReorderStep,
+    isEditingStep = null
   } = $props<{
     steps: ManifestStep[];
     selectedStepIndex: number | null;
     onSelectStep: (index: number | null) => void;
     onEditStep: (index: number) => void;
+    onEditStepCode: (index: number) => void;
     onRemoveStep: (index: number) => void;
     onReorderStep: (fromIndex: number, toIndex: number) => void;
+    isEditingStep?: number | null;
   }>();
 
   let draggedIndex = $state<number | null>(null);
@@ -29,10 +34,18 @@
     onEditStep(index);
   }
 
-  function handleRemoveClick(index: number, event: Event) {
+  function handleEditCodeClick(index: number, event: Event) {
     event.stopPropagation();
-    if (steps.length > 1 && confirm('Are you sure you want to remove this step?')) {
-      onRemoveStep(index);
+    onEditStepCode(index);
+  }
+
+  async function handleRemoveClick(index: number, event: Event) {
+    event.stopPropagation();
+    if (steps.length > 1) {
+      const confirmed = await requestConfirm('Are you sure you want to remove this step?');
+      if (confirmed) {
+        onRemoveStep(index);
+      }
     }
   }
 
@@ -134,9 +147,23 @@
             <button 
               class="action-button edit"
               onclick={(e) => handleEditClick(index, e)}
-              title="Edit step"
+              title="Edit step metadata"
             >
               ✏️
+            </button>
+            
+            <button 
+              class="action-button edit-code"
+              class:loading={isEditingStep === index}
+              onclick={(e) => handleEditCodeClick(index, e)}
+              disabled={isEditingStep !== null && isEditingStep !== index}
+              title={isEditingStep === index 
+                ? "Currently editing step code..." 
+                : isEditingStep !== null 
+                  ? "Another step is being edited. Finish current editing to enable this."
+                  : `Edit the actual code/files for this step. This will check out commit ${step.commit.substring(0, 8)} and allow you to modify files in VS Code.`}
+            >
+              {isEditingStep === index ? "⏳" : "💻"}
             </button>
             
             {#if steps.length > 1}
@@ -144,6 +171,7 @@
                 class="action-button remove"
                 onclick={(e) => handleRemoveClick(index, e)}
                 title="Remove step"
+                disabled={isEditingStep !== null}
               >
                 🗑️
               </button>
@@ -281,9 +309,27 @@
     transition: all 0.2s;
   }
 
-  .action-button:hover {
+  .action-button:hover:not(:disabled) {
     opacity: 1;
     background: var(--vscode-toolbar-hoverBackground);
+  }
+
+  .action-button:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  .action-button.edit-code {
+    color: var(--vscode-button-background);
+  }
+
+  .action-button.edit-code.loading {
+    animation: pulse 1.5s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 0.7; }
+    50% { opacity: 1; }
   }
 
   .step-title {

@@ -82,12 +82,16 @@ export class TutorialBuilder {
 
   public static extractStepsFromCommits(commits: DomainCommit[], tutorialId: TutorialId): Step[] {
     const chronologicalCommits = [...commits].reverse();
+    
+    console.log(`🔍 TutorialBuilder: Processing ${chronologicalCommits.length} commits for tutorial ${tutorialId}`);
 
     return chronologicalCommits.map((commit, index) => {
       const message = commit.message.trim();
+      console.log(`🔍 TutorialBuilder: Processing commit ${index + 1}: hash="${commit.hash}", message="${message}"`);
       const colonIndex = message.indexOf(':');
 
       if (colonIndex <= 0) {
+        console.error(`🔍 TutorialBuilder: ERROR - Commit message "${message}" missing type prefix!`);
         throw new Error(`TutorialBuilder: Commit message "${message}" missing type prefix.`);
       }
 

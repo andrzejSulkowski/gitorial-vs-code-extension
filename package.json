@@ -118,7 +118,11 @@
       "properties": {
         "gitorial.cloneLocation": {
           "type": "string",
-          "enum": ["subdirectory", "separate-workspace", "ask"],
+          "enum": [
+            "subdirectory",
+            "separate-workspace",
+            "ask"
+          ],
           "default": "ask",
           "description": "Where to clone tutorials: as subdirectories in current workspace, separate workspace, or ask each time"
         },
@@ -135,6 +139,7 @@
     "markdown-it": "^14.1.0",
     "neverthrow": "^6.1.0",
     "simple-git": "^3.28.0",
+    "uuid": "9.0.0",
     "ws": "^8.18.0"
   },
   "devDependencies": {
@@ -148,6 +153,7 @@
     "@types/node": "~20.17.51",
     "@types/sinon": "^17.0.4",
     "@types/sinonjs__fake-timers": "^8.1.5",
+    "@types/uuid": "^10.0.0",
     "@types/vscode": "^1.87.0",
     "@types/ws": "^8.18.1",
     "@typescript-eslint/eslint-plugin": "^8.28.0",

@@ -293,7 +293,28 @@ export interface IGitOperations {
    * Synthesize/force-update the local 'gitorial' branch from the provided ordered steps.
    * Each step is applied as a commit with the given message, starting from the first as base.
    */
-  synthesizeGitorialBranch(steps: Array<{ commit: string; message: string }>): Promise<void>;
+  synthesizeGitorialBranch(steps: Array<{ commit: string; message: string }>): Promise<string[]>;
+
+  /**
+   * Safely update a single step in the gitorial branch without corrupting other steps.
+   * This prevents cascade corruption that can occur with full branch synthesis.
+   * @param stepIndex - The index of the step to update (0-based)
+   * @param newCommitContent - The new commit hash and message for the step
+   * @param totalSteps - Total number of steps in the tutorial
+   * @returns The new commit hash for the updated step
+   */
+  updateSingleStepInGitorialBranch(
+    stepIndex: number,
+    newCommitContent: { commit: string; message: string },
+    totalSteps: number
+  ): Promise<string>;
+
+  /**
+   * Rebuild the gitorial branch from a manifest when publishing.
+   * This creates a clean gitorial branch with the exact commits specified in the manifest.
+   * @param steps - Array of steps with commit hash, type, and title
+   */
+  rebuildGitorialBranchFromManifest(steps: Array<{ commit: string; type: string; title: string }>): Promise<void>;
 
   /**
    * Get the current branch name

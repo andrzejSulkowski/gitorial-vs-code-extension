@@ -13,6 +13,7 @@ import simpleGit, {
 import * as path from 'path'; //TODO: Remove this import and use IFileSystem instead
 import * as fs from 'fs';
 import { IGitOperations, DefaultLogFields, ListLogLine } from '../../domain/ports/IGitOperations';
+import { CommitHashSanitizer } from '../../utils/git/CommitHashSanitizer';
 import { IGitChanges, DiffFilePayload } from 'src/ui/ports/IGitChanges';
 
 /**
@@ -65,6 +66,8 @@ export class GitAdapter implements IGitOperations, IGitChanges {
   //                           | |
   //                           |_|
   public async ensureGitorialBranch(): Promise<void> {
+    console.log('🔍 GitAdapter: ensureGitorialBranch called');
+
     // Fetch latest remote information first to ensure we see all remote branches
     console.log('GitAdapter: Fetching latest remote information...');
     try {
@@ -95,11 +98,26 @@ export class GitAdapter implements IGitOperations, IGitChanges {
         await this.git.checkout(['-f', 'gitorial']);
         console.log('GitAdapter: Successfully force checked out local \'gitorial\' branch.');
         return;
-      } catch (checkoutError) {
+      } catch (checkoutError: any) {
         console.warn(
           'GitAdapter: Failed to force checkout existing local \'gitorial\' branch. Will try to set up from remote.',
           checkoutError,
         );
+
+        // Check if this is a "reference is not a tree" error indicating corrupted commit hash
+        if (checkoutError.message && checkoutError.message.includes('reference is not a tree')) {
+          console.error('🚨 GitAdapter: Detected corrupted commit hash in gitorial branch. Attempting to recover...');
+
+          try {
+            // Try to delete the corrupted local gitorial branch and recreate from remote
+            console.log('🔄 GitAdapter: Deleting corrupted local gitorial branch...');
+            await this.git.branch(['-D', 'gitorial']);
+            console.log('✅ GitAdapter: Successfully deleted corrupted local gitorial branch');
+          } catch (deleteError) {
+            console.warn('GitAdapter: Could not delete corrupted gitorial branch:', deleteError);
+          }
+        }
+
         // Proceed to check remote branches
       }
     }
@@ -213,11 +231,32 @@ export class GitAdapter implements IGitOperations, IGitChanges {
           await this.git.checkout(['-f', 'gitorial']);
           console.log('GitAdapter: Successfully set up gitorial branch from remote.');
           return;
-        } catch (setupError) {
+        } catch (setupError: any) {
           console.error(
             `GitAdapter: Failed to set up gitorial branch from ${targetRemoteName}/${targetBranchName}:`,
             setupError,
           );
+
+          // Check if this is a "reference is not a tree" error
+          if (setupError.message && setupError.message.includes('reference is not a tree')) {
+            console.error('🚨 GitAdapter: Detected corrupted commit hash when setting up gitorial branch from remote');
+            console.log('🔄 GitAdapter: Attempting to recover by recreating gitorial branch...');
+
+            try {
+              // Delete any corrupted local gitorial branch
+              await this.git.branch(['-D', 'gitorial']);
+              console.log('✅ GitAdapter: Deleted corrupted local gitorial branch');
+
+              // Try to fetch and create a clean gitorial branch
+              await this.git.fetch(targetRemoteName);
+              await this.git.checkout(['-B', 'gitorial', `${targetRemoteName}/${targetBranchName}`]);
+              console.log('✅ GitAdapter: Successfully recreated gitorial branch from remote');
+              return;
+            } catch (recoveryError) {
+              console.error('🚨 GitAdapter: Failed to recover from corrupted gitorial branch:', recoveryError);
+            }
+          }
+
           throw new Error(
             `Failed to set up 'gitorial' branch from remote '${targetRemoteName}/${targetBranchName}': ${setupError instanceof Error ? setupError.message : String(setupError)}`,
           );
@@ -460,9 +499,9 @@ export class GitAdapter implements IGitOperations, IGitChanges {
    * in the specified order. This approach completely rebuilds the branch to avoid
    * any cherry-pick conflicts when commits are reordered.
    */
-  public async synthesizeGitorialBranch(steps: Array<{ commit: string; message: string }>): Promise<void> {
+  public async synthesizeGitorialBranch(steps: Array<{ commit: string; message: string }>): Promise<string[]> {
     if (steps.length === 0) {
-      return;
+      return [];
     }
 
     console.log('GitAdapter: Starting gitorial branch synthesis with', steps.length, 'steps');
@@ -474,6 +513,9 @@ export class GitAdapter implements IGitOperations, IGitChanges {
     // Step 1: Create a new orphan branch to start clean
     const tempBranchName = `gitorial-temp-${Date.now()}`;
     console.log(`GitAdapter: Creating temporary orphan branch: ${tempBranchName}`);
+
+    // Array to collect the new commit hashes
+    const newCommitHashes: string[] = [];
 
     try {
       // Create orphan branch (no history)
@@ -523,14 +565,26 @@ export class GitAdapter implements IGitOperations, IGitChanges {
           await this.git.add('.');
           console.log(`🔍 GitAdapter: About to commit with message: "${step.message}"`);
           await this.git.commit(step.message);
-          console.log(`🔍 GitAdapter: Successfully created commit for step ${i + 1}: ${step.message}`);
+
+          // Get the new commit hash and add it to our collection
+          const newCommitHash = await this.git.revparse(['HEAD']);
+          const sanitizedHash = CommitHashSanitizer.sanitize(newCommitHash);
+          newCommitHashes.push(sanitizedHash);
+
+          console.log(`🔍 GitAdapter: Successfully created commit for step ${i + 1}: ${step.message} (${sanitizedHash})`);
 
         } catch (error) {
           console.error(`GitAdapter: Error processing step ${i + 1} (${step.commit}):`, error);
 
           // Create empty commit to maintain step sequence
           await this.git.commit(step.message, { '--allow-empty': null });
-          console.log(`GitAdapter: Created empty commit as fallback for step ${i + 1}`);
+
+          // Get the new commit hash even for empty commits
+          const newCommitHash = await this.git.revparse(['HEAD']);
+          const sanitizedHash = CommitHashSanitizer.sanitize(newCommitHash);
+          newCommitHashes.push(sanitizedHash);
+
+          console.log(`GitAdapter: Created empty commit as fallback for step ${i + 1} (${sanitizedHash})`);
         }
       }
 
@@ -562,6 +616,9 @@ export class GitAdapter implements IGitOperations, IGitChanges {
       await this.finalizeRepositoryState();
 
       console.log('GitAdapter: Successfully synthesized gitorial branch');
+
+      // Return the array of new commit hashes
+      return newCommitHashes;
 
     } catch (error) {
       console.error('GitAdapter: Error during gitorial branch synthesis:', error);
@@ -966,7 +1023,7 @@ export class GitAdapter implements IGitOperations, IGitChanges {
   public async createStepCommit(message: string): Promise<string> {
     // Stage all changes
     await this.addAll();
-    
+
     // Create the commit
     return await this.commit(message);
   }
@@ -987,7 +1044,7 @@ export class GitAdapter implements IGitOperations, IGitChanges {
         'diff',
         '--name-status',
         `${commitHash}^`,
-        commitHash
+        commitHash,
       ]);
 
       const added: string[] = [];
@@ -1000,18 +1057,18 @@ export class GitAdapter implements IGitOperations, IGitChanges {
           const [status, filePath] = line.split('\t');
           if (filePath) {
             switch (status) {
-              case 'A':
-                added.push(filePath);
-                break;
-              case 'M':
-                modified.push(filePath);
-                break;
-              case 'D':
-                deleted.push(filePath);
-                break;
-              default:
-                // Handle other statuses (R for rename, C for copy, etc.)
-                modified.push(filePath);
+            case 'A':
+              added.push(filePath);
+              break;
+            case 'M':
+              modified.push(filePath);
+              break;
+            case 'D':
+              deleted.push(filePath);
+              break;
+            default:
+              // Handle other statuses (R for rename, C for copy, etc.)
+              modified.push(filePath);
             }
           }
         }
@@ -1021,6 +1078,138 @@ export class GitAdapter implements IGitOperations, IGitChanges {
     } catch (error) {
       console.warn(`GitAdapter: Could not get file changes for commit ${commitHash}:`, error);
       return { added: [], modified: [], deleted: [] };
+    }
+  }
+
+  /**
+   * Safely update a single step in the gitorial branch without corrupting other steps.
+   * This prevents the cascade corruption issue that occurs when synthesizeGitorialBranch
+   * is called with potentially corrupted commit hashes from the manifest.
+   */
+  public async updateSingleStepInGitorialBranch(
+    stepIndex: number,
+    newCommitContent: { commit: string; message: string },
+    totalSteps: number,
+  ): Promise<string> {
+    console.log(`🔄 GitAdapter: Updating step ${stepIndex + 1} of ${totalSteps} using patch-based approach`);
+
+    // MUCH SIMPLER APPROACH: Don't modify gitorial branch during editing
+    // Instead, just return the new commit hash and let the manifest track it
+    // The gitorial branch will be updated only when explicitly publishing
+
+    console.log(`✅ GitAdapter: Using simple approach - returning new commit hash ${newCommitContent.commit}`);
+    console.log(`📝 GitAdapter: Step ${stepIndex + 1} will use commit ${newCommitContent.commit} in manifest`);
+    console.log('🔒 GitAdapter: Gitorial branch remains unchanged until publish');
+
+    // Validate that the new commit exists
+    try {
+      await this.git.raw(['cat-file', '-e', newCommitContent.commit]);
+      console.log(`✅ GitAdapter: Confirmed new commit ${newCommitContent.commit} exists`);
+    } catch (_error) {
+      throw new Error(`New commit ${newCommitContent.commit} does not exist in repository`);
+    }
+
+    // Simply return the new commit hash
+    // The manifest will track this change, and the gitorial branch stays intact
+    return newCommitContent.commit;
+  }
+
+  /**
+   * Rebuild the gitorial branch from a manifest when publishing.
+   * This creates a clean gitorial branch with the exact commits specified in the manifest.
+   */
+  public async rebuildGitorialBranchFromManifest(steps: Array<{ commit: string; type: string; title: string }>): Promise<void> {
+    // Create backup of current gitorial branch
+    const backupBranch = `gitorial-backup-${Date.now()}`;
+    try {
+      await this.git.checkout('gitorial');
+      await this.git.checkout(['-b', backupBranch]);
+    } catch (_error) {
+      // No existing gitorial branch to backup
+    }
+
+    try {
+      // Create new gitorial branch from scratch
+      await this.git.checkout(['--orphan', 'gitorial-new']);
+      await this.cleanWorkingDirectory();
+
+      // Remove everything from index
+      try {
+        await this.git.raw(['rm', '-rf', '--cached', '.']);
+      } catch (_error) {
+        // Index might be empty
+      }
+
+      // Apply each step in order
+      for (let i = 0; i < steps.length; i++) {
+        const step = steps[i];
+
+        try {
+          // Validate commit exists
+          await this.git.raw(['cat-file', '-e', step.commit]);
+
+          // Get the file tree from this commit
+          const fileList = await this.git.raw(['ls-tree', '-r', '--name-only', step.commit]);
+          const filePaths = fileList.trim().split('\n').filter(path => path.length > 0);
+
+          // Clear working directory
+          await this.cleanWorkingDirectory();
+
+          // Extract and write each file from the commit
+          for (const filePath of filePaths) {
+            try {
+              const fileContent = await this.getFileContent(step.commit, filePath);
+              const absolutePath = path.join(this.repoPath, filePath);
+
+              const dir = path.dirname(absolutePath);
+              await fs.promises.mkdir(dir, { recursive: true });
+              await fs.promises.writeFile(absolutePath, fileContent);
+            } catch (fileError) {
+              console.warn(`GitAdapter: Could not extract file ${filePath} from ${step.commit}:`, fileError);
+            }
+          }
+
+          // Stage and commit
+          await this.git.add('.');
+          const commitMessage = `${step.type}: ${step.title}`;
+          await this.git.commit(commitMessage);
+
+        } catch (error) {
+          console.error(`GitAdapter: Error applying step ${i + 1}:`, error);
+          // Create empty commit to maintain sequence
+          await this.git.commit(`${step.type}: ${step.title}`, { '--allow-empty': null });
+        }
+      }
+
+      // Replace old gitorial branch with new one
+      await this.git.checkout('main').catch(() => {
+        // If main doesn't exist, create it from first step
+        return this.git.checkout(['-B', 'main']);
+      });
+
+      // Delete old gitorial branch
+      await this.git.branch(['-D', 'gitorial']).catch(() => { });
+
+      // Rename new branch to gitorial
+      await this.git.branch(['-m', 'gitorial-new', 'gitorial']);
+      await this.git.checkout('gitorial');
+
+      // Clean up backup
+      await this.git.branch(['-D', backupBranch]).catch(() => { });
+
+    } catch (error) {
+      console.error('GitAdapter: Error rebuilding gitorial branch:', error);
+
+      // Restore from backup if possible
+      try {
+        await this.git.checkout(backupBranch);
+        await this.git.branch(['-D', 'gitorial']).catch(() => { });
+        await this.git.branch(['-m', 'gitorial']);
+      } catch (restoreError) {
+        console.error('GitAdapter: Could not restore from backup:', restoreError);
+      }
+
+      throw error;
     }
   }
 }

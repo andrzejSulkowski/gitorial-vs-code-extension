@@ -34,6 +34,17 @@ describe('CommitHashSanitizer', () => {
       assert.throws(() => CommitHashSanitizer.sanitize('invalid'));
       assert.throws(() => CommitHashSanitizer.sanitize('HEAD invalid'));
     });
+
+    it('should handle the specific HEAD.c74 pattern from the original bug', () => {
+      // This tests the specific case that was causing the original navigation issue
+      const truncatedHash = 'c74cd10a4d1aa6a0af4be62c131e5d75bb8a0f44';
+      const malformedInput = `HEAD.${truncatedHash.substring(0, 3)}`;
+
+      // This should throw an error because "HEAD.c74" is not a valid pattern
+      assert.throws(() => CommitHashSanitizer.sanitize(malformedInput),
+        /Could not extract valid commit hash/,
+      );
+    });
   });
 
   describe('isValid', () => {
@@ -56,7 +67,7 @@ describe('CommitHashSanitizer', () => {
         type: 'section',
         title: 'test',
       };
-      
+
       const sanitized = CommitHashSanitizer.sanitizeManifestStep(step);
       assert.strictEqual(sanitized.commit, validHash);
       assert.strictEqual(sanitized.type, 'section');

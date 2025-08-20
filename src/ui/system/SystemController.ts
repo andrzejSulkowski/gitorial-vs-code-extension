@@ -39,7 +39,7 @@ export class SystemController implements IWebviewSystemMessageHandler {
    */
   public async handleWebviewMessage(message: WebviewToExtensionSystemMessageAll): Promise<void> {
     try {
-  switch (message.type) {
+      switch (message.type) {
       case 'error':
         await this.handleError(message.payload);
         break;
@@ -209,10 +209,37 @@ export class SystemController implements IWebviewSystemMessageHandler {
    */
   public getAuthorManifestBackup(repoPath: string): AuthorManifestData | null {
     try {
-      return this.extensionContext.globalState.get(`authorManifestBackup_${repoPath}`, null);
+      const backup = this.extensionContext.globalState.get(`authorManifestBackup_${repoPath}`, null) as AuthorManifestData | null;
+
+      // Validate backup data for corrupted commit hashes
+      if (backup && backup.steps) {
+        for (const step of backup.steps) {
+          if (!step.commit || step.commit.length !== 40 || step.commit.includes('HEAD.') || step.commit.includes('.c74')) {
+            console.warn(`🚨 SystemController: Corrupted commit hash detected in backup: "${step.commit}" - clearing backup`);
+            this.clearAuthorManifestBackup(repoPath);
+            return null;
+          }
+        }
+      }
+
+      return backup;
     } catch (error) {
       console.error('Failed to retrieve author manifest backup:', error);
       return null;
+    }
+  }
+
+  /**
+   * Clears the backup of the author manifest for a specific repository.
+   * @param repoPath - The repository path
+   */
+  public async clearAuthorManifestBackup(repoPath: string): Promise<void> {
+    try {
+      const key = `authorManifestBackup_${repoPath}`;
+      await this.extensionContext.globalState.update(key, undefined);
+      console.log(`🧹 SystemController: Cleared corrupted backup for ${repoPath}`);
+    } catch (error) {
+      console.error('Failed to clear author manifest backup:', error);
     }
   }
 

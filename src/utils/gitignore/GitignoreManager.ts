@@ -264,31 +264,31 @@ export class GitignoreManager {
       const languageMarkers: Array<{ language: ProjectLanguage; files: string[] }> = [
         {
           language: 'rust',
-          files: ['Cargo.toml', 'Cargo.lock']
+          files: ['Cargo.toml', 'Cargo.lock'],
         },
         {
           language: 'typescript',
-          files: ['tsconfig.json', 'package.json'] // Will check for .ts files later if package.json exists
+          files: ['tsconfig.json', 'package.json'], // Will check for .ts files later if package.json exists
         },
         {
           language: 'javascript',
-          files: ['package.json', 'yarn.lock', 'package-lock.json']
+          files: ['package.json', 'yarn.lock', 'package-lock.json'],
         },
         {
           language: 'python',
-          files: ['requirements.txt', 'setup.py', 'pyproject.toml', 'Pipfile']
+          files: ['requirements.txt', 'setup.py', 'pyproject.toml', 'Pipfile'],
         },
         {
           language: 'go',
-          files: ['go.mod', 'go.sum']
+          files: ['go.mod', 'go.sum'],
         },
         {
           language: 'java',
-          files: ['pom.xml', 'build.gradle', 'gradle.properties']
+          files: ['pom.xml', 'build.gradle', 'gradle.properties'],
         },
         {
           language: 'csharp',
-          files: ['.csproj', '.sln'] // Will check for actual files with these extensions
+          files: ['.csproj', '.sln'], // Will check for actual files with these extensions
         },
       ];
 
@@ -307,7 +307,7 @@ export class GitignoreManager {
               // Fall through to JavaScript detection
               continue;
             }
-            
+
             // Special case for C#: check for actual project files
             if (marker.language === 'csharp') {
               const hasProjectFile = await this.checkForCSharpProjectFiles(projectPath);
@@ -316,7 +316,7 @@ export class GitignoreManager {
               }
               continue;
             }
-            
+
             return marker.language;
           }
         }
@@ -341,7 +341,7 @@ export class GitignoreManager {
       'Solution.sln',
       'App.sln',
     ];
-    
+
     for (const pattern of patterns) {
       const filePath = this.fs.join(projectPath, pattern);
       const exists = await this.fs.pathExists(filePath);
@@ -349,7 +349,7 @@ export class GitignoreManager {
         return true;
       }
     }
-    
+
     return false;
   }
 
@@ -361,7 +361,7 @@ export class GitignoreManager {
   public async ensureGitignore(projectPath: string): Promise<boolean> {
     try {
       const language = await this.detectProjectLanguage(projectPath);
-      
+
       if (language === 'unknown') {
         console.log('GitignoreManager: Unknown project language, skipping .gitignore creation');
         return false;
@@ -372,12 +372,12 @@ export class GitignoreManager {
 
       // Check if .gitignore already exists
       const exists = await this.fs.pathExists(gitignorePath);
-      
+
       if (exists) {
         // Check if it already contains the essential patterns for this language
         const existingContent = await this.fs.readFile(gitignorePath);
         const hasEssentialPatterns = this.hasEssentialPatterns(existingContent, language);
-        
+
         if (hasEssentialPatterns) {
           console.log(`GitignoreManager: .gitignore already contains essential ${language} patterns`);
           return false;
@@ -419,9 +419,9 @@ export class GitignoreManager {
 
     const patterns = essentialPatterns[language];
     const lowercaseContent = content.toLowerCase();
-    
-    return patterns.some(pattern => 
-      lowercaseContent.includes(pattern.toLowerCase())
+
+    return patterns.some(pattern =>
+      lowercaseContent.includes(pattern.toLowerCase()),
     );
   }
 
@@ -432,9 +432,9 @@ export class GitignoreManager {
    * @param language Detected project language
    */
   private async appendEssentialPatterns(
-    gitignorePath: string, 
-    existingContent: string, 
-    language: ProjectLanguage
+    gitignorePath: string,
+    existingContent: string,
+    language: ProjectLanguage,
   ): Promise<void> {
     const essentialPatterns: Record<ProjectLanguage, string[]> = {
       rust: [
@@ -506,7 +506,9 @@ export class GitignoreManager {
     };
 
     const patterns = essentialPatterns[language];
-    if (patterns.length === 0) return;
+    if (patterns.length === 0) {
+      return;
+    }
 
     const newContent = existingContent + '\n' + patterns.join('\n') + '\n';
     await this.fs.writeFile(gitignorePath, newContent);
@@ -518,7 +520,9 @@ export class GitignoreManager {
    * @returns Template content or null if language not supported
    */
   public getTemplate(language: ProjectLanguage): string | null {
-    if (language === 'unknown') return null;
+    if (language === 'unknown') {
+      return null;
+    }
     return GITIGNORE_TEMPLATES[language];
   }
 

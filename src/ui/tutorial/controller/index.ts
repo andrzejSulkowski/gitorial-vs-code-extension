@@ -267,7 +267,7 @@ export class TutorialController implements IWebviewTutorialMessageHandler {
   public async forceRefreshCurrentTutorial(): Promise<void> {
     console.log('TutorialController: Forcing refresh of current tutorial');
     const tutorial = this.tutorialService.tutorial;
-    if (tutorial && this.webviewController.isVisible()) {
+    if (tutorial) {
       await this.webviewController.forceRefresh(tutorial);
       console.log('TutorialController: Tutorial refresh completed');
     }

@@ -84,10 +84,10 @@ export class CommitHashSanitizer {
    */
   public static logIfMalformed(input: string, context: string = 'GitOperation'): void {
     const trimmed = input.trim();
-    
+
     // Check for common malformation patterns
-    if (trimmed.includes('HEAD ') || 
-        trimmed.includes('commit ') || 
+    if (trimmed.includes('HEAD ') ||
+        trimmed.includes('commit ') ||
         trimmed.includes('origin/') ||
         trimmed.length > 40) {
       console.warn(`${context}: Detected potentially malformed commit hash: "${input}"`);

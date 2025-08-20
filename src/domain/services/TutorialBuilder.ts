@@ -82,7 +82,7 @@ export class TutorialBuilder {
 
   public static extractStepsFromCommits(commits: DomainCommit[], tutorialId: TutorialId): Step[] {
     const chronologicalCommits = [...commits].reverse();
-    
+
     console.log(`🔍 TutorialBuilder: Processing ${chronologicalCommits.length} commits for tutorial ${tutorialId}`);
 
     return chronologicalCommits.map((commit, index) => {

@@ -117,6 +117,8 @@ export class IntegrationTestUtils {
       'gitorial.openWorkspaceTutorial',
       'gitorial.navigateToNextStep',
       'gitorial.navigateToPreviousStep',
+      'gitorial.exitAuthorMode',
+      'gitorial.publishTutorial',
       'workbench.action.closeAllEditors', // Used in cleanup
     ];
 

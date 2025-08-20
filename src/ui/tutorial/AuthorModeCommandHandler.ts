@@ -6,7 +6,7 @@ export class AuthorModeCommandHandler {
   constructor(
     private systemController: SystemController,
     private authorModeController: AuthorModeController,
-  ) {}
+  ) { }
 
   /**
    * Enters author mode for the current workspace
@@ -45,6 +45,34 @@ export class AuthorModeCommandHandler {
     } catch (error) {
       console.error('Error exiting author mode:', error);
       vscode.window.showErrorMessage(`Failed to exit Author Mode: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  /**
+   * Clears corrupted data that might be causing issues
+   */
+  public async handleClearCorruptedData(): Promise<void> {
+    try {
+      console.log('🧹 CLEAR CORRUPTED DATA: Starting cleanup...');
+
+      const workspace = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+      if (!workspace) {
+        vscode.window.showWarningMessage('No workspace folder found. Cannot clear corrupted data.');
+        return;
+      }
+
+      // Clear author manifest backup
+      await this.systemController.clearAuthorManifestBackup(workspace);
+
+      // Clear any cached manifest in author mode controller
+      await this.authorModeController.clearCachedData();
+
+      console.log('✅ CLEAR CORRUPTED DATA: Cleanup complete!');
+      vscode.window.showInformationMessage('Corrupted data cleared successfully. Try entering Author Mode again.');
+
+    } catch (error) {
+      console.error('🚨 CLEAR CORRUPTED DATA: Error during cleanup:', error);
+      vscode.window.showErrorMessage(`Failed to clear corrupted data: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -101,6 +129,13 @@ export class AuthorModeCommandHandler {
 
     context.subscriptions.push(
       vscode.commands.registerCommand('gitorial.publishTutorial', () => this.handlePublishTutorial()),
+    );
+
+    context.subscriptions.push(
+      vscode.commands.registerCommand('gitorial.clearCorruptedData', () => {
+        console.log('🧹 COMMAND TRIGGERED: clearCorruptedData');
+        return this.handleClearCorruptedData();
+      }),
     );
 
     console.log('Author Mode commands registered.');
